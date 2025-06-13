@@ -1,5 +1,6 @@
 import "../styles/HeroComponent.css";
 import backgroundVideo from "../assets/231933_small.mp4";
+import { NavLink } from "react-router-dom";
 export const HeroComponent = () => {
   return (
     <>
@@ -11,7 +12,9 @@ export const HeroComponent = () => {
             Explora las historias, sonidos y colores que hacen único al secreto
             de Argentina
           </p>
-          <a href="#">Descubre más</a>
+          <NavLink to="/descubre" className="discover-link" aria-current="page">
+            Descubre mas
+          </NavLink>
         </div>
         <video autoPlay muted loop>
           <source src={backgroundVideo} type="video/mp4" />

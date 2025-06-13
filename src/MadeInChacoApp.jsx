@@ -1,11 +1,17 @@
+import { Navigate, Route, Routes } from "react-router-dom";
 import { HeaderComponent } from "./components/HeaderComponent";
-import { HeroComponent } from "./components/HeroComponent";
+import { MapPage } from "./pages/mapPage";
+import { HomePage } from "./pages/HomePage";
 
 function MadeInChacoApp() {
   return (
     <>
       <HeaderComponent />
-      <HeroComponent />
+      <Routes>
+        <Route path="/" element={<HomePage />}></Route>
+        <Route path="/descubre" element={<MapPage />}></Route>
+        <Route path="/*" element={<Navigate to="/" />}></Route>
+      </Routes>
     </>
   );
 }

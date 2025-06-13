@@ -9,6 +9,7 @@ section {
   position: relative;
   display: flex;
   align-items: center;
+  text-shadow: 1px 1px 10px black;
 }
 
 .hero-text {
@@ -42,7 +43,7 @@ section {
   font-family: "Cinzel", serif;
 }
 
-.hero-text a {
+.hero-text .discover-link {
   display: inline-block;
   background-color: #7c5f36;
   border: 1px solid transparent;
@@ -68,7 +69,6 @@ section {
   height: 100%;
   object-fit: cover;
   z-index: -10;
-  opacity: 0.6;
 }
 
 .icons {

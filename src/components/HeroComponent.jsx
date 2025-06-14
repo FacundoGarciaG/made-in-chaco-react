@@ -1,5 +1,5 @@
 import "../styles/HeroComponent.css";
-import backgroundVideo from "../assets/231933_small.mp4";
+import backgroundVideo from "../assets/videos/231933_small.mp4";
 import { NavLink } from "react-router-dom";
 export const HeroComponent = () => {
   return (

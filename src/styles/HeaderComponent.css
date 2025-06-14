@@ -8,7 +8,8 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 15px 3%;
-  background-color: transparent;
+  background-color: rgba(0, 0, 0, 0.395);
+  box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.395);
   text-shadow: 1px 1px 2px black;
 }
 

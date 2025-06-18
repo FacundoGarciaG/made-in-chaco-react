@@ -1,6 +1,7 @@
 import "../styles/HeroComponent.css";
 import backgroundVideo from "../assets/videos/231933_small.mp4";
 import { NavLink } from "react-router-dom";
+
 export const HeroComponent = () => {
   return (
     <>
@@ -16,7 +17,7 @@ export const HeroComponent = () => {
             Descubre mas
           </NavLink>
         </div>
-        <video autoPlay muted loop>
+        <video autoPlay muted loop className="video">
           <source src={backgroundVideo} type="video/mp4" />
           Tu navegador no soporta video.
         </video>
@@ -27,12 +28,6 @@ export const HeroComponent = () => {
         </a>
         <a href="#">
           <i className="ri-youtube-line"></i>
-        </a>
-      </div>
-
-      <div className="scroll-down">
-        <a href="#">
-          <i className="ri-arrow-down-wide-line"></i>
         </a>
       </div>
     </>

@@ -1,0 +1,70 @@
+.project-container {
+  visibility: hidden;
+  background-color: #f9f9f9;
+  margin-top: 150vh;
+  padding: 10rem 5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.project-container p {
+  color: rgba(0, 0, 0, 0.9);
+  font-family: "Cinzel", serif;
+  text-align: start;
+  font-size: 1.5rem;
+  max-width: 1000px;
+  line-height: 1.4;
+  margin-top: 2rem;
+}
+
+.project-container .project-intro,
+.project-container .project-intro span {
+  font-family: "Cinzel", serif;
+  font-size: 4rem;
+  margin: 0 auto;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.9);
+  text-align: center;
+  max-width: 100%;
+  font-weight: 600;
+}
+
+.project-container h2 {
+  color: rgba(0, 0, 0, 0.8);
+  font-family: "Cinzel", serif;
+  font-size: 3rem;
+  margin-top: 15rem;
+}
+
+.project-container h3 {
+  color: rgba(0, 0, 0, 0.8);
+  font-family: "Cinzel", serif;
+  font-size: 2rem;
+  margin: 5rem 5rem 0;
+}
+
+.project-list li {
+  color: rgba(0, 0, 0, 0.9);
+  font-family: "Cinzel", serif;
+  text-align: start;
+  font-size: 1.5rem;
+  max-width: 1000px;
+  line-height: 1.4;
+  margin-top: 2rem;
+}
+
+.scroll-down i {
+  font-size: 5rem;
+}
+
+.progress {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.8);
+  bottom: 10px;
+  transform: scaleX(0);
+}

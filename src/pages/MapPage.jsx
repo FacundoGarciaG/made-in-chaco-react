@@ -49,7 +49,7 @@ export const MapPage = () => {
 
   return (
     <>
-      <div className="map-container">
+      <div className={`map-container`}>
         <LoadScript googleMapsApiKey="AIzaSyCtbH9GiLRaHeHKgWCn0vfOl3yOMiZFnIQ">
           <GoogleMap
             mapContainerStyle={containerStyle}
@@ -57,15 +57,26 @@ export const MapPage = () => {
             zoom={8}
             options={mapOptions}
           >
-            {/* Máscara que oscurece todo menos Chaco */}
+            {/* Chaco */}
             <Polygon
               paths={[outerBounds, chacoLimits]}
               options={{
                 fillColor: "#000000",
                 fillOpacity: 0,
-                strokeOpacity: 1,
+                strokeOpacity: 0,
                 clickable: false,
                 zIndex: 1,
+              }}
+            />
+            {/* Borde de Chaco */}
+            <Polygon
+              paths={chacoLimits}
+              options={{
+                fillOpacity: 0,
+                strokeColor: "black",
+                strokeWeight: 3,
+                strokeOpacity: 1,
+                zIndex: 2,
               }}
             />
 

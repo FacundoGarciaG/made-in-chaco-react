@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.6",
+    "motion": "^12.18.1",
+    "motion-plus": "^1.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2"

@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "cd backend && node server.js",
-    "railway-build": "cd backend && npm install && cd .. && npm install && npm run build"
+    "postinstall": "cd backend && npm install",
+    "railway-build": "npm run build"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.6",

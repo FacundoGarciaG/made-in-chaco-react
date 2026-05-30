@@ -408,7 +408,7 @@ export const EntidadDetallePage = () => {
             ← Volver
           </button>
           <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate("/descubre"); }} className="entidad-nav-btn" style={{ background: "rgba(45,26,18,0.45)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", fontFamily: "inherit", color: "#fff" }}>
-            <img src="/src/assets/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+            <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
             Mapa
           </button>
         </div>
@@ -437,7 +437,7 @@ export const EntidadDetallePage = () => {
           Volver
         </button>
         <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate("/descubre"); }} className="entidad-nav-btn" style={{ border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-          <img src="/src/assets/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+          <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
           Mapa
         </button>
       </nav>
@@ -898,21 +898,21 @@ export const EntidadDetallePage = () => {
                         target="_blank" rel="noopener noreferrer"
                         onClick={() => setNavOpen(false)}
                       >
-                        <img src="/src/assets/icons/googlemaps.png" alt="" /> Google Maps
+                        <img src="/icons/googlemaps.png" alt="" /> Google Maps
                       </a>
                       <a
                         href={`https://waze.com/ul?ll=${entidad.latitud},${entidad.longitud}&navigate=yes`}
                         target="_blank" rel="noopener noreferrer"
                         onClick={() => setNavOpen(false)}
                       >
-                        <img src="/src/assets/icons/waze.png" alt="" /> Waze
+                        <img src="/icons/waze.png" alt="" /> Waze
                       </a>
                       <a
                         href={`https://maps.apple.com/?daddr=${entidad.latitud},${entidad.longitud}`}
                         target="_blank" rel="noopener noreferrer"
                         onClick={() => setNavOpen(false)}
                       >
-                        <img src="/src/assets/icons/applemaps.png" alt="" /> Apple Maps
+                        <img src="/icons/applemaps.png" alt="" /> Apple Maps
                       </a>
                     </div>
                   )}
@@ -968,9 +968,9 @@ export const EntidadDetallePage = () => {
                 className="entidad-conexiones-toggle"
               >
                 {viewMode === "cards" ? (
-                  <><img src="/src/assets/icons/globe.png" alt="" style={{width:20,height:20,verticalAlign:"middle",marginRight:6,background:"#2d1a12",borderRadius:"50%",padding:3}}/> Ver gráfico</>
+                  <><img src="/icons/globe.png" alt="" style={{width:20,height:20,verticalAlign:"middle",marginRight:6,background:"#2d1a12",borderRadius:"50%",padding:3}}/> Ver gráfico</>
                 ) : (
-                  <><img src="/src/assets/icons/card.png" alt="" style={{width:20,height:20,verticalAlign:"middle",marginRight:6,background:"#2d1a12",borderRadius:4,padding:3}}/> Ver tarjetas</>
+                  <><img src="/icons/card.png" alt="" style={{width:20,height:20,verticalAlign:"middle",marginRight:6,background:"#2d1a12",borderRadius:4,padding:3}}/> Ver tarjetas</>
                 )}
               </button>
             </div>
@@ -1015,7 +1015,7 @@ export const EntidadDetallePage = () => {
                         }}
                       >
                         <img
-                          src={`/src/assets/icons/${conn.tipo}.png`}
+                          src={`/icons/${conn.tipo}.png`}
                           alt={conn.tipo}
                           className="entidad-conexion-icon"
                         />
@@ -1143,7 +1143,7 @@ export const EntidadDetallePage = () => {
                                 style={{ transition: "fill 0.2s, stroke-width 0.2s" }}
                               />
                               <image
-                                href={`/src/assets/icons/${conn.tipo}.png`}
+                                href={`/icons/${conn.tipo}.png`}
                                 x={x - iconSize / 2}
                                 y={y - iconSize / 2}
                                 width={iconSize}
@@ -1197,7 +1197,7 @@ export const EntidadDetallePage = () => {
                           strokeWidth="3"
                         />
                         <image
-                          href={`/src/assets/icons/${entidad.tipo}.png`}
+                          href={`/icons/${entidad.tipo}.png`}
                           x={cx - 24}
                           y={cy - 24}
                           width="48"
@@ -1247,8 +1247,8 @@ export const EntidadDetallePage = () => {
                 width: 16,
                 height: 16,
                 background: "var(--primary)",
-                mask: "url(/src/assets/icons/globe.png) center/contain no-repeat",
-                WebkitMask: "url(/src/assets/icons/globe.png) center/contain no-repeat",
+                mask: "url(/icons/globe.png) center/contain no-repeat",
+                WebkitMask: "url(/icons/globe.png) center/contain no-repeat",
                 flexShrink: 0,
               }}
             />

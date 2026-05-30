@@ -326,7 +326,7 @@ export const RecorridoDetallePage = () => {
                     <span className="rd-thumb-check">✓</span>
                   )}
                   <img
-                    src={`/src/assets/icons/${p.tipo}.png`}
+                    src={`/icons/${p.tipo}.png`}
                     alt={p.tipo}
                   />
                   <span>
@@ -350,7 +350,7 @@ export const RecorridoDetallePage = () => {
                 <div className="rd-step-card-image-overlay" />
                 <div className="rd-step-card-image-badge">
                   <img
-                    src={`/src/assets/icons/${paso.tipo}.png`}
+                    src={`/icons/${paso.tipo}.png`}
                     alt={paso.tipo}
                   />
                   <span style={{ color: "#fff" }}>{paso.tipo}</span>
@@ -407,21 +407,21 @@ export const RecorridoDetallePage = () => {
                           target="_blank" rel="noopener noreferrer"
                           onClick={() => setNavOpen(false)}
                         >
-                          <img src="/src/assets/icons/googlemaps.png" alt="" /> Google Maps
+                          <img src="/icons/googlemaps.png" alt="" /> Google Maps
                         </a>
                         <a
                           href={`https://waze.com/ul?ll=${paso.latitud},${paso.longitud}&navigate=yes`}
                           target="_blank" rel="noopener noreferrer"
                           onClick={() => setNavOpen(false)}
                         >
-                          <img src="/src/assets/icons/waze.png" alt="" /> Waze
+                          <img src="/icons/waze.png" alt="" /> Waze
                         </a>
                         <a
                           href={`https://maps.apple.com/?daddr=${paso.latitud},${paso.longitud}`}
                           target="_blank" rel="noopener noreferrer"
                           onClick={() => setNavOpen(false)}
                         >
-                          <img src="/src/assets/icons/applemaps.png" alt="" /> Apple Maps
+                          <img src="/icons/applemaps.png" alt="" /> Apple Maps
                         </a>
                       </div>
                     )}

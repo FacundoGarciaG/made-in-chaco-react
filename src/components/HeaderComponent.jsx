@@ -221,7 +221,7 @@ export const HeaderComponent = () => {
               }}
             >
               <img
-                src={filtroPanelOpen ? "/src/assets/icons/close.png" : "/src/assets/icons/filter.png"}
+                src={filtroPanelOpen ? "/icons/close.png" : "/icons/filter.png"}
                 alt={filtroPanelOpen ? "close" : "filter"}
                 style={{ width: "24px", height: "24px", objectFit: "contain" }}
               />
@@ -237,7 +237,7 @@ export const HeaderComponent = () => {
               }}
             >
               <img
-                src={recorridosPanelOpen ? "/src/assets/icons/close.png" : "/src/assets/icons/route.png"}
+                src={recorridosPanelOpen ? "/icons/close.png" : "/icons/route.png"}
                 alt={recorridosPanelOpen ? "close" : "route"}
                 style={{ width: "24px", height: "24px", objectFit: "contain" }}
               />
@@ -358,8 +358,8 @@ export const HeaderComponent = () => {
                 <img
                   src={
                     filtroLocalidad
-                      ? "/src/assets/icons/location.png"
-                      : "/src/assets/icons/map.png"
+                      ? "/icons/location.png"
+                      : "/icons/map.png"
                   }
                   alt="location"
                   className="filter-panel-icon"
@@ -391,7 +391,7 @@ export const HeaderComponent = () => {
                   }}
                 >
                   <img
-                    src="/src/assets/icons/map.png"
+                    src="/icons/map.png"
                     alt="map"
                     style={{
                       width: "16px",
@@ -417,7 +417,7 @@ export const HeaderComponent = () => {
                     }}
                   >
                     <img
-                      src="/src/assets/icons/location.png"
+                      src="/icons/location.png"
                       alt="location"
                       style={{
                         width: "16px",
@@ -456,7 +456,7 @@ export const HeaderComponent = () => {
                 }}
               >
                 <img
-                  src={`/src/assets/icons/${cat.id}.png`}
+                  src={`/icons/${cat.id}.png`}
                   alt={cat.label}
                   style={{
                     width: "20px",

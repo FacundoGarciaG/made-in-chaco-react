@@ -213,7 +213,7 @@ export const MapChaco = () => {
     map.touchZoomRotate.disable();
 
     // Crear elemento de audio
-    const audio = new Audio("/src/assets/audios/Intro.wav");
+    const audio = new Audio("/audios/Intro.wav");
     audio.volume = 0.7;
     audioRef.current = audio;
 
@@ -612,7 +612,7 @@ export const MapChaco = () => {
         iconos.map((nombre) => {
           return new Promise((resolve) => {
             if (map.hasImage(nombre)) return resolve();
-            map.loadImage(`/src/assets/icons/${nombre}.png`, (error, image) => {
+            map.loadImage(`/icons/${nombre}.png`, (error, image) => {
               if (!error && image) map.addImage(nombre, image);
               resolve();
             });
@@ -630,7 +630,7 @@ export const MapChaco = () => {
           paint: {
             "fill-color": "#863819",
             "fill-opacity": 0.04,
-            "fill-outline-color": "#86381930",
+            "fill-outline-color": "rgba(134, 56, 25, 0.19)",
           },
         });
       }
@@ -928,7 +928,7 @@ export const MapChaco = () => {
                         text-decoration: none; font-size: 12px; font-weight: 600;
                         color: #333; transition: background 0.15s;
                       " onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background='transparent'">
-                        <img src="/src/assets/icons/googlemaps.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Google Maps
+                        <img src="/icons/googlemaps.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Google Maps
                       </a>
                       <a href="https://waze.com/ul?ll=${coordinates[1]},${coordinates[0]}&navigate=yes"
                          target="_blank" rel="noopener noreferrer"
@@ -938,7 +938,7 @@ export const MapChaco = () => {
                         text-decoration: none; font-size: 12px; font-weight: 600;
                         color: #333; transition: background 0.15s;
                       " onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background='transparent'">
-                        <img src="/src/assets/icons/waze.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Waze
+                        <img src="/icons/waze.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Waze
                       </a>
                       <a href="https://maps.apple.com/?daddr=${coordinates[1]},${coordinates[0]}"
                          target="_blank" rel="noopener noreferrer"
@@ -948,7 +948,7 @@ export const MapChaco = () => {
                         text-decoration: none; font-size: 12px; font-weight: 600;
                         color: #333; transition: background 0.15s;
                       " onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background='transparent'">
-                        <img src="/src/assets/icons/applemaps.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Apple Maps
+                        <img src="/icons/applemaps.png" style="width:18px;height:18px;object-fit:contain;" alt=""/> Apple Maps
                       </a>
                     </div>
                   </div>
@@ -1769,7 +1769,7 @@ export const MapChaco = () => {
               animation: "pulse 2s infinite",
             }}
           >
-            <img src="/src/assets/icons/touch.png" />
+            <img src="/icons/touch.png" />
           </div>
           <h2
             style={{

@@ -1658,19 +1658,19 @@ export const AdminPanel = () => {
         {/* SIDEBAR */}
         <div style={styles.sidebar}>
           <div style={styles.sidebarHeader}>
-            <img src="/src/assets/imagenes/logo-madeinchaco.png" alt="Made in Chaco" style={{ width: "100%", maxWidth: "180px", display: "block", marginBottom: "8px" }} />
+            <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" style={{ width: "100%", maxWidth: "180px", display: "block", marginBottom: "8px" }} />
             <div style={{ fontSize: "15px", color: "#1c1c18", marginTop: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <img src="/src/assets/icons/user.png" style={{ width: "18px", height: "18px" }} alt="" />
+              <img src="/icons/user.png" style={{ width: "18px", height: "18px" }} alt="" />
               {user?.username || "Admin"}
             </div>
           </div>
           <div style={styles.sidebarNav}>
             {[
-              { id: "entidades", label: "Entidades", icon: "/src/assets/icons/book.png" },
-              { id: "nuevo-editar", label: "Nueva Entidad", icon: "/src/assets/icons/add.png" },
-              { id: "nuevo-recorrido", label: "Recorridos", icon: "/src/assets/icons/route.png" },
-              { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/src/assets/icons/add.png" },
-              { id: "localidades", label: "Localidades", icon: "/src/assets/icons/location.png" },
+              { id: "entidades", label: "Entidades", icon: "/icons/book.png" },
+              { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
+              { id: "nuevo-recorrido", label: "Recorridos", icon: "/icons/route.png" },
+              { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
+              { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1711,7 +1711,7 @@ export const AdminPanel = () => {
             ))}
           </div>
           <button onClick={logout} className="admin-logout-btn" style={styles.logoutBtn}>
-            <img src="/src/assets/icons/logout.png" style={{ width: "16px", height: "16px", marginRight: "8px", verticalAlign: "middle" }} alt="" />
+            <img src="/icons/logout.png" style={{ width: "16px", height: "16px", marginRight: "8px", verticalAlign: "middle" }} alt="" />
             CERRAR SESIÓN
           </button>
         </div>
@@ -1723,7 +1723,7 @@ export const AdminPanel = () => {
               <>
                 <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h2 style={styles.sectionTitle}>
-                    <img src="/src/assets/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                    <img src="/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                     Entidades
                   </h2>
                   <button
@@ -1763,7 +1763,7 @@ export const AdminPanel = () => {
                     return (
                       <div key={tipo} style={{ marginBottom: "24px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", padding: "0 4px" }}>
-                          <img src={`/src/assets/icons/${tipo}.png`} style={{ width: "20px", height: "20px" }} alt="" />
+                          <img src={`/icons/${tipo}.png`} style={{ width: "20px", height: "20px" }} alt="" />
                           <span style={{ fontWeight: 700, fontSize: "14px", color: colorMapAdmin[tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>
                             {tipoLabels[tipo] || tipo}
                           </span>
@@ -1801,7 +1801,7 @@ export const AdminPanel = () => {
                               className="admin-btn-ghost"
                               style={styles.smallBtn("#863819")}
                             >
-                              <img src="/src/assets/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                              <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
                               EDITAR
                             </button>
                             <button
@@ -1809,7 +1809,7 @@ export const AdminPanel = () => {
                               className="admin-btn-ghost"
                               style={styles.smallBtn("#2e7d32")}
                             >
-                              <img src="/src/assets/icons/link.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                              <img src="/icons/link.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
                               CONEXIÓN
                             </button>
                             <button
@@ -1817,7 +1817,7 @@ export const AdminPanel = () => {
                               className="admin-btn-danger"
                               style={styles.smallBtn("#c0392b")}
                             >
-                              <img src="/src/assets/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                              <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
                               ELIMINAR
                             </button>
                           </div>
@@ -1841,7 +1841,7 @@ export const AdminPanel = () => {
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                         <h3 style={{ margin: 0, fontSize: 18, color: "#1c1c18" }}>
-                          <img src="/src/assets/icons/link.png" style={{ width: "20px", height: "20px", verticalAlign: "middle", marginRight: 8 }} alt="" />
+                          <img src="/icons/link.png" style={{ width: "20px", height: "20px", verticalAlign: "middle", marginRight: 8 }} alt="" />
                           Conexiones: {conexModal.nombre}
                         </h3>
                         <button onClick={() => setConexModal(null)}
@@ -1978,9 +1978,9 @@ export const AdminPanel = () => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                   <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
                     {editingEntityId ? (
-                      <><img src="/src/assets/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Editar: {general.nombre || "..."}</>
+                      <><img src="/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Editar: {general.nombre || "..."}</>
                     ) : (
-                      <><img src="/src/assets/icons/add.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Nueva Entidad</>
+                      <><img src="/icons/add.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Nueva Entidad</>
                     )}
                   </h2>
                 </div>
@@ -2592,7 +2592,7 @@ export const AdminPanel = () => {
               <div>
                 <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h2 style={styles.sectionTitle}>
-                    <img src="/src/assets/icons/route.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                    <img src="/icons/route.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                     Recorridos
                   </h2>
                   {!editingRecorridoId && (
@@ -2844,7 +2844,7 @@ export const AdminPanel = () => {
                           className="admin-btn-ghost"
                           style={styles.smallBtn("#863819")}
                         >
-                          <img src="/src/assets/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                          <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
                           EDITAR
                         </button>
                         <button
@@ -2852,7 +2852,7 @@ export const AdminPanel = () => {
                           className="admin-btn-danger"
                           style={styles.smallBtn("#c0392b")}
                         >
-                          <img src="/src/assets/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                          <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
                           ELIMINAR
                         </button>
                       </div>
@@ -2867,7 +2867,7 @@ export const AdminPanel = () => {
               <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                   <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-                    <img src="/src/assets/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                    <img src="/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                     Localidades
                   </h2>
                   <button

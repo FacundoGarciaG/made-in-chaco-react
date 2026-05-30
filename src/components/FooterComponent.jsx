@@ -243,7 +243,7 @@ export const FooterComponent = ({
                     type="button"
                   >
                     <img
-                      src={`/src/assets/icons/${cat.id}.png`}
+                      src={`/icons/${cat.id}.png`}
                       alt={cat.label}
                       className="footer-map__menu-icon"
                       style={{
@@ -275,7 +275,7 @@ export const FooterComponent = ({
                   type="button"
                 >
                   <img
-                    src="/src/assets/icons/map.png"
+                    src="/icons/map.png"
                     alt="Chaco"
                     className="footer-map__menu-icon"
                   />
@@ -293,7 +293,7 @@ export const FooterComponent = ({
                     type="button"
                   >
                     <img
-                      src="/src/assets/icons/location.png"
+                      src="/icons/location.png"
                       alt={loc.nombre}
                       className="footer-map__menu-icon"
                       style={{

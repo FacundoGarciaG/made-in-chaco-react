@@ -31,7 +31,7 @@ export const LoginPage = () => {
       <div className="login-card">
          <div className="login-header">
            <img 
-             src="/src/assets/imagenes/logo-madeinchaco.png" 
+             src="/imagenes/logo-madeinchaco.png" 
              alt="Made in Chaco" 
              className="login-logo" 
            />

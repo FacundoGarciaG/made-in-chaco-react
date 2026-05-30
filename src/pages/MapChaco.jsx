@@ -65,7 +65,8 @@ export const MapChaco = () => {
   const popupRef = useRef(null);
   const audioRef = useRef(null);
   const escHintTimerRef = useRef(null);
-  const returningRef = useRef(false); // ref síncrona para suprimir flyTo inicial
+  const returningRef = useRef(false);
+  const savedPuntosFilterRef = useRef(null);
   const conexionesLayerRef = useRef(null);
   const conexionesSourceRef = useRef(null);
   const recorridoLayerRef = useRef(null);
@@ -977,12 +978,9 @@ export const MapChaco = () => {
           // Limpiar líneas al cerrar popup
           popupRef.current.on("close", () => {
             const m = mapRef.current;
-            if (m && recorridoRouteDataRef.current && m.getLayer("capa-puntos")) {
-              m.setFilter("capa-puntos", [
-                "in",
-                ["get", "id"],
-                ["literal", recorridoRouteDataRef.current.entityIds],
-              ]);
+            if (m && m.getLayer("capa-puntos")) {
+              m.setFilter("capa-puntos", savedPuntosFilterRef.current);
+              savedPuntosFilterRef.current = null;
             }
             limpiarConexiones(m);
           });
@@ -990,29 +988,18 @@ export const MapChaco = () => {
           // Cargar y dibujar conexiones
           if (id) {
             dibujarConexiones(id, coordinates, map, conexionesData);
-            // Mostrar pines de entidades conectadas si hay recorrido activo
-            if (map.getLayer("capa-puntos") && recorridoRouteDataRef.current) {
-              const recorridoEntIds = recorridoRouteDataRef.current.entityIds;
-              const extraIds = [];
+            if (map.getLayer("capa-puntos")) {
+              savedPuntosFilterRef.current = map.getFilter("capa-puntos");
+              const ids = recorridoRouteDataRef.current
+                ? recorridoRouteDataRef.current.entityIds
+                : [];
+              const allIds = [...ids, id];
               for (const c of conexionesData) {
                 const isOrigin = c.entidad_origen_id === id;
                 const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-                if (!recorridoEntIds.includes(otherId)) extraIds.push(otherId);
+                if (!allIds.includes(otherId)) allIds.push(otherId);
               }
-              if (extraIds.length > 0) {
-                map.setFilter("capa-puntos", [
-                  "in",
-                  ["get", "id"],
-                  ["literal", [...recorridoEntIds, id, ...extraIds]],
-                ]);
-              } else {
-                // Aunque no tenga conexiones, la entidad clickeada debe seguir visible
-                map.setFilter("capa-puntos", [
-                  "in",
-                  ["get", "id"],
-                  ["literal", [...recorridoEntIds, id]],
-                ]);
-              }
+              map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", allIds]]);
             }
           }
         });
@@ -1034,13 +1021,14 @@ export const MapChaco = () => {
             popupRef.current = null;
           }
           setRecorridoPopup(null);
-          // Restaurar filtro del recorrido si estaba activo
-          if (recorridoRouteDataRef.current && map.getLayer("capa-puntos")) {
-            map.setFilter("capa-puntos", [
-              "in",
-              ["get", "id"],
-              ["literal", recorridoRouteDataRef.current.entityIds],
-            ]);
+          // Restaurar filtro
+          if (map.getLayer("capa-puntos")) {
+            if (savedPuntosFilterRef.current !== null) {
+              map.setFilter("capa-puntos", savedPuntosFilterRef.current);
+              savedPuntosFilterRef.current = null;
+            } else if (recorridoRouteDataRef.current) {
+              map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", recorridoRouteDataRef.current.entityIds]]);
+            }
           }
           limpiarConexiones(map);
           setEntityActive(false);
@@ -1202,21 +1190,27 @@ export const MapChaco = () => {
         .addTo(map);
       popupRef.current.on("close", () => {
         const m = mapRef.current;
-        if (m && recorridoRouteDataRef.current && m.getLayer("capa-puntos")) {
-          m.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", recorridoRouteDataRef.current.entityIds]]);
+        if (m && m.getLayer("capa-puntos")) {
+          if (savedPuntosFilterRef.current !== null) {
+            m.setFilter("capa-puntos", savedPuntosFilterRef.current);
+            savedPuntosFilterRef.current = null;
+          } else if (recorridoRouteDataRef.current) {
+            m.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", recorridoRouteDataRef.current.entityIds]]);
+          }
         }
         limpiarConexiones(m);
       });
       dibujarConexiones(coincId, coords, map, conexData);
-      if (map.getLayer("capa-puntos") && recorridoRouteDataRef.current) {
-        const ids = recorridoRouteDataRef.current.entityIds;
-        const extra = [];
+      if (map.getLayer("capa-puntos")) {
+        savedPuntosFilterRef.current = map.getFilter("capa-puntos");
+        const ids = recorridoRouteDataRef.current ? recorridoRouteDataRef.current.entityIds : [];
+        const allIds = [...ids, coincId];
         for (const c of conexData) {
           const isOrigin = c.entidad_origen_id === coincId;
           const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-          if (!ids.includes(otherId)) extra.push(otherId);
+          if (!allIds.includes(otherId)) allIds.push(otherId);
         }
-        map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", [...ids, coincId, ...extra]]]);
+        map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", allIds]]);
       }
 
       // Restaurar el texto en el input

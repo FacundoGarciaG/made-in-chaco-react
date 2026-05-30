@@ -81,7 +81,6 @@ export const MapChaco = () => {
   const clickResetFilterRef = useRef(false);
   const filtroRef = useRef(filtro);
   const filtroLocalidadRef = useRef(filtroLocalidad);
-  const imagesLoadedRef = useRef(false);
 
   // 0. Restaurar estado del mapa al volver
   const savedState = sessionStorage.getItem("mapState");
@@ -599,30 +598,33 @@ export const MapChaco = () => {
     if (!map || !geoData) return;
 
     const inicializarCapaYRecursos = async () => {
-      // A. Cargar Imágenes (solo una vez)
-      if (!imagesLoadedRef.current) {
-        const iconos = [
-          "artesano",
-          "gastronomia",
-          "comercio",
-          "evento",
-          "patrimonio",
-          "personalidad",
-        ];
+      // A. Cargar Imágenes (solo una vez por mapa)
+      const iconos = [
+        "artesano",
+        "gastronomia",
+        "comercio",
+        "evento",
+        "patrimonio",
+        "personalidad",
+      ];
 
-        await Promise.all(
-          iconos.map((nombre) => {
-            return new Promise((resolve) => {
-              if (map.hasImage(nombre)) return resolve();
-              map.loadImage(`/icons/${nombre}.png`, (error, image) => {
-                if (!error && image) map.addImage(nombre, image);
-                resolve();
-              });
+      await Promise.all(
+        iconos.map((nombre) => {
+          return new Promise((resolve) => {
+            if (map.hasImage(nombre)) return resolve();
+            map.loadImage(`/icons/${nombre}.png`, (error, image) => {
+              if (!error && image) {
+                try {
+                  map.addImage(nombre, image);
+                } catch {
+                  // ya existe, ignorar
+                }
+              }
+              resolve();
             });
-          }),
-        );
-        imagesLoadedRef.current = true;
-      }
+          });
+        }),
+      );
 
       // B. Capa de polígonos de departamentos
       if (departamentos && !map.getSource("departamentos")) {

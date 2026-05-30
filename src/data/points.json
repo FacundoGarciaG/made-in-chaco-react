@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "nombre": "Parque Nacional El Impenetrable",
+    "descripcion": "Naturaleza virgen, cultura wichí y fauna única.",
+    "posicion": { "lat": -25.8333, "lng": -61.3333 },
+    "video": "/src/assets/231933_small.mp4",
+    "categoria": "naturaleza"
+  },
+  {
+    "id": 2,
+    "nombre": "Resistencia - Capital Cultural",
+    "descripcion": "Ciudad de las esculturas y arte chaqueño.",
+    "posicion": { "lat": -27.4516, "lng": -58.9867 },
+    "video": "/videos/resistencia.mp4",
+    "categoria": "cultura"
+  },
+  {
+    "id": 3,
+    "nombre": "Colonia Benítez - Reserva Natural",
+    "descripcion": "Senderos naturales y avistaje de aves.",
+    "posicion": { "lat": -27.3, "lng": -59.2333 },
+    "video": "/videos/benitez.mp4",
+    "categoria": "naturaleza"
+  }
+]

@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HeaderComponent } from "./components/HeaderComponent";
 import { FullscreenToggle } from "./components/FullscreenToggle";
+import { UnderConstruction } from "./components/UnderConstruction";
 import { HomePage } from "./pages/HomePage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { MapChaco } from "./pages/MapChaco";
@@ -17,8 +18,8 @@ function MadeInChacoApp() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
 
-  return (
-    <AuthProvider>
+  const content = (
+    <>
       {!isAdmin && <HeaderComponent />}
       <FullscreenToggle />
       <Routes>
@@ -40,6 +41,12 @@ function MadeInChacoApp() {
         <Route path="/recorrido/:slug" element={<RecorridoDetallePage />} />
         <Route path="/*" element={<Navigate to="/" />}></Route>
       </Routes>
+    </>
+  );
+
+  return (
+    <AuthProvider>
+      {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
     </AuthProvider>
   );
 }

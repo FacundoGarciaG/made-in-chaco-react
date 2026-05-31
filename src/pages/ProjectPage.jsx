@@ -146,20 +146,14 @@ export const ProjectPage = () => {
             educativo.
           </p>
           <p>
-            identitaria y con alto potencial de impacto social y educativo. El
-            proyecto no solo apunta a la conservación cultural, sino también al
-            desarrollo económico de la región, mediante la articulación con el
-            sector comercial y turístico. Made in Chaco se plantea como una
+            El proyecto no solo apunta a la conservación cultural, sino también
+            al desarrollo económico de la región, mediante la articulación con
+            el sector comercial y turístico. Made in Chaco se plantea como una
             plataforma dinámica donde la identidad se convierte también en motor
-            de actividad económica, incluyendo:
+            de actividad económica, transformando el sentido de pertenencia
+            territorial en un valor de mercado que beneficia directamente a los
+            productores, comerciantes y prestadores de servicios locales.
           </p>
-          <ul className="project-list">
-            <li>Publicaciones y guías de comercios locales</li>
-            <li>Recomendaciones gastronómicas regionales</li>
-            <li>Calendarios de eventos</li>
-            <li>Promoción de alojamientos y circuitos turísticos</li>
-            <li>Publicaciones y guías de comercios locales</li>
-          </ul>
         </div>
 
         <div

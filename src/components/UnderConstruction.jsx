@@ -9,7 +9,8 @@ export function UnderConstruction({ children }) {
       minHeight: "100vh", background: "#f6f3ec", color: "#863819", fontFamily: "Cinzel, serif",
       textAlign: "center", padding: "40px",
     }}>
-      <h1 style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>Made in Chaco</h1>
+      <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco"
+        style={{ maxWidth: "300px", marginBottom: "2rem" }} />
       <p style={{ fontSize: "1.2rem", color: "#666", fontFamily: "Epilogue, sans-serif" }}>
         Sitio en construcción. Pronto estaremos online.
       </p>

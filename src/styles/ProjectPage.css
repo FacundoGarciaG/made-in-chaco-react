@@ -1,5 +1,5 @@
 .project-container {
-  background-color: #f9f9f9;
+  background-color: var(--surface);
   margin-top: 150vh;
   padding: 10rem 5rem;
   display: flex;

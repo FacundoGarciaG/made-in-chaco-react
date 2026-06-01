@@ -1,4 +1,4 @@
-import { NavLink, useLocation, Link } from "react-router-dom";
+import { NavLink, useLocation, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import "../styles/HeaderComponent.css";
 import logoClaro from "../assets/imagenes/madeinchacoclaro.png";
@@ -6,7 +6,9 @@ import logoSymbol from "../assets/imagenes/logo-sintitulo.png";
 export const HeaderComponent = () => {
   const location = useLocation();
   const isMapPage = location.pathname === "/descubre";
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('made-in-chaco-dark-mode') === 'true');
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("made-in-chaco-dark-mode") === "true",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [filtroPanelOpen, setFiltroPanelOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("todos");
@@ -22,6 +24,10 @@ export const HeaderComponent = () => {
   const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
   const [localidadSearch, setLocalidadSearch] = useState("");
   const [localidadDropdownOpen, setLocalidadDropdownOpen] = useState(false);
+  const [showSelloModal, setShowSelloModal] = useState(false);
+  const [filterPanelClosing, setFilterPanelClosing] = useState(false);
+  const [rutasPanelClosing, setRutasPanelClosing] = useState(false);
+  const navigate = useNavigate();
   const logoRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -40,7 +46,7 @@ export const HeaderComponent = () => {
       el.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
     };
     const handleMouseLeave = () => {
-      el.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg)';
+      el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
     };
     el.addEventListener("mousemove", handleMouseMove);
     el.addEventListener("mouseleave", handleMouseLeave);
@@ -113,7 +119,7 @@ export const HeaderComponent = () => {
   useEffect(() => {
     if (!isMapPage) return;
     fetch("/api/entidades")
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then(setEntidades)
       .catch(() => setEntidades([]));
   }, [isMapPage]);
@@ -174,9 +180,24 @@ export const HeaderComponent = () => {
       setSearchTerm("");
       setActiveFilter("todos");
       setFiltroLocalidad("");
-      setFiltroPanelOpen(false);
+      closeFilterPanel();
     }
   }, [isMapPage]);
+
+  // Closing animation for filter and rutas panels
+  useEffect(() => {
+    if (!filtroPanelOpen && filterPanelClosing) {
+      const t = setTimeout(() => setFilterPanelClosing(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [filtroPanelOpen, filterPanelClosing]);
+
+  useEffect(() => {
+    if (!recorridosPanelOpen && rutasPanelClosing) {
+      const t = setTimeout(() => setRutasPanelClosing(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [recorridosPanelOpen, rutasPanelClosing]);
 
   // Listen for external reset (e.g. from FooterComponent filter change)
   useEffect(() => {
@@ -204,7 +225,27 @@ export const HeaderComponent = () => {
 
   const handleFilterClick = useCallback((catId) => {
     setActiveFilter(catId);
+    closeFilterPanel();
+  }, []);
+
+  const closeFilterPanel = useCallback(() => {
+    setFilterPanelClosing(true);
     setFiltroPanelOpen(false);
+  }, []);
+
+  const openFilterPanel = useCallback(() => {
+    setFilterPanelClosing(false);
+    setFiltroPanelOpen(true);
+  }, []);
+
+  const closeRutasPanel = useCallback(() => {
+    setRutasPanelClosing(true);
+    setRecorridosPanelOpen(false);
+  }, []);
+
+  const openRutasPanel = useCallback(() => {
+    setRutasPanelClosing(false);
+    setRecorridosPanelOpen(true);
   }, []);
 
   return (
@@ -223,8 +264,12 @@ export const HeaderComponent = () => {
             <button
               className="header-filter-toggle"
               onClick={() => {
-                setFiltroPanelOpen(!filtroPanelOpen);
-                if (!filtroPanelOpen) setRecorridosPanelOpen(false);
+                if (filtroPanelOpen) {
+                  closeFilterPanel();
+                } else {
+                  openFilterPanel();
+                  if (recorridosPanelOpen) closeRutasPanel();
+                }
               }}
             >
               <img
@@ -239,12 +284,18 @@ export const HeaderComponent = () => {
             <button
               className="header-rutas-toggle"
               onClick={() => {
-                setRecorridosPanelOpen(!recorridosPanelOpen);
-                if (!recorridosPanelOpen) setFiltroPanelOpen(false);
+                if (recorridosPanelOpen) {
+                  closeRutasPanel();
+                } else {
+                  openRutasPanel();
+                  if (filtroPanelOpen) closeFilterPanel();
+                }
               }}
             >
               <img
-                src={recorridosPanelOpen ? "/icons/close.png" : "/icons/route.png"}
+                src={
+                  recorridosPanelOpen ? "/icons/close.png" : "/icons/route.png"
+                }
                 alt={recorridosPanelOpen ? "close" : "route"}
                 style={{ width: "24px", height: "24px", objectFit: "contain" }}
               />
@@ -277,34 +328,73 @@ export const HeaderComponent = () => {
             )}
             {(() => {
               const filtrarEntidad = (e) => {
-                if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                if (activeFilter !== "todos" && e.tipo !== activeFilter) return false;
-                if (filtroLocalidad && e.localidad_id !== parseInt(filtroLocalidad)) return false;
+                if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
+                  return false;
+                if (activeFilter !== "todos" && e.tipo !== activeFilter)
+                  return false;
+                if (
+                  filtroLocalidad &&
+                  e.localidad_id !== parseInt(filtroLocalidad)
+                )
+                  return false;
                 if (!e.visible) return false;
                 if (["comercio", "hospedaje", "productor"].includes(e.tipo)) {
                   if (e.estado_pago !== "al_dia") return false;
-                  if (e.fecha_fin_suscripcion && new Date(e.fecha_fin_suscripcion) < new Date(new Date().toDateString())) return false;
-                  if (e.fecha_inicio_suscripcion && new Date(e.fecha_inicio_suscripcion) > new Date(new Date().toDateString())) return false;
+                  if (
+                    e.fecha_fin_suscripcion &&
+                    new Date(e.fecha_fin_suscripcion) <
+                      new Date(new Date().toDateString())
+                  )
+                    return false;
+                  if (
+                    e.fecha_inicio_suscripcion &&
+                    new Date(e.fecha_inicio_suscripcion) >
+                      new Date(new Date().toDateString())
+                  )
+                    return false;
                 }
                 if (e.tipo === "evento") {
-                  if (e.fecha_evento && new Date(e.fecha_evento) < new Date(new Date().toDateString())) return false;
+                  if (
+                    e.fecha_evento &&
+                    new Date(e.fecha_evento) <
+                      new Date(new Date().toDateString())
+                  )
+                    return false;
                   if (e.estado_pago && e.estado_pago !== "al_dia") return false;
-                  if (e.estado_pago && e.fecha_fin_suscripcion && new Date(e.fecha_fin_suscripcion) < new Date(new Date().toDateString())) return false;
-                  if (e.estado_pago && e.fecha_inicio_suscripcion && new Date(e.fecha_inicio_suscripcion) > new Date(new Date().toDateString())) return false;
+                  if (
+                    e.estado_pago &&
+                    e.fecha_fin_suscripcion &&
+                    new Date(e.fecha_fin_suscripcion) <
+                      new Date(new Date().toDateString())
+                  )
+                    return false;
+                  if (
+                    e.estado_pago &&
+                    e.fecha_inicio_suscripcion &&
+                    new Date(e.fecha_inicio_suscripcion) >
+                      new Date(new Date().toDateString())
+                  )
+                    return false;
                 }
                 return true;
               };
               const resultados = entidades.filter(filtrarEntidad);
-              return searchTerm && searchDropdownOpen && resultados.length > 0 ? (
+              return searchTerm &&
+                searchDropdownOpen &&
+                resultados.length > 0 ? (
                 <div className="header-search-dropdown">
-                  {resultados.slice(0, 8).map(e => (
+                  {resultados.slice(0, 8).map((e) => (
                     <button
                       key={e.id}
                       className="header-search-suggestion"
                       onMouseDown={() => {
                         setSearchTerm(e.nombre);
                         setSearchDropdownOpen(false);
-                        window.dispatchEvent(new CustomEvent("header-search-select", { detail: e.nombre }));
+                        window.dispatchEvent(
+                          new CustomEvent("header-search-select", {
+                            detail: e.nombre,
+                          }),
+                        );
                       }}
                     >
                       {e.nombre}
@@ -318,34 +408,54 @@ export const HeaderComponent = () => {
 
         {/* NAV en desktop */}
         {!isMapPage && (
-        <ul className="navlist">
-          <li>
-            <NavLink to="/proyecto" aria-current="page">
-              Proyecto
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/" aria-current="page">
-              Quienes somos
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/solicitar-sello" aria-current="page">
-              Solicitar sello
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/contacto" aria-current="page">
-              Contacto
-            </NavLink>
-          </li>
-        </ul>
+          <ul className="navlist">
+            <li>
+              <NavLink to="/proyecto" aria-current="page">
+                Proyecto
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/" aria-current="page">
+                Quienes somos
+              </NavLink>
+            </li>
+
+            <li>
+              <NavLink to="/contacto" aria-current="page">
+                Contacto
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/solicitar-sello"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowSelloModal(true);
+                }}
+              >
+                Solicitar sello
+              </NavLink>
+            </li>
+          </ul>
         )}
 
         {/* FILTER PANEL DROPDOWN on map page */}
-        {isMapPage && filtroPanelOpen && (
-          <div className="filter-panel-dropdown">
-            <div className="filter-title" style={{ fontSize: "13px", fontWeight: 700, color: "#863819", fontFamily: "Cinzel, serif", textShadow: "none", marginBottom: "4px", padding: "0 16px" }}>
+        {isMapPage && (filtroPanelOpen || filterPanelClosing) && (
+          <div
+            className={`filter-panel-dropdown${filterPanelClosing && !filtroPanelOpen ? " filter-panel-dropdown--closing" : ""}`}
+          >
+            <div
+              className="filter-title"
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#863819",
+                fontFamily: "Cinzel, serif",
+                textShadow: "none",
+                marginBottom: "4px",
+                padding: "0 16px",
+              }}
+            >
               FILTROS
             </div>
             {/* BUSCADOR DE LOCALIDADES */}
@@ -377,9 +487,7 @@ export const HeaderComponent = () => {
               >
                 <img
                   src={
-                    filtroLocalidad
-                      ? "/icons/location.png"
-                      : "/icons/map.png"
+                    filtroLocalidad ? "/icons/location.png" : "/icons/map.png"
                   }
                   alt="location"
                   className="filter-panel-icon"
@@ -401,54 +509,56 @@ export const HeaderComponent = () => {
                 </span>
               </div>
               {localidadDropdownOpen && (
-              <div className="filter-panel-localidad-options">
-                <button
-                  className={`filter-panel-localidad-option ${!filtroLocalidad ? "active" : ""}`}
-                  onClick={() => {
-                    setFiltroLocalidad("");
-                    setFiltroPanelOpen(false);
-                    setLocalidadDropdownOpen(false);
-                  }}
-                >
-                  <img
-                    src="/icons/map.png"
-                    alt="map"
-                    style={{
-                      width: "16px",
-                      height: "16px",
-                      objectFit: "contain",
-                    }}
-                  />
-                  CHACO
-                </button>
-                {localidades
-                  .filter((loc) =>
-                    loc.nombre.toLowerCase().includes(localidadSearch.toLowerCase())
-                  )
-                  .map((loc) => (
+                <div className="filter-panel-localidad-options">
                   <button
-                    key={loc.id}
-                    className={`filter-panel-localidad-option ${filtroLocalidad === loc.id.toString() ? "active" : ""}`}
+                    className={`filter-panel-localidad-option ${!filtroLocalidad ? "active" : ""}`}
                     onClick={() => {
-                      setFiltroLocalidad(loc.id.toString());
-      setFiltroPanelOpen(false);
-      setRecorridosPanelOpen(false);
+                      setFiltroLocalidad("");
+                      closeFilterPanel();
                       setLocalidadDropdownOpen(false);
                     }}
                   >
                     <img
-                      src="/icons/location.png"
-                      alt="location"
+                      src="/icons/map.png"
+                      alt="map"
                       style={{
                         width: "16px",
                         height: "16px",
                         objectFit: "contain",
                       }}
                     />
-                    {loc.nombre}
+                    CHACO
                   </button>
-                ))}
-              </div>
+                  {localidades
+                    .filter((loc) =>
+                      loc.nombre
+                        .toLowerCase()
+                        .includes(localidadSearch.toLowerCase()),
+                    )
+                    .map((loc) => (
+                      <button
+                        key={loc.id}
+                        className={`filter-panel-localidad-option ${filtroLocalidad === loc.id.toString() ? "active" : ""}`}
+                        onClick={() => {
+                          setFiltroLocalidad(loc.id.toString());
+                          closeFilterPanel();
+                          closeRutasPanel();
+                          setLocalidadDropdownOpen(false);
+                        }}
+                      >
+                        <img
+                          src="/icons/location.png"
+                          alt="location"
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            objectFit: "contain",
+                          }}
+                        />
+                        {loc.nombre}
+                      </button>
+                    ))}
+                </div>
               )}
             </div>
 
@@ -468,11 +578,15 @@ export const HeaderComponent = () => {
                       ? cat.color
                       : activeFilter === cat.id
                         ? cat.color
-                        : darkMode ? "rgba(50, 50, 60, 0.6)" : "rgba(252, 249, 242, 0.9)",
+                        : darkMode
+                          ? "rgba(50, 50, 60, 0.6)"
+                          : "rgba(252, 249, 242, 0.9)",
                   color:
                     hoveredFilter === cat.id || activeFilter === cat.id
                       ? "white"
-                      : darkMode ? "#d0c8b0" : "#333",
+                      : darkMode
+                        ? "#d0c8b0"
+                        : "#333",
                 }}
               >
                 <img
@@ -496,7 +610,7 @@ export const HeaderComponent = () => {
                 setActiveFilter("todos");
                 setFiltroLocalidad("");
                 setSearchTerm("");
-                setFiltroPanelOpen(false);
+                closeFilterPanel();
               }}
               className="filter-panel-clear-btn"
             >
@@ -506,13 +620,34 @@ export const HeaderComponent = () => {
         )}
 
         {/* RECORRIDOS PANEL on map page */}
-        {isMapPage && recorridosPanelOpen && (
-          <div className="rutas-panel-dropdown">
-            <div className="rutas-title" style={{ fontSize: "13px", fontWeight: 700, color: "#863819", fontFamily: "Cinzel, serif", textShadow: "none", marginBottom: "4px", padding: "0 16px" }}>
+        {isMapPage && (recorridosPanelOpen || rutasPanelClosing) && (
+          <div
+            className={`rutas-panel-dropdown${rutasPanelClosing && !recorridosPanelOpen ? " rutas-panel-dropdown--closing" : ""}`}
+          >
+            <div
+              className="rutas-title"
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#863819",
+                fontFamily: "Cinzel, serif",
+                textShadow: "none",
+                marginBottom: "4px",
+                padding: "0 16px",
+              }}
+            >
               RECORRIDOS
             </div>
             {recorridosList.length === 0 && (
-              <div className="rutas-empty" style={{ padding: "12px 16px", fontSize: "12px", color: "#888", textShadow: "none" }}>
+              <div
+                className="rutas-empty"
+                style={{
+                  padding: "12px 16px",
+                  fontSize: "12px",
+                  color: "#888",
+                  textShadow: "none",
+                }}
+              >
                 No hay recorridos disponibles.
               </div>
             )}
@@ -533,13 +668,14 @@ export const HeaderComponent = () => {
                   }}
                   onClick={() => {
                     setSelectedRecorrido(isActive ? null : r);
-                    setRecorridosPanelOpen(false);
+                    closeRutasPanel();
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) e.currentTarget.style.background = "#f5f0eb";
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "transparent";
+                    if (!isActive)
+                      e.currentTarget.style.background = "transparent";
                   }}
                 >
                   {r.imagen ? (
@@ -572,7 +708,15 @@ export const HeaderComponent = () => {
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="rutas-item-text" style={{ fontSize: "13px", fontWeight: isActive ? 700 : 500, color: "#2d1a12", textShadow: "none" }}>
+                    <div
+                      className="rutas-item-text"
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: isActive ? 700 : 500,
+                        color: "#2d1a12",
+                        textShadow: "none",
+                      }}
+                    >
                       {r.nombre}
                     </div>
                   </div>
@@ -599,7 +743,7 @@ export const HeaderComponent = () => {
             })}
             <Link
               to="/recorridos"
-              onClick={() => setRecorridosPanelOpen(false)}
+              onClick={() => closeRutasPanel()}
               className="rutas-view-all"
               style={{
                 display: "block",
@@ -623,7 +767,7 @@ export const HeaderComponent = () => {
                 onClick={() => {
                   setSelectedRecorrido(null);
                   window.dispatchEvent(new CustomEvent("header-recorrido-fly"));
-                  setRecorridosPanelOpen(false);
+                  closeRutasPanel();
                 }}
                 className="rutas-clear-btn"
               >
@@ -636,22 +780,24 @@ export const HeaderComponent = () => {
         {/* Logo símbolo + menú tipo tren en map page */}
         {isMapPage && (
           <div className="header-symbol-wrapper">
-            {symbolMenuOpen && (
-              <div className="header-symbol-overlay" onClick={() => setSymbolMenuOpen(false)} />
-            )}
             <button
               className={`header-symbol-link ${symbolMenuOpen ? "active" : ""}`}
               onClick={() => setSymbolMenuOpen((prev) => !prev)}
               title="Menú"
             >
-              <img src={logoSymbol} alt="Made in Chaco" className="header-symbol-img" />
+              <img
+                src={logoSymbol}
+                alt="Made in Chaco"
+                className="header-symbol-img"
+              />
             </button>
-            <nav className={`header-symbol-train ${symbolMenuOpen ? "open" : ""}`}>
+            <nav
+              className={`header-symbol-train ${symbolMenuOpen ? "open" : ""}`}
+            >
               <NavLink
                 to="/proyecto"
                 className="train-item"
                 style={{ transitionDelay: "0s" }}
-                onClick={() => setSymbolMenuOpen(false)}
               >
                 Proyecto
               </NavLink>
@@ -659,7 +805,6 @@ export const HeaderComponent = () => {
                 to="/"
                 className="train-item"
                 style={{ transitionDelay: "0.08s" }}
-                onClick={() => setSymbolMenuOpen(false)}
               >
                 Quienes somos
               </NavLink>
@@ -667,7 +812,6 @@ export const HeaderComponent = () => {
                 to="/contacto"
                 className="train-item"
                 style={{ transitionDelay: "0.16s" }}
-                onClick={() => setSymbolMenuOpen(false)}
               >
                 Contacto
               </NavLink>
@@ -675,7 +819,10 @@ export const HeaderComponent = () => {
                 to="/solicitar-sello"
                 className="train-item"
                 style={{ transitionDelay: "0.24s" }}
-                onClick={() => setSymbolMenuOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowSelloModal(true);
+                }}
               >
                 Solicitar sello
               </NavLink>
@@ -693,6 +840,63 @@ export const HeaderComponent = () => {
           </>
         )}
       </header>
+
+      {showSelloModal && (
+        <div
+          className="sello-modal-overlay"
+          onClick={() => setShowSelloModal(false)}
+        >
+          <div className="sello-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="sello-modal-close"
+              onClick={() => setShowSelloModal(false)}
+            >
+              ×
+            </button>
+            <h2 className="sello-modal-title">Solicitar Sello</h2>
+            <p className="sello-modal-text">
+              El <strong>Sello Made in Chaco</strong> es una distinción oficial
+              que reconoce y visibiliza a emprendedores, productores, artistas y
+              prestadores de servicios de la provincia del Chaco.
+            </p>
+            <p className="sello-modal-text">
+              Obtener este sello significa{" "}
+              <strong>formar parte de un mapa interactivo</strong> donde tu
+              emprendimiento será geolocalizado y descubierto por personas que
+              valoran lo auténtico, lo local y lo chaqueño. Además, te integrás
+              a una comunidad que promueve el consumo consciente y el desarrollo
+              económico de la región.
+            </p>
+            <p className="sello-modal-text">
+              <strong>Beneficios clave:</strong> presencia en el mapa oficial de
+              la provincia, visibilidad para turistas y vecinos, conexión con
+              otros actores locales, y la posibilidad de mostrar tu historia al
+              mundo a través de tu perfil público.
+            </p>
+            <p className="sello-modal-text">
+              Si te interesa pertenecer a esta red y dar a conocer tu trabajo,
+              completá el formulario y pronto nos pondremos en contacto.
+            </p>
+            <div className="sello-modal-actions">
+              <button
+                className="sello-modal-btn sello-modal-btn--primary"
+                onClick={() => {
+                  setShowSelloModal(false);
+                  navigate("/solicitar-sello");
+                }}
+              >
+                Aceptar
+              </button>
+              <button
+                className="sello-modal-btn sello-modal-btn--secondary"
+                onClick={() => setShowSelloModal(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -102,10 +102,16 @@ export const RecorridosPage = () => {
         style={{ scaleX, originX: 0 }}
       />
 
-      <Link to="/descubre" className="recorridos-back-btn">
-        <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
-        Volver
-      </Link>
+      <nav className="recorridos-nav-bar">
+        <Link to="/descubre" className="recorridos-nav-btn">
+          <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
+          Volver
+        </Link>
+        <Link to="/descubre" className="recorridos-nav-btn">
+          <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+          Mapa
+        </Link>
+      </nav>
 
       <motion.button
         className="recorridos-theme-btn"

@@ -136,8 +136,8 @@ export const RecorridoDetallePage = () => {
         <p className="rd-error-text">No pudimos encontrar este recorrido.</p>
         <Link
           to="/recorridos"
-          className="rd-back-btn"
-          style={{ position: "static" }}
+          className="rd-top-nav-btn"
+          style={{ position: "static", background: "rgba(45,26,18,0.45)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "100px", padding: "8px 16px" }}
         >
           ← Todos los recorridos
         </Link>
@@ -173,10 +173,16 @@ export const RecorridoDetallePage = () => {
         style={{ scaleX, originX: 0 }}
       />
 
-      <Link to="/recorridos" className="rd-back-btn">
-        <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
-        Todos los recorridos
-      </Link>
+      <nav className="rd-top-nav-bar">
+        <Link to="/recorridos" className="rd-top-nav-btn">
+          <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
+          Recorridos
+        </Link>
+        <Link to="/descubre" className="rd-top-nav-btn">
+          <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+          Mapa
+        </Link>
+      </nav>
 
       <motion.button
         className="rd-share-btn"
@@ -330,7 +336,7 @@ export const RecorridoDetallePage = () => {
                   }}
                 >
                   {isDone && (
-                    <span className="rd-thumb-check">✓</span>
+                    <span className="rd-thumb-check" style={{ color: pColor }}>✓</span>
                   )}
                   <img
                     src={`/icons/${p.tipo}.png`}

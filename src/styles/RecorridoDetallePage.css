@@ -9,38 +9,61 @@
   background: linear-gradient(90deg, var(--primary), #c0392b);
 }
 
-.rd-back-btn {
+/* === NAV BAR (back + map) === */
+.rd-top-nav-bar {
   position: fixed;
-  top: 72px;
+  top: 140px;
   left: 24px;
   z-index: 5;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(45,26,18,0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+}
+
+.rd-top-nav-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  background: rgba(45, 26, 18, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  gap: 6px;
+  padding: 6px 14px;
   border-radius: 100px;
-  color: #fff;
+  color: rgba(255,255,255,0.8);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   font-family: var(--font-display);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
 }
 
-.rd-back-btn i {
+.rd-top-nav-btn i,
+.rd-top-nav-btn img {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rd-top-nav-btn:hover {
+  background: rgba(255,255,255,0.12);
   color: #fff;
 }
 
-.rd-back-btn:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  box-shadow: 0 8px 30px rgba(134, 56, 25, 0.35);
-  transform: translateX(-2px);
+.rd-top-nav-btn:hover i {
+  transform: translateX(-3px);
+}
+
+.rd-top-nav-btn:hover img {
+  transform: scale(1.15);
+}
+
+.rd-top-nav-btn:active {
+  transform: scale(0.94);
 }
 
 .rd-theme-btn {
@@ -435,17 +458,11 @@
 
 .rd-thumb-check {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 2px;
+  right: 2px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .rd-step-card {
@@ -770,11 +787,14 @@
     min-height: 350px;
   }
 
-  .rd-back-btn {
-    top: 64px;
+  .rd-top-nav-bar {
+    top: 100px;
     left: 12px;
-    padding: 8px 14px;
-    font-size: 11px;
+  }
+
+  .rd-top-nav-btn {
+    padding: 4px 10px;
+    font-size: 10px;
   }
 
   .rd-section {

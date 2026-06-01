@@ -483,15 +483,16 @@ export const EntidadDetallePage = () => {
       <div className="entidad-error">
         <div className="entidad-error-icon">⟡</div>
         <p className="entidad-error-text">No pudimos encontrar esta entidad.</p>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 16 }}>
-          <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn" style={{ background: "rgba(45,26,18,0.45)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", fontFamily: "inherit", color: "#fff" }}>
-            ← Volver
+        <nav className="entidad-nav-bar" style={{ position: "static", display: "inline-flex", marginTop: 16 }}>
+          <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn">
+            <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
+            Volver
           </button>
-          <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate("/descubre"); }} className="entidad-nav-btn" style={{ background: "rgba(45,26,18,0.45)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", fontFamily: "inherit", color: "#fff" }}>
+          <Link to="/descubre" className="entidad-nav-btn">
             <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
             Mapa
-          </button>
-        </div>
+          </Link>
+        </nav>
       </div>
     );
   }
@@ -512,14 +513,14 @@ export const EntidadDetallePage = () => {
 
       {/* Back + Map buttons */}
       <nav className="entidad-nav-bar">
-        <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn" style={{ border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+        <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn">
           <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
           Volver
         </button>
-        <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate("/descubre"); }} className="entidad-nav-btn" style={{ border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+        <Link to="/descubre" className="entidad-nav-btn">
           <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
           Mapa
-        </button>
+        </Link>
       </nav>
 
       {/* === HERO === */}

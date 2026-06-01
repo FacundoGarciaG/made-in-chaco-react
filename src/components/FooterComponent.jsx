@@ -32,6 +32,8 @@ export const FooterComponent = ({
   onLocalidadChange,
   darkMode,
   onToggleDarkMode,
+  showDepartamentos,
+  onToggleDepartamentos,
 }) => {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -58,6 +60,13 @@ export const FooterComponent = ({
     { id: "evento", label: "Eventos", color: "#9c27b0" },
     { id: "patrimonio", label: "Patrimonios", color: "#795548" },
     { id: "personalidad", label: "Personalidades", color: "#e91e63" },
+    { id: "comunidad_indigena", label: "Comunidades", color: "#8B4513" },
+    { id: "lugar_natural", label: "Naturaleza", color: "#2E7D32" },
+    { id: "hospedaje", label: "Hospedajes", color: "#FF6F00" },
+    { id: "productor", label: "Productores", color: "#00695C" },
+    { id: "experiencia", label: "Experiencias", color: "#6A1B9A" },
+    { id: "relato", label: "Relatos", color: "#D84315" },
+    { id: "espacio_cultural", label: "Cultura", color: "#37474F" },
   ];
 
   return (
@@ -210,6 +219,20 @@ export const FooterComponent = ({
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               )}
+            </button>
+            <button
+              className={`footer-map__ctrl-btn ${showDepartamentos ? "footer-map__ctrl-btn--active" : ""}`}
+              onClick={() => onToggleDepartamentos?.(!showDepartamentos)}
+              aria-label="División política"
+              title="División política"
+              type="button"
+              style={showDepartamentos ? { background: "#863819" } : {}}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showDepartamentos ? "#fff" : "#000"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5" />
+                <line x1="12" y1="22" x2="12" y2="15.5" />
+                <polyline points="22 8.5 12 15.5 2 8.5" />
+              </svg>
             </button>
             <button
               className={`footer-map__hamburger ${menuAbierto ? "footer-map__hamburger--active" : ""}`}

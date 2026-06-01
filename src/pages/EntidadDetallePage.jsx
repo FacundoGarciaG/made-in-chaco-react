@@ -11,6 +11,13 @@ const colorMap = {
   evento: "#9c27b0",
   patrimonio: "#795548",
   personalidad: "#e91e63",
+  comunidad_indigena: "#8B4513",
+  lugar_natural: "#2E7D32",
+  hospedaje: "#FF6F00",
+  productor: "#00695C",
+  experiencia: "#6A1B9A",
+  relato: "#D84315",
+  espacio_cultural: "#37474F",
 };
 
 const SOCIAL_PLATFORMS = [
@@ -20,6 +27,8 @@ const SOCIAL_PLATFORMS = [
   { value: "tiktok", label: "TikTok", url: (v) => `https://www.tiktok.com/@${v}` },
   { value: "twitter", label: "X / Twitter", url: (v) => `https://x.com/${v}` },
   { value: "whatsapp", label: "WhatsApp", url: (v) => `https://wa.me/${v.replace(/[^0-9]/g, "")}` },
+  { value: "telefono", label: "Teléfono", url: (v) => v },
+  { value: "email", label: "Email", url: (v) => `mailto:${v}` },
 ];
 
 const parseSocialList = (v) => {
@@ -376,9 +385,80 @@ export const EntidadDetallePage = () => {
         { label: "Profesión", value: entidad.profesion },
         { label: "Comunidad", value: entidad.comunidad_etnica },
         { label: "Apodo", value: entidad.apodo },
-        { label: "Contacto", value: entidad.contacto },
         ...socialFichaItems(entidad.redes_sociales),
         ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+      ].filter((i) => i.value);
+    }
+    if (t === "comunidad_indigena") {
+      return [
+        { label: "Etnia", value: entidad.etnia },
+        { label: "Lenguas", value: entidad.lenguas },
+        { label: "Territorio", value: entidad.territorio_tradicional },
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+        ...socialFichaItems(entidad.redes_sociales),
+      ].filter((i) => i.value);
+    }
+    if (t === "lugar_natural") {
+      return [
+        { label: "Categoría", value: entidad.categoria_natural },
+        { label: "Actividades", value: entidad.actividades },
+        { label: "Acceso", value: entidad.acceso },
+        { label: "Flora y fauna", value: entidad.flora_fauna_destacada },
+        { label: "Mejor época", value: entidad.mejor_epoca },
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+      ].filter((i) => i.value);
+    }
+    if (t === "hospedaje") {
+      return [
+        { label: "Categoría", value: entidad.categoria_hospedaje },
+        { label: "Servicios", value: entidad.servicios },
+        { label: "Capacidad", value: entidad.capacidad },
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+        ...socialFichaItems(entidad.redes_sociales),
+        { label: "Sitio Web", value: entidad.sitio_web, link: entidad.sitio_web },
+      ].filter((i) => i.value);
+    }
+    if (t === "productor") {
+      return [
+        { label: "Producto", value: entidad.tipo_producto },
+        { label: "Métodos", value: entidad.metodos_produccion },
+        { label: "Certificaciones", value: entidad.certificaciones },
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+        ...socialFichaItems(entidad.redes_sociales),
+        { label: "Sitio Web", value: entidad.sitio_web, link: entidad.sitio_web },
+      ].filter((i) => i.value);
+    }
+    if (t === "experiencia") {
+      return [
+        { label: "Tipo", value: entidad.tipo_experiencia },
+        { label: "Duración", value: entidad.duracion_experiencia },
+        { label: "Incluye", value: entidad.que_incluye },
+        { label: "Precio ref.", value: (() => {
+          const p = (entidad.precio_referencia || "").trim();
+          if (!p) return "";
+          const [amount, currency] = p.split(" ");
+          if (currency === "USD") return `USD ${amount}`;
+          return `$${Number(amount).toLocaleString("es-AR")}`;
+        })() },
+        { label: "Operador", value: entidad.operador },
+        ...socialFichaItems(entidad.redes_sociales),
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+      ].filter((i) => i.value);
+    }
+    if (t === "relato") {
+      return [
+        { label: "Autor", value: entidad.autor },
+        { label: "Fecha", value: entidad.fecha_relato },
+        { label: "Tipo", value: entidad.tipo_relato },
+      ].filter((i) => i.value);
+    }
+    if (t === "espacio_cultural") {
+      return [
+        { label: "Tipo", value: entidad.tipo_espacio },
+        { label: "Horarios", value: entidad.horarios },
+        ...(entidad.direccion_escrita ? [{ label: "Dirección", value: direccionStr(entidad.direccion_escrita), link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entidad.direccion_escrita)}` }] : []),
+        ...socialFichaItems(entidad.redes_sociales),
+        { label: "Sitio Web", value: entidad.sitio_web, link: entidad.sitio_web },
       ].filter((i) => i.value);
     }
     return [];
@@ -609,6 +689,26 @@ export const EntidadDetallePage = () => {
             </div>
             <p className="entidad-section-text-lg">
               {mainDescription}
+            </p>
+            <div className="entidad-about-divider" />
+          </motion.section>
+        )}
+
+        {/* Relato completo */}
+        {entidad.tipo === "relato" && entidad.contenido_completo && (
+          <motion.section
+            className="entidad-section"
+            variants={sectionVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+          >
+            <div className="entidad-section-header">
+              <span className="entidad-section-label">Relato</span>
+              <h2 className="entidad-section-title">{entidad.nombre}</h2>
+            </div>
+            <p className="entidad-section-text-lg">
+              {entidad.contenido_completo}
             </p>
             <div className="entidad-about-divider" />
           </motion.section>
@@ -852,23 +952,7 @@ export const EntidadDetallePage = () => {
                 ))}
               </div>
 
-              {/* Contacto comercial extra */}
-              {entidad.contacto_comercial && (
-                <div
-                  style={{
-                    marginTop: 24,
-                    padding: 16,
-                    background: "var(--surface)",
-                    borderRadius: 12,
-                    fontSize: 14,
-                    color: "var(--on-surface)",
-                    border: "1px solid rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <span className="entidad-ficha-label">Contacto comercial</span>
-                  <span className="entidad-ficha-value">{entidad.contacto_comercial}</span>
-                </div>
-              )}
+
 
               {/* Navigation buttons */}
               {entidad.latitud && entidad.longitud && (

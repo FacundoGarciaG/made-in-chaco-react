@@ -93,6 +93,72 @@ router.post("/entidades", authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/solicitar-sello — público, sin auth
+router.post("/solicitar-sello", async (req, res) => {
+  try {
+    const { tipo, nombre, resumen, localidad_id, latitud, longitud, direccion_escrita, imagen, ...detalles } = req.body;
+
+    if (!tipo || !nombre) {
+      return res.status(400).json({ error: "tipo y nombre son requeridos" });
+    }
+
+    const tiposValidos = ["comercio", "hospedaje", "productor", "evento"];
+    if (!tiposValidos.includes(tipo)) {
+      return res.status(400).json({ error: "Tipo de entidad no válido para el sello" });
+    }
+
+    const slug = nombre
+      .toLowerCase()
+      .replace(/[^a-z0-9áéíóúüñ ]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") + "-" + Date.now();
+
+    const { rows } = await pool.query(
+      `INSERT INTO entidades (tipo, nombre, slug, resumen, localidad_id,
+        latitud, longitud, visible, estado_sello, imagen, direccion_escrita)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
+      [
+        tipo, nombre, slug, resumen || "",
+        localidad_id || null, latitud || null, longitud || null,
+        false, "pendiente", imagen || "", direccion_escrita || "",
+      ],
+    );
+
+    const entityId = rows[0].id;
+
+    // Guardar campos específicos del tipo
+    const campos = { ...detalles };
+    delete campos.tipo;
+    // Filtrar valores vacíos y convertir booleanos
+    const keys = Object.entries(campos)
+      .filter(([_, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => {
+        if ((k === "acepta_tarjetas" || k === "es_itinerante" || k === "taller_abierto" || k === "es_referente_comunidad") && typeof v === "string") {
+          if (v === "true") return [k, true];
+          if (v === "false") return [k, false];
+          return null;
+        }
+        return [k, v];
+      })
+      .filter(Boolean);
+    if (keys.length > 0) {
+      const setClauses = keys.map(([k], i) => `${k} = $${i + 1}`).join(", ");
+      const values = keys.map(([, v]) => v ?? null);
+      await pool.query(
+        `UPDATE entidades SET ${setClauses} WHERE id = $${keys.length + 1}`,
+        [...values, entityId],
+      );
+    }
+
+    res.status(201).json({ id: entityId, slug });
+  } catch (err) {
+    console.error("Error POST /solicitar-sello:", err);
+    res.status(500).json({ error: `Error al procesar la solicitud: ${err.message}` });
+  }
+});
+
 // PUT /api/entidades/:id
 router.put("/entidades/:id", authMiddleware, async (req, res) => {
   try {
@@ -263,13 +329,113 @@ router.get("/mapa-puntos", async (_req, res) => {
               fecha_evento, localidad_id
        FROM entidades
        WHERE visible = true AND latitud IS NOT NULL AND longitud IS NOT NULL
-         AND (tipo != 'comercio' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE)))
-         AND (tipo != 'evento' OR (fecha_evento IS NULL OR fecha_evento >= CURRENT_DATE))`,
+         AND (tipo != 'comercio' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'hospedaje' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'productor' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'evento' OR (fecha_evento IS NULL OR fecha_evento >= CURRENT_DATE))
+         AND (tipo != 'evento' OR estado_pago IS NULL OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))`,
     );
     res.json(rows);
   } catch (err) {
     console.error("Error GET /mapa-puntos:", err);
     res.status(500).json({ error: "Error al obtener puntos del mapa" });
+  }
+});
+
+// --- SOLICITUDES (revisión admin) ---
+
+// GET /api/solicitudes — listar solicitudes pendientes
+router.get("/solicitudes", authMiddleware, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+       `SELECT id, tipo, nombre, slug, resumen, localidad_id, email,
+               (created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires' as created_at, imagen, direccion_escrita, redes_sociales,
+              razon_social, cuit, rubro_especifico, horario_apertura,
+              horario_cierre, dias_abierto, sitio_web, acepta_tarjetas,
+              categoria_hospedaje, servicios, capacidad, biografia_larga,
+              tipo_producto, metodos_produccion, certificaciones,
+              fecha_evento, duracion_dias, actividades_principales,
+              link_entradas, fecha_inicio_suscripcion, fecha_fin_suscripcion,
+              estado_pago
+       FROM entidades
+       WHERE visible = false AND estado_sello = 'pendiente'
+       ORDER BY created_at DESC`,
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /solicitudes:", err);
+    res.status(500).json({ error: "Error al obtener solicitudes" });
+  }
+});
+
+// POST /api/solicitudes/:id/aprobar — aprobar solicitud y activar membresía
+router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
+  try {
+    const { fecha_inicio_suscripcion, fecha_fin_suscripcion, estado_pago } = req.body;
+    const { id } = req.params;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    updates.push(`visible = $${idx++}`);
+    values.push(true);
+    updates.push(`estado_sello = $${idx++}`);
+    values.push("aprobado");
+
+    const tiposConMembresia = ["comercio", "hospedaje", "productor", "evento"];
+
+    // Primero obtenemos el tipo de la entidad
+    const { rows: entRows } = await pool.query(
+      "SELECT tipo FROM entidades WHERE id = $1",
+      [id],
+    );
+    if (entRows.length === 0) {
+      return res.status(404).json({ error: "Entidad no encontrada" });
+    }
+
+    const tipo = entRows[0].tipo;
+
+    if (tiposConMembresia.includes(tipo)) {
+      if (fecha_inicio_suscripcion) {
+        updates.push(`fecha_inicio_suscripcion = $${idx++}`);
+        values.push(fecha_inicio_suscripcion);
+      }
+      if (fecha_fin_suscripcion) {
+        updates.push(`fecha_fin_suscripcion = $${idx++}`);
+        values.push(fecha_fin_suscripcion);
+      }
+      if (estado_pago) {
+        updates.push(`estado_pago = $${idx++}`);
+        values.push(estado_pago);
+      }
+    }
+
+    values.push(id);
+    await pool.query(
+      `UPDATE entidades SET ${updates.join(", ")} WHERE id = $${idx}`,
+      values,
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error POST /solicitudes/:id/aprobar:", err);
+    res.status(500).json({ error: "Error al aprobar solicitud" });
+  }
+});
+
+// POST /api/solicitudes/:id/rechazar — rechazar solicitud
+router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      "UPDATE entidades SET estado_sello = 'rechazado' WHERE id = $1",
+      [id],
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error POST /solicitudes/:id/rechazar:", err);
+    res.status(500).json({ error: "Error al rechazar solicitud" });
   }
 });
 

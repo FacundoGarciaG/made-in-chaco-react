@@ -49,11 +49,15 @@ export const MapChaco = () => {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const [geoData, setGeoData] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('made-in-chaco-dark-mode') === 'true');
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("made-in-chaco-dark-mode") === "true",
+  );
   const [filtro, setFiltro] = useState("todos");
   const [terminoBusqueda, setTerminoBusqueda] = useState("");
   const [localidades, setLocalidades] = useState([]);
   const [departamentos, setDepartamentos] = useState(null);
+  const [provincia, setProvincia] = useState(null);
+  const [showDepartamentos, setShowDepartamentos] = useState(false);
   const [filtroLocalidad, setFiltroLocalidad] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -82,13 +86,18 @@ export const MapChaco = () => {
   const clickResetFilterRef = useRef(false);
   const filtroRef = useRef(filtro);
   const filtroLocalidadRef = useRef(filtroLocalidad);
+  const showDepartamentosRef = useRef(showDepartamentos);
 
   // 0. Restaurar estado del mapa al volver
   const savedState = sessionStorage.getItem("mapState");
   const parsedState = savedState ? JSON.parse(savedState) : null;
   const returningToMap = sessionStorage.getItem("return-to-map") === "true";
-  const initialCenter = parsedState ? parsedState.center : (returningToMap ? [-60.44, -26.05] : [60.44, 25.4]);
-  const initialZoom = parsedState ? parsedState.zoom : (returningToMap ? 7 : 0);
+  const initialCenter = parsedState
+    ? parsedState.center
+    : returningToMap
+      ? [-60.44, -26.05]
+      : [60.44, 25.4];
+  const initialZoom = parsedState ? parsedState.zoom : returningToMap ? 7 : 0;
 
   // 1. Inicializar el mapa y limpiar audio al desmontar
   useEffect(() => {
@@ -145,12 +154,14 @@ export const MapChaco = () => {
     } else {
       // Primera visita: mapa en blanco y negro desde el inicio
       const applyGrayscale = () => {
-        try { map.getCanvas().classList.add('grayscale-canvas'); } catch (_) {}
+        try {
+          map.getCanvas().classList.add("grayscale-canvas");
+        } catch (_) {}
       };
       if (map.isStyleLoaded()) {
         applyGrayscale();
       } else {
-        map.once('style.load', applyGrayscale);
+        map.once("style.load", applyGrayscale);
       }
     }
 
@@ -198,6 +209,10 @@ export const MapChaco = () => {
     window.__filtrosActuales = { filtro, filtroLocalidad, terminoBusqueda };
   }, [filtro, filtroLocalidad, terminoBusqueda]);
 
+  useEffect(() => {
+    showDepartamentosRef.current = showDepartamentos;
+  }, [showDepartamentos]);
+
   // Ref para saber si el usuario ya hizo click en el overlay
   const introStartedRef = useRef(false);
 
@@ -220,24 +235,31 @@ export const MapChaco = () => {
 
     // Poner el mapa en blanco y negro antes del flyTo
     const canvas = map.getCanvas();
-    canvas.style.filter = 'grayscale(1)';
-    canvas.style.transition = 'filter 0.1s linear';
+    canvas.style.filter = "grayscale(1)";
+    canvas.style.transition = "filter 0.1s linear";
 
     // Animar de BW a color durante el flyTo
     const onMove = () => {
       const progress = Math.min(map.getZoom() / 7, 1);
       canvas.style.filter = `grayscale(${1 - progress})`;
     };
-    map.on('move', onMove);
+    map.on("move", onMove);
 
     // setTimeout para dar respiro al navegador
     const timerId = setTimeout(() => {
       // Intentar reproducir audio
-      audio.play()
+      audio
+        .play()
         .then(() => console.log("Audio de intro reproducido correctamente"))
         .catch(() => {
           // Reintentar una vez
-          setTimeout(() => audio.play().catch(() => { audioRef.current = null; }), 200);
+          setTimeout(
+            () =>
+              audio.play().catch(() => {
+                audioRef.current = null;
+              }),
+            200,
+          );
         });
 
       map.flyTo({
@@ -251,9 +273,9 @@ export const MapChaco = () => {
 
     // RE-ACTIVAR interacción cuando termine el movimiento
     map.once("moveend", () => {
-      canvas.style.filter = 'grayscale(0)';
-      canvas.style.transition = 'none';
-      map.off('move', onMove);
+      canvas.style.filter = "grayscale(0)";
+      canvas.style.transition = "none";
+      map.off("move", onMove);
 
       map.dragPan.enable();
       map.scrollZoom.enable();
@@ -298,14 +320,26 @@ export const MapChaco = () => {
     // Cargar localidades
     fetch("/api/localidades")
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setLocalidades(data); })
+      .then((data) => {
+        if (!cancelled) setLocalidades(data);
+      })
       .catch((err) => console.error("Error cargando localidades:", err));
 
     // Cargar departamentos (polígonos)
     fetch("/api/departamentos")
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setDepartamentos(data); })
+      .then((data) => {
+        if (!cancelled) setDepartamentos(data);
+      })
       .catch((err) => console.error("Error cargando departamentos:", err));
+
+    // Cargar contorno unificado de la provincia
+    fetch("/api/provincia")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setProvincia(data);
+      })
+      .catch((err) => console.error("Error cargando provincia:", err));
 
     // Cargar puntos del mapa
     fetch("/api/mapa-puntos")
@@ -318,7 +352,10 @@ export const MapChaco = () => {
             type: "Feature",
             geometry: {
               type: "Point",
-              coordinates: [parseFloat(punto.longitud), parseFloat(punto.latitud)],
+              coordinates: [
+                parseFloat(punto.longitud),
+                parseFloat(punto.latitud),
+              ],
             },
             properties: { ...punto },
           })),
@@ -327,7 +364,9 @@ export const MapChaco = () => {
         window.__geoData = geojson;
       })
       .catch((err) => console.error("Error cargando GeoJSON:", err));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Construir lookups por ID de entidad
@@ -347,11 +386,17 @@ export const MapChaco = () => {
   const limpiarConexiones = useCallback((map) => {
     hoveredLineIdRef.current = null;
     try {
-      if (conexionesLayerRef.current && map?.getLayer(conexionesLayerRef.current)) {
+      if (
+        conexionesLayerRef.current &&
+        map?.getLayer(conexionesLayerRef.current)
+      ) {
         map.removeLayer(conexionesLayerRef.current);
         conexionesLayerRef.current = null;
       }
-      if (conexionesSourceRef.current && map?.getSource(conexionesSourceRef.current)) {
+      if (
+        conexionesSourceRef.current &&
+        map?.getSource(conexionesSourceRef.current)
+      ) {
         map.removeSource(conexionesSourceRef.current);
         conexionesSourceRef.current = null;
       }
@@ -364,7 +409,10 @@ export const MapChaco = () => {
       clearInterval(routeAnimRef.current);
       routeAnimRef.current = null;
     }
-    if (recorridoGlowLayerRef.current && map?.getLayer(recorridoGlowLayerRef.current)) {
+    if (
+      recorridoGlowLayerRef.current &&
+      map?.getLayer(recorridoGlowLayerRef.current)
+    ) {
       map.removeLayer(recorridoGlowLayerRef.current);
       recorridoGlowLayerRef.current = null;
     }
@@ -372,7 +420,10 @@ export const MapChaco = () => {
       map.removeLayer(recorridoLayerRef.current);
       recorridoLayerRef.current = null;
     }
-    if (recorridoSourceRef.current && map?.getSource(recorridoSourceRef.current)) {
+    if (
+      recorridoSourceRef.current &&
+      map?.getSource(recorridoSourceRef.current)
+    ) {
       map.removeSource(recorridoSourceRef.current);
       recorridoSourceRef.current = null;
     }
@@ -411,154 +462,206 @@ export const MapChaco = () => {
   }, []);
 
   // Dibujar líneas de conexión con animación de trazado
-  const dibujarConexiones = useCallback(async (entityId, clickedCoords, map, existingData) => {
-    limpiarConexiones(map);
-    try {
-    let data;
-    if (existingData) {
-      data = existingData;
-    } else {
+  const dibujarConexiones = useCallback(
+    async (entityId, clickedCoords, map, existingData) => {
+      limpiarConexiones(map);
       try {
-        const res = await fetch(`/api/entidades/${entityId}/conexiones`);
-        if (!res.ok) return;
-        data = await res.json();
-      } catch (_) { return; }
-    }
-    const lookup = entidadCoordsRef.current;
-    const fullCurves = [];
-    const conectados = [];
-    const seenIds = new Set();
-    let featIndex = 0;
-    for (const c of data) {
-      const isOrigin = c.entidad_origen_id === entityId;
-      const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-      if (seenIds.has(otherId)) continue;
-      seenIds.add(otherId);
-      const otherCoords = lookup[otherId];
-      if (!otherCoords) continue;
-      const tipo = isOrigin ? c.tipo_destino : c.tipo_origen;
-      const nombre = isOrigin ? c.nombre_destino : c.nombre_origen;
-      const slug = isOrigin ? c.slug_destino : c.slug_origen;
-      const entData = entidadDataRef.current[otherId];
-      const resumen = entData?.resumen || "";
-      featIndex++;
-      fullCurves.push({
-        curve: generarCurva(clickedCoords, otherCoords),
-        id: featIndex,
-        properties: { id: otherId, nombre, slug, tipo, resumen },
-      });
-      conectados.push({ nombre, slug, tipo });
-    }
-    if (fullCurves.length === 0) return;
-
-    const sourceId = `conexiones-${entityId}`;
-    const layerId = `capa-conexiones-${entityId}`;
-
-    map.addSource(sourceId, {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] },
-    });
-
-    map.addLayer({
-      id: layerId,
-      type: "line",
-      source: sourceId,
-      layout: { "line-join": "round", "line-cap": "round" },
-      paint: {
-        "line-color": [
-          "match", ["get", "tipo"],
-          "artesano", "#ff5722", "gastronomia", "#4caf50",
-          "comercio", "#2196f3", "evento", "#9c27b0",
-          "patrimonio", "#795548", "personalidad", "#e91e63",
-          "#863819",
-        ],
-        "line-width": [
-          "case",
-          ["boolean", ["feature-state", "hover"], false],
-          5,
-          2.5,
-        ],
-        "line-opacity": [
-          "case",
-          ["boolean", ["feature-state", "hover"], false],
-          1,
-          0.6,
-        ],
-      },
-    });
-
-    // Hover: resaltar solo la línea hovereada con feature-state
-    map.on("mouseenter", layerId, (e) => {
-      map.getCanvas().style.cursor = "";
-      const fid = e.features?.[0]?.id;
-      if (fid != null) {
-        if (hoveredLineIdRef.current != null) {
-          map.setFeatureState({ source: sourceId, id: hoveredLineIdRef.current }, { hover: false });
+        let data;
+        if (existingData) {
+          data = existingData;
+        } else {
+          try {
+            const res = await fetch(`/api/entidades/${entityId}/conexiones`);
+            if (!res.ok) return;
+            data = await res.json();
+          } catch (_) {
+            return;
+          }
         }
-        hoveredLineIdRef.current = fid;
-        map.setFeatureState({ source: sourceId, id: fid }, { hover: true });
-      }
-    });
-    map.on("mouseleave", layerId, () => {
-      map.getCanvas().style.cursor = "";
-      if (hoveredLineIdRef.current != null) {
-        try { map.setFeatureState({ source: sourceId, id: hoveredLineIdRef.current }, { hover: false }); } catch (_) {}
-        hoveredLineIdRef.current = null;
-      }
-    });
+        const lookup = entidadCoordsRef.current;
+        const fullCurves = [];
+        const conectados = [];
+        const seenIds = new Set();
+        let featIndex = 0;
+        for (const c of data) {
+          const isOrigin = c.entidad_origen_id === entityId;
+          const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
+          if (seenIds.has(otherId)) continue;
+          seenIds.add(otherId);
+          const otherCoords = lookup[otherId];
+          if (!otherCoords) continue;
+          const tipo = isOrigin ? c.tipo_destino : c.tipo_origen;
+          const nombre = isOrigin ? c.nombre_destino : c.nombre_origen;
+          const slug = isOrigin ? c.slug_destino : c.slug_origen;
+          const entData = entidadDataRef.current[otherId];
+          const resumen = entData?.resumen || "";
+          featIndex++;
+          fullCurves.push({
+            curve: generarCurva(clickedCoords, otherCoords),
+            id: featIndex,
+            properties: { id: otherId, nombre, slug, tipo, resumen },
+          });
+          conectados.push({ nombre, slug, tipo });
+        }
+        if (fullCurves.length === 0) return;
 
-    conexionesSourceRef.current = sourceId;
-    conexionesLayerRef.current = layerId;
+        const sourceId = `conexiones-${entityId}`;
+        const layerId = `capa-conexiones-${entityId}`;
 
-    // Animación de trazado progresivo
-    const duracionMs = 1500;
-    const fps = 30;
-    const totalFrames = Math.ceil(duracionMs / (1000 / fps));
-    let frame = 0;
-
-    const anim = setInterval(() => {
-      frame++;
-      const progress = Math.min(frame / totalFrames, 1);
-      const partialFeatures = fullCurves.map((fc) => ({
-        type: "Feature",
-        id: fc.id,
-        geometry: {
-          type: "LineString",
-          coordinates: fc.curve.slice(
-            0,
-            Math.max(2, Math.ceil(fc.curve.length * progress)),
-          ),
-        },
-        properties: fc.properties,
-      }));
-      try {
-        map.getSource(sourceId)?.setData({
-          type: "FeatureCollection",
-          features: partialFeatures,
+        map.addSource(sourceId, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
         });
-      } catch (e) {
-        clearInterval(anim);
-      }
-      if (frame >= totalFrames) clearInterval(anim);
-    }, 1000 / fps);
 
-    // Actualizar popup con chips de entidades conectadas
-    if (conectados.length > 0 && popupRef.current) {
-      const popupEl = popupRef.current.getElement();
-      const container = popupEl?.querySelector(".conexiones-container");
-      if (container) {
-        container.innerHTML = conectados
-          .map((c) => {
-            const chipColor = ({ artesano: "#ff5722", gastronomia: "#4caf50", comercio: "#2196f3", evento: "#9c27b0", patrimonio: "#795548", personalidad: "#e91e63" })[c.tipo] || "#863819";
-            return `<a href="/entidad/${c.slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:${chipColor}15;color:${chipColor};font-size:10px;font-weight:800;letter-spacing:0.5px;text-decoration:none;text-transform:uppercase;white-space:nowrap">${c.nombre}</a>`;
-          })
-          .join("");
+        map.addLayer({
+          id: layerId,
+          type: "line",
+          source: sourceId,
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": [
+              "match",
+              ["get", "tipo"],
+              "artesano",
+              "#ff5722",
+              "gastronomia",
+              "#4caf50",
+              "comercio",
+              "#2196f3",
+              "evento",
+              "#9c27b0",
+              "patrimonio",
+              "#795548",
+              "personalidad",
+              "#e91e63",
+              "comunidad_indigena",
+              "#8B4513",
+              "lugar_natural",
+              "#2E7D32",
+              "hospedaje",
+              "#FF6F00",
+              "productor",
+              "#00695C",
+              "experiencia",
+              "#6A1B9A",
+              "relato",
+              "#D84315",
+              "espacio_cultural",
+              "#37474F",
+              "#863819",
+            ],
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              5,
+              2.5,
+            ],
+            "line-opacity": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              1,
+              0.6,
+            ],
+          },
+        });
+
+        // Hover: resaltar solo la línea hovereada con feature-state
+        map.on("mouseenter", layerId, (e) => {
+          map.getCanvas().style.cursor = "";
+          const fid = e.features?.[0]?.id;
+          if (fid != null) {
+            if (hoveredLineIdRef.current != null) {
+              map.setFeatureState(
+                { source: sourceId, id: hoveredLineIdRef.current },
+                { hover: false },
+              );
+            }
+            hoveredLineIdRef.current = fid;
+            map.setFeatureState({ source: sourceId, id: fid }, { hover: true });
+          }
+        });
+        map.on("mouseleave", layerId, () => {
+          map.getCanvas().style.cursor = "";
+          if (hoveredLineIdRef.current != null) {
+            try {
+              map.setFeatureState(
+                { source: sourceId, id: hoveredLineIdRef.current },
+                { hover: false },
+              );
+            } catch (_) {}
+            hoveredLineIdRef.current = null;
+          }
+        });
+
+        conexionesSourceRef.current = sourceId;
+        conexionesLayerRef.current = layerId;
+
+        // Animación de trazado progresivo
+        const duracionMs = 1500;
+        const fps = 30;
+        const totalFrames = Math.ceil(duracionMs / (1000 / fps));
+        let frame = 0;
+
+        const anim = setInterval(() => {
+          frame++;
+          const progress = Math.min(frame / totalFrames, 1);
+          const partialFeatures = fullCurves.map((fc) => ({
+            type: "Feature",
+            id: fc.id,
+            geometry: {
+              type: "LineString",
+              coordinates: fc.curve.slice(
+                0,
+                Math.max(2, Math.ceil(fc.curve.length * progress)),
+              ),
+            },
+            properties: fc.properties,
+          }));
+          try {
+            map.getSource(sourceId)?.setData({
+              type: "FeatureCollection",
+              features: partialFeatures,
+            });
+          } catch (e) {
+            clearInterval(anim);
+          }
+          if (frame >= totalFrames) clearInterval(anim);
+        }, 1000 / fps);
+
+        // Actualizar popup con chips de entidades conectadas
+        if (conectados.length > 0 && popupRef.current) {
+          const popupEl = popupRef.current.getElement();
+          const container = popupEl?.querySelector(".conexiones-container");
+          if (container) {
+            container.innerHTML = conectados
+              .map((c) => {
+                const chipColor =
+                  {
+                    artesano: "#ff5722",
+                    gastronomia: "#4caf50",
+                    comercio: "#2196f3",
+                    evento: "#9c27b0",
+                    patrimonio: "#795548",
+                    personalidad: "#e91e63",
+                    comunidad_indigena: "#8B4513",
+                    lugar_natural: "#2E7D32",
+                    hospedaje: "#FF6F00",
+                    productor: "#00695C",
+                    experiencia: "#6A1B9A",
+                    relato: "#D84315",
+                    espacio_cultural: "#37474F",
+                  }[c.tipo] || "#863819";
+                return `<a href="/entidad/${c.slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:${chipColor}15;color:${chipColor};font-size:10px;font-weight:800;letter-spacing:0.5px;text-decoration:none;text-transform:uppercase;white-space:nowrap">${c.nombre}</a>`;
+              })
+              .join("");
+          }
+        }
+      } catch (err) {
+        console.error("Error al cargar conexiones:", err);
       }
-    }
-    } catch (err) {
-      console.error("Error al cargar conexiones:", err);
-    }
-  }, [limpiarConexiones, generarCurva]);
+    },
+    [limpiarConexiones, generarCurva],
+  );
 
   // 3. Efecto para manejar el zoom cuando se selecciona una localidad
   useEffect(() => {
@@ -607,6 +710,13 @@ export const MapChaco = () => {
         "evento",
         "patrimonio",
         "personalidad",
+        "comunidad_indigena",
+        "lugar_natural",
+        "hospedaje",
+        "productor",
+        "experiencia",
+        "relato",
+        "espacio_cultural",
       ];
 
       await Promise.all(
@@ -627,9 +737,12 @@ export const MapChaco = () => {
         }),
       );
 
-      // B. Capa de polígonos de departamentos
+      // A. Capa de polígonos de departamentos
       if (departamentos && !map.getSource("departamentos")) {
-        map.addSource("departamentos", { type: "geojson", data: departamentos });
+        map.addSource("departamentos", {
+          type: "geojson",
+          data: departamentos,
+        });
         map.addLayer({
           id: "capa-departamentos",
           type: "fill",
@@ -638,6 +751,19 @@ export const MapChaco = () => {
             "fill-color": "#863819",
             "fill-opacity": 0.04,
             "fill-outline-color": "rgba(134, 56, 25, 0.19)",
+          },
+        });
+        map.addLayer({
+          id: "capa-departamentos-lineas",
+          type: "line",
+          source: "departamentos",
+          layout: {
+            visibility: "none",
+          },
+          paint: {
+            "line-color": "#863819",
+            "line-opacity": 0.6,
+            "line-width": 1.5,
           },
         });
       }
@@ -721,17 +847,55 @@ export const MapChaco = () => {
           }
         });
 
+        // Hover sobre departamentos
+        let hoverDeptEl = document.getElementById("dept-hover-label");
+        if (!hoverDeptEl) {
+          hoverDeptEl = document.createElement("div");
+          hoverDeptEl.id = "dept-hover-label";
+          hoverDeptEl.style.cssText =
+            "position:absolute;top:90px;left:50%;transform:translateX(-50%);padding:8px 24px;background:linear-gradient(180deg,rgba(255,255,255,0.15) 0%,rgba(210,195,165,0.35) 40%,rgba(210,195,165,0.6) 100%);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);border-radius:12px;font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:#000;text-align:center;letter-spacing:1px;z-index:10;pointer-events:none;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.15)";
+          map.getContainer().appendChild(hoverDeptEl);
+        }
+
+        map.on("mousemove", "capa-departamentos", (e) => {
+          if (!showDepartamentosRef.current) return;
+          const nombre = e.features?.[0]?.properties?.nombre;
+          if (nombre) {
+            hoverDeptEl.textContent = nombre;
+            hoverDeptEl.style.display = "block";
+          }
+        });
+        map.on("mouseleave", "capa-departamentos", () => {
+          hoverDeptEl.style.display = "none";
+        });
+
         // Evento Click - Popup detallado moderno
         map.on("click", "capa-puntos", async (e) => {
           // Resetear filtros de categoría y localidad
-          if (filtroRef.current !== "todos" || filtroLocalidadRef.current !== "") {
+          if (
+            filtroRef.current !== "todos" ||
+            filtroLocalidadRef.current !== ""
+          ) {
             clickResetFilterRef.current = true;
             setFiltro("todos");
             setFiltroLocalidad("");
-            window.dispatchEvent(new CustomEvent("header-localidad-reset", { detail: "" }));
+            window.dispatchEvent(
+              new CustomEvent("header-localidad-reset", { detail: "" }),
+            );
           }
           const coordinates = e.features[0].geometry.coordinates.slice();
-          const { id, nombre, resumen, slug, tipo, imagen, horario_apertura, horario_cierre, dias_abierto, fecha_evento } = e.features[0].properties;
+          const {
+            id,
+            nombre,
+            resumen,
+            slug,
+            tipo,
+            imagen,
+            horario_apertura,
+            horario_cierre,
+            dias_abierto,
+            fecha_evento,
+          } = e.features[0].properties;
           const colorMap = {
             artesano: "#ff5722",
             gastronomia: "#4caf50",
@@ -739,6 +903,13 @@ export const MapChaco = () => {
             evento: "#9c27b0",
             patrimonio: "#795548",
             personalidad: "#e91e63",
+            comunidad_indigena: "#8B4513",
+            lugar_natural: "#2E7D32",
+            hospedaje: "#FF6F00",
+            productor: "#00695C",
+            experiencia: "#6A1B9A",
+            relato: "#D84315",
+            espacio_cultural: "#37474F",
           };
           const catColor = colorMap[tipo] || "#863819";
 
@@ -769,13 +940,20 @@ export const MapChaco = () => {
           lastClickedEntityRef.current = id;
           setEntityActive(true);
           if (isSameEntity) {
-            map.flyTo({ center: coordinates, zoom: 14, speed: 0.5, essential: true });
+            map.flyTo({
+              center: coordinates,
+              zoom: 14,
+              speed: 0.5,
+              essential: true,
+            });
           } else {
             const bounds = new mapboxgl.LngLatBounds(coordinates, coordinates);
             const lookup = entidadCoordsRef.current;
             for (const c of conexionesData) {
               const isOrigin = c.entidad_origen_id === id;
-              const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
+              const otherId = isOrigin
+                ? c.entidad_destino_id
+                : c.entidad_origen_id;
               const otherCoords = lookup[otherId];
               if (otherCoords) bounds.extend(otherCoords);
             }
@@ -784,8 +962,22 @@ export const MapChaco = () => {
 
           // Determinar si el comercio está abierto ahora
           const getOpenBadge = () => {
-            if (tipo !== "comercio" || !dias_abierto || !horario_apertura || !horario_cierre) return "";
-            const diasSemana = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+            if (
+              tipo !== "comercio" ||
+              !dias_abierto ||
+              !horario_apertura ||
+              !horario_cierre
+            )
+              return "";
+            const diasSemana = [
+              "Domingo",
+              "Lunes",
+              "Martes",
+              "Miércoles",
+              "Jueves",
+              "Viernes",
+              "Sábado",
+            ];
             const hoy = diasSemana[new Date().getDay()];
             const dias = dias_abierto.split(",").map((d) => d.trim());
             if (!dias.includes(hoy)) {
@@ -806,9 +998,14 @@ export const MapChaco = () => {
 
           const eventBadge = (() => {
             if (tipo !== "evento" || !fecha_evento) return "";
-            const diff = Math.ceil((new Date(fecha_evento) - new Date(new Date().toDateString())) / 86400000);
-            if (diff === 0) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
-            if (diff <= 7) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
+            const diff = Math.ceil(
+              (new Date(fecha_evento) - new Date(new Date().toDateString())) /
+                86400000,
+            );
+            if (diff === 0)
+              return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
+            if (diff <= 7)
+              return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
             return "";
           })();
 
@@ -853,7 +1050,7 @@ export const MapChaco = () => {
                     font-weight: 700;
                     line-height: 1.3;
                   ">${nombre}</h3>
-                  ${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ''}
+                  ${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ""}
                 </div>
                 <p style="
                   font-size: 12px;
@@ -996,10 +1193,16 @@ export const MapChaco = () => {
               const allIds = [...ids, id];
               for (const c of conexionesData) {
                 const isOrigin = c.entidad_origen_id === id;
-                const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
+                const otherId = isOrigin
+                  ? c.entidad_destino_id
+                  : c.entidad_origen_id;
                 if (!allIds.includes(otherId)) allIds.push(otherId);
               }
-              map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", allIds]]);
+              map.setFilter("capa-puntos", [
+                "in",
+                ["get", "id"],
+                ["literal", allIds],
+              ]);
             }
           }
         });
@@ -1007,12 +1210,16 @@ export const MapChaco = () => {
         // Click en fondo del mapa (no punto, no línea) → cerrar popup y conexiones
         map.on("click", (e) => {
           if (!popupRef.current && !recorridoPopup) return;
-          const underPoint = map.queryRenderedFeatures(e.point, { layers: ["capa-puntos"] });
+          const underPoint = map.queryRenderedFeatures(e.point, {
+            layers: ["capa-puntos"],
+          });
           if (underPoint.length > 0) return;
           const styleLayers = map.getStyle()?.layers || [];
           for (const l of styleLayers) {
             if (l.id.startsWith("capa-conexiones-") && map.getLayer(l.id)) {
-              const underLine = map.queryRenderedFeatures(e.point, { layers: [l.id] });
+              const underLine = map.queryRenderedFeatures(e.point, {
+                layers: [l.id],
+              });
               if (underLine.length > 0) return;
             }
           }
@@ -1027,7 +1234,11 @@ export const MapChaco = () => {
               map.setFilter("capa-puntos", savedPuntosFilterRef.current);
               savedPuntosFilterRef.current = null;
             } else if (recorridoRouteDataRef.current) {
-              map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", recorridoRouteDataRef.current.entityIds]]);
+              map.setFilter("capa-puntos", [
+                "in",
+                ["get", "id"],
+                ["literal", recorridoRouteDataRef.current.entityIds],
+              ]);
             }
           }
           limpiarConexiones(map);
@@ -1078,7 +1289,6 @@ export const MapChaco = () => {
             "capa-puntos",
             filtroFinal.length > 1 ? filtroFinal : null,
           );
-
         }
       }
     };
@@ -1088,7 +1298,15 @@ export const MapChaco = () => {
     } else {
       map.once("idle", inicializarCapaYRecursos);
     }
-  }, [geoData, departamentos, filtro, filtroLocalidad, terminoBusqueda, showControls]); // Se encarga de todo cuando algo cambia
+  }, [
+    geoData,
+    departamentos,
+    provincia,
+    filtro,
+    filtroLocalidad,
+    terminoBusqueda,
+    showControls,
+  ]); // Se encarga de todo cuando algo cambia
 
   // Escuchar búsqueda desde el HeaderComponent
   useEffect(() => {
@@ -1156,35 +1374,85 @@ export const MapChaco = () => {
       }
       map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
 
-      const { nombre: n, resumen, slug, tipo, imagen, horario_apertura, horario_cierre, dias_abierto, fecha_evento } = coincidencia.properties;
-      const colorMap = { artesano: "#ff5722", gastronomia: "#4caf50", comercio: "#2196f3", evento: "#9c27b0", patrimonio: "#795548", personalidad: "#e91e63" };
+      const {
+        nombre: n,
+        resumen,
+        slug,
+        tipo,
+        imagen,
+        horario_apertura,
+        horario_cierre,
+        dias_abierto,
+        fecha_evento,
+      } = coincidencia.properties;
+      const colorMap = {
+        artesano: "#ff5722",
+        gastronomia: "#4caf50",
+        comercio: "#2196f3",
+        evento: "#9c27b0",
+        patrimonio: "#795548",
+        personalidad: "#e91e63",
+        comunidad_indigena: "#8B4513",
+        lugar_natural: "#2E7D32",
+        hospedaje: "#FF6F00",
+        productor: "#00695C",
+        experiencia: "#6A1B9A",
+        relato: "#D84315",
+        espacio_cultural: "#37474F",
+      };
       const catColor = colorMap[tipo] || "#863819";
       const openBadge2 = (() => {
-        if (tipo !== "comercio" || !dias_abierto || !horario_apertura || !horario_cierre) return "";
-        const diasSemana = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+        if (
+          tipo !== "comercio" ||
+          !dias_abierto ||
+          !horario_apertura ||
+          !horario_cierre
+        )
+          return "";
+        const diasSemana = [
+          "Domingo",
+          "Lunes",
+          "Martes",
+          "Miércoles",
+          "Jueves",
+          "Viernes",
+          "Sábado",
+        ];
         const hoy = diasSemana[new Date().getDay()];
         const dias = dias_abierto.split(",").map((d) => d.trim());
-        if (!dias.includes(hoy)) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
+        if (!dias.includes(hoy))
+          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
         const ahora = new Date();
         const [hA, mA] = horario_apertura.split(":").map(Number);
         const [hC, mC] = horario_cierre.split(":").map(Number);
         const minActual = ahora.getHours() * 60 + ahora.getMinutes();
         const minApertura = hA * 60 + mA;
         const minCierre = hC * 60 + mC;
-        if (minActual >= minApertura && minActual < minCierre) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Abierto</span>`;
+        if (minActual >= minApertura && minActual < minCierre)
+          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Abierto</span>`;
         return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
       })();
       const eventBadge2 = (() => {
         if (tipo !== "evento" || !fecha_evento) return "";
-        const diff = Math.ceil((new Date(fecha_evento) - new Date(new Date().toDateString())) / 86400000);
-        if (diff === 0) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
-        if (diff <= 7) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
+        const diff = Math.ceil(
+          (new Date(fecha_evento) - new Date(new Date().toDateString())) /
+            86400000,
+        );
+        if (diff === 0)
+          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
+        if (diff <= 7)
+          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
         return "";
       })();
 
-      const html = `<div style="padding:16px;min-width:240px;max-width:280px;font-family:'Epilogue',sans-serif;position:relative;"><div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${catColor};border-radius:3px 0 0 3px;"></div><div style="margin-left:8px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="display:inline-block;padding:2px 10px;border-radius:20px;background:${catColor}15;color:${catColor};font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">${tipo}</div>${openBadge2}${eventBadge2}</div><div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px 0;"><h3 style="margin:0;flex:1;color:#2D1A12;font-family:'Cinzel',serif;font-size:16px;font-weight:700;line-height:1.3;">${n}</h3>${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ''}</div><p style="font-size:12px;color:#666;line-height:1.5;margin:0 0 12px 0;">${resumen}</p><div style="display:flex;gap:6px;flex-wrap:wrap;"><a href="/entidad/${slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:linear-gradient(135deg,${catColor},${catColor}dd);color:white;text-decoration:none;border-radius:25px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px ${catColor}40;">Explorar <span style="font-size:14px;line-height:1;">→</span></a><div style="margin-top:6px;position:relative;display:inline-block;"><button onclick="var m=this.nextElementSibling;m.style.display=m.style.display==='flex'?'none':'flex';" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:transparent;color:#4285F4;border:1px solid #4285F4;border-radius:25px;font-size:10px;font-weight:600;cursor:pointer;font-family:'Epilogue',sans-serif;line-height:1.4;">Cómo llegar</button><div style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:white;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:6px;gap:4px;z-index:10;flex-direction:column;min-width:140px;"><a href="https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Google Maps</a><a href="https://waze.com/ul?ll=${coords[1]},${coords[0]}&navigate=yes" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Waze</a><a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Apple Maps</a></div></div></div></div></div>`;
+      const html = `<div style="padding:16px;min-width:240px;max-width:280px;font-family:'Epilogue',sans-serif;position:relative;"><div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${catColor};border-radius:3px 0 0 3px;"></div><div style="margin-left:8px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="display:inline-block;padding:2px 10px;border-radius:20px;background:${catColor}15;color:${catColor};font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">${tipo}</div>${openBadge2}${eventBadge2}</div><div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px 0;"><h3 style="margin:0;flex:1;color:#2D1A12;font-family:'Cinzel',serif;font-size:16px;font-weight:700;line-height:1.3;">${n}</h3>${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ""}</div><p style="font-size:12px;color:#666;line-height:1.5;margin:0 0 12px 0;">${resumen}</p><div style="display:flex;gap:6px;flex-wrap:wrap;"><a href="/entidad/${slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:linear-gradient(135deg,${catColor},${catColor}dd);color:white;text-decoration:none;border-radius:25px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px ${catColor}40;">Explorar <span style="font-size:14px;line-height:1;">→</span></a><div style="margin-top:6px;position:relative;display:inline-block;"><button onclick="var m=this.nextElementSibling;m.style.display=m.style.display==='flex'?'none':'flex';" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:transparent;color:#4285F4;border:1px solid #4285F4;border-radius:25px;font-size:10px;font-weight:600;cursor:pointer;font-family:'Epilogue',sans-serif;line-height:1.4;">Cómo llegar</button><div style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:white;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:6px;gap:4px;z-index:10;flex-direction:column;min-width:140px;"><a href="https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Google Maps</a><a href="https://waze.com/ul?ll=${coords[1]},${coords[0]}&navigate=yes" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Waze</a><a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Apple Maps</a></div></div></div></div></div>`;
 
-      popupRef.current = new mapboxgl.Popup({ offset: 15, closeButton: false, closeOnClick: false, maxWidth: "320px" })
+      popupRef.current = new mapboxgl.Popup({
+        offset: 15,
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: "320px",
+      })
         .setLngLat(coords)
         .setHTML(html)
         .addTo(map);
@@ -1195,7 +1463,11 @@ export const MapChaco = () => {
             m.setFilter("capa-puntos", savedPuntosFilterRef.current);
             savedPuntosFilterRef.current = null;
           } else if (recorridoRouteDataRef.current) {
-            m.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", recorridoRouteDataRef.current.entityIds]]);
+            m.setFilter("capa-puntos", [
+              "in",
+              ["get", "id"],
+              ["literal", recorridoRouteDataRef.current.entityIds],
+            ]);
           }
         }
         limpiarConexiones(m);
@@ -1203,18 +1475,26 @@ export const MapChaco = () => {
       dibujarConexiones(coincId, coords, map, conexData);
       if (map.getLayer("capa-puntos")) {
         savedPuntosFilterRef.current = map.getFilter("capa-puntos");
-        const ids = recorridoRouteDataRef.current ? recorridoRouteDataRef.current.entityIds : [];
+        const ids = recorridoRouteDataRef.current
+          ? recorridoRouteDataRef.current.entityIds
+          : [];
         const allIds = [...ids, coincId];
         for (const c of conexData) {
           const isOrigin = c.entidad_origen_id === coincId;
           const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
           if (!allIds.includes(otherId)) allIds.push(otherId);
         }
-        map.setFilter("capa-puntos", ["in", ["get", "id"], ["literal", allIds]]);
+        map.setFilter("capa-puntos", [
+          "in",
+          ["get", "id"],
+          ["literal", allIds],
+        ]);
       }
 
       // Restaurar el texto en el input
-      window.dispatchEvent(new CustomEvent("header-search-set", { detail: nombre }));
+      window.dispatchEvent(
+        new CustomEvent("header-search-set", { detail: nombre }),
+      );
     };
     window.addEventListener("header-search-select", handler);
     return () => window.removeEventListener("header-search-select", handler);
@@ -1295,7 +1575,7 @@ export const MapChaco = () => {
       const routeCoords = [];
       const entityIds = [];
       for (const p of pasos) {
-          const c = coords[p.entidad_id];
+        const c = coords[p.entidad_id];
         if (c) {
           routeCoords.push(c);
           entityIds.push(p.entidad_id);
@@ -1319,7 +1599,8 @@ export const MapChaco = () => {
         const points = [];
         const midLng = (f1[0] + f2[0]) / 2;
         const midLat = (f1[1] + f2[1]) / 2;
-        const d = Math.sqrt((f2[0] - f1[0]) ** 2 + (f2[1] - f1[1]) ** 2) || 0.001;
+        const d =
+          Math.sqrt((f2[0] - f1[0]) ** 2 + (f2[1] - f1[1]) ** 2) || 0.001;
         const offsetAmt = d * 0.12;
         const cpLng = midLng + (-(f2[1] - f1[1]) / d) * offsetAmt;
         const cpLat = midLat + ((f2[0] - f1[0]) / d) * offsetAmt;
@@ -1355,7 +1636,10 @@ export const MapChaco = () => {
       }
 
       // Add source with initial points (first segment at minimum)
-      const initialCoords = allRoutePoints.slice(0, Math.min(4, allRoutePoints.length));
+      const initialCoords = allRoutePoints.slice(
+        0,
+        Math.min(4, allRoutePoints.length),
+      );
       map.addSource(sourceId, {
         type: "geojson",
         data: {
@@ -1417,7 +1701,10 @@ export const MapChaco = () => {
           clearInterval(anim);
           return;
         }
-        const currentEnd = Math.max(2, Math.ceil(allRoutePoints.length * progress));
+        const currentEnd = Math.max(
+          2,
+          Math.ceil(allRoutePoints.length * progress),
+        );
         map.getSource(sourceId).setData({
           type: "Feature",
           properties: {},
@@ -1459,7 +1746,7 @@ export const MapChaco = () => {
     };
 
     dibujarRuta();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorridoActivo, geoData]);
 
   // Sincronizar Header cuando Footer cambia filtro
@@ -1538,7 +1825,9 @@ export const MapChaco = () => {
       setTerminoBusqueda("");
       setRecorridoActivo(null);
       limpiarRutaRecorrido(map);
-      window.dispatchEvent(new CustomEvent("header-recorrido", { detail: null }));
+      window.dispatchEvent(
+        new CustomEvent("header-recorrido", { detail: null }),
+      );
       map.flyTo({
         center: [-60.44, -26.05],
         zoom: 7,
@@ -1546,8 +1835,12 @@ export const MapChaco = () => {
         curve: 1.5,
         essential: true,
       });
-      window.dispatchEvent(new CustomEvent("header-filter-reset", { detail: "todos" }));
-      window.dispatchEvent(new CustomEvent("header-localidad-reset", { detail: "" }));
+      window.dispatchEvent(
+        new CustomEvent("header-filter-reset", { detail: "todos" }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("header-localidad-reset", { detail: "" }),
+      );
     };
 
     window.addEventListener("header-reset-map", handleReset);
@@ -1556,16 +1849,20 @@ export const MapChaco = () => {
 
   // 4b. Toggle dark mode on map canvas, persist, and broadcast
   useEffect(() => {
-    localStorage.setItem('made-in-chaco-dark-mode', darkMode);
+    localStorage.setItem("made-in-chaco-dark-mode", darkMode);
     const map = mapRef.current;
     if (!map) return;
     try {
       const canvas = map.getCanvas();
-      canvas.style.filter = darkMode ? 'brightness(0.7) saturate(0.6) invert(0.92) hue-rotate(180deg)' : '';
-      canvas.style.transition = 'filter 0.5s ease';
-      canvas.classList.remove('grayscale-canvas');
+      canvas.style.filter = darkMode
+        ? "brightness(0.7) saturate(0.6) invert(0.92) hue-rotate(180deg)"
+        : "";
+      canvas.style.transition = "filter 0.5s ease";
+      canvas.classList.remove("grayscale-canvas");
     } catch (_) {}
-    window.dispatchEvent(new CustomEvent("darkmode-toggle", { detail: darkMode }));
+    window.dispatchEvent(
+      new CustomEvent("darkmode-toggle", { detail: darkMode }),
+    );
   }, [darkMode]);
 
   // 5. Cerrar popups y limpiar conexiones cuando cambian los filtros
@@ -1582,11 +1879,21 @@ export const MapChaco = () => {
       popupRef.current = null;
     }
     setRecorridoActivo(null);
-  }, [filtro, filtroLocalidad, terminoBusqueda, limpiarConexiones, limpiarRutaRecorrido]);
+  }, [
+    filtro,
+    filtroLocalidad,
+    terminoBusqueda,
+    limpiarConexiones,
+    limpiarRutaRecorrido,
+  ]);
 
   // 6. Mostrar hint de ESC después de 5s con filtro/ruta activos
   useEffect(() => {
-    const anyActive = filtro !== "todos" || filtroLocalidad !== "" || recorridoActivo !== null || entityActive;
+    const anyActive =
+      filtro !== "todos" ||
+      filtroLocalidad !== "" ||
+      recorridoActivo !== null ||
+      entityActive;
 
     if (escHintTimerRef.current) {
       clearTimeout(escHintTimerRef.current);
@@ -1610,15 +1917,15 @@ export const MapChaco = () => {
   }, [filtro, filtroLocalidad, recorridoActivo, entityActive]);
 
   return (
-      <div
-        className={darkMode ? "dark-mode" : ""}
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100vh",
-          overflow: "hidden",
-        }}
-      >
+    <div
+      className={darkMode ? "dark-mode" : ""}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100vh",
+        overflow: "hidden",
+      }}
+    >
       {/* Estilos para animaciones */}
       <style>{welcomeOverlayStyles}</style>
       <style>{`
@@ -1799,7 +2106,6 @@ export const MapChaco = () => {
         </div>
       )}
 
-
       {/* ESC HINT - aparece tras 5s con filtro/ruta activa */}
       {showEscHint && (
         <div
@@ -1839,13 +2145,23 @@ export const MapChaco = () => {
             }}
           >
             Presioná ESC o{" "}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(252,249,242,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle", margin: "0 2px" }}>
-                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-                <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-              </svg>
-              {" "}para volver a la vista principal
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(252,249,242,0.7)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ verticalAlign: "middle", margin: "0 2px" }}
+            >
+              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>{" "}
+            para volver a la vista principal
           </div>
         </div>
       )}
@@ -1868,7 +2184,8 @@ export const MapChaco = () => {
             className="recorrido-popup-overlay"
             onClick={() => setRecorridoPopup(null)}
             style={{
-              background: "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
               backdropFilter: "blur(16px) saturate(1.2)",
               WebkitBackdropFilter: "blur(16px) saturate(1.2)",
               borderRadius: "12px",
@@ -1885,10 +2202,28 @@ export const MapChaco = () => {
             }}
           >
             <div>
-              <div className="recorrido-label" style={{ fontSize: "10px", color: "#863819", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", textShadow: "none" }}>
+              <div
+                className="recorrido-label"
+                style={{
+                  fontSize: "10px",
+                  color: "#863819",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  textShadow: "none",
+                }}
+              >
                 Recorrido
               </div>
-              <div className="recorrido-name" style={{ fontSize: "14px", fontWeight: 700, color: "#2d1a12", textShadow: "none" }}>
+              <div
+                className="recorrido-name"
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: "#2d1a12",
+                  textShadow: "none",
+                }}
+              >
                 {recorridoPopup.nombre}
               </div>
             </div>
@@ -1915,56 +2250,128 @@ export const MapChaco = () => {
       )}
 
       {/* LOCALIDAD DETAIL PANEL - borde superior derecho */}
-      {filtroLocalidad && (() => {
-        const loc = localidades.find((l) => l.id === parseInt(filtroLocalidad));
-        if (!loc) return null;
-        const fundDate = loc.fecha_fundacion ? new Date(loc.fecha_fundacion).getFullYear() : null;
-        return (
-          <div
-            className="localidad-detail-panel"
-            style={{
-              position: "absolute",
-              top: panelOpen ? "680px" : "95px",
-              right: "16px",
-              zIndex: 1500,
-              pointerEvents: "auto",
-              background: "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
-              backdropFilter: "blur(16px) saturate(1.2)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.2)",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-              animation: "filterPanelSlideIn 0.3s ease-out",
-              transition: "top 0.35s ease-out",
-              minWidth: "180px",
-            }}
-          >
-            <div className="localidad-name" style={{ fontSize: "15px", color: "#863819", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", textShadow: "none", marginBottom: "6px" }}>
-              {loc.nombre}
+      {filtroLocalidad &&
+        (() => {
+          const loc = localidades.find(
+            (l) => l.id === parseInt(filtroLocalidad),
+          );
+          if (!loc) return null;
+          const fundDate = loc.fecha_fundacion
+            ? new Date(loc.fecha_fundacion).getFullYear()
+            : null;
+          return (
+            <div
+              className="localidad-detail-panel"
+              style={{
+                position: "absolute",
+                top: panelOpen ? "680px" : "95px",
+                right: "16px",
+                zIndex: 1500,
+                pointerEvents: "auto",
+                background:
+                  "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
+                backdropFilter: "blur(16px) saturate(1.2)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.2)",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                animation: "filterPanelSlideIn 0.3s ease-out",
+                transition: "top 0.35s ease-out",
+                minWidth: "180px",
+              }}
+            >
+              <div
+                className="localidad-name"
+                style={{
+                  fontSize: "15px",
+                  color: "#863819",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  textShadow: "none",
+                  marginBottom: "6px",
+                }}
+              >
+                {loc.nombre}
+              </div>
+              {(loc.departamento_nombre || loc.departamento) && (
+                <div
+                  className="localidad-value"
+                  style={{
+                    fontSize: "13px",
+                    color: "#000",
+                    textShadow: "none",
+                    marginBottom: "3px",
+                  }}
+                >
+                  <span
+                    className="localidad-label"
+                    style={{ opacity: 0.6, color: "#000" }}
+                  >
+                    Departamento:
+                  </span>{" "}
+                  {loc.departamento_nombre || loc.departamento}
+                </div>
+              )}
+              {loc.habitantes != null && (
+                <div
+                  className="localidad-value"
+                  style={{
+                    fontSize: "13px",
+                    color: "#000",
+                    textShadow: "none",
+                    marginBottom: "3px",
+                  }}
+                >
+                  <span
+                    className="localidad-label"
+                    style={{ opacity: 0.6, color: "#000" }}
+                  >
+                    Población:
+                  </span>{" "}
+                  {loc.habitantes.toLocaleString()}
+                </div>
+              )}
+              {fundDate && (
+                <div
+                  className="localidad-value"
+                  style={{
+                    fontSize: "13px",
+                    color: "#000",
+                    textShadow: "none",
+                    marginBottom: "3px",
+                  }}
+                >
+                  <span
+                    className="localidad-label"
+                    style={{ opacity: 0.6, color: "#000" }}
+                  >
+                    Fundación:
+                  </span>{" "}
+                  {fundDate}
+                </div>
+              )}
+              {loc.gentilicio && (
+                <div
+                  className="localidad-value"
+                  style={{
+                    fontSize: "13px",
+                    color: "#000",
+                    textShadow: "none",
+                  }}
+                >
+                  <span
+                    className="localidad-label"
+                    style={{ opacity: 0.6, color: "#000" }}
+                  >
+                    Gentilicio:
+                  </span>{" "}
+                  {loc.gentilicio}
+                </div>
+              )}
             </div>
-            {(loc.departamento_nombre || loc.departamento) && (
-              <div className="localidad-value" style={{ fontSize: "13px", color: "#000", textShadow: "none", marginBottom: "3px" }}>
-                <span className="localidad-label" style={{ opacity: 0.6, color: "#000" }}>Departamento:</span> {loc.departamento_nombre || loc.departamento}
-              </div>
-            )}
-            {loc.habitantes != null && (
-              <div className="localidad-value" style={{ fontSize: "13px", color: "#000", textShadow: "none", marginBottom: "3px" }}>
-                <span className="localidad-label" style={{ opacity: 0.6, color: "#000" }}>Población:</span> {loc.habitantes.toLocaleString()}
-              </div>
-            )}
-            {fundDate && (
-              <div className="localidad-value" style={{ fontSize: "13px", color: "#000", textShadow: "none", marginBottom: "3px" }}>
-                <span className="localidad-label" style={{ opacity: 0.6, color: "#000" }}>Fundación:</span> {fundDate}
-              </div>
-            )}
-            {loc.gentilicio && (
-              <div className="localidad-value" style={{ fontSize: "13px", color: "#000", textShadow: "none" }}>
-                <span className="localidad-label" style={{ opacity: 0.6, color: "#000" }}>Gentilicio:</span> {loc.gentilicio}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* FOOTER ESTILO MAPA ANTIGUO */}
       <div
@@ -1988,6 +2395,18 @@ export const MapChaco = () => {
           localidades={localidades}
           filtroLocalidad={filtroLocalidad}
           onLocalidadChange={setFiltroLocalidad}
+          showDepartamentos={showDepartamentos}
+          onToggleDepartamentos={(val) => {
+            setShowDepartamentos(val);
+            const map = window.__mapInstance;
+            if (map?.getLayer("capa-departamentos-lineas")) {
+              map.setLayoutProperty(
+                "capa-departamentos-lineas",
+                "visibility",
+                val ? "visible" : "none",
+              );
+            }
+          }}
         />
       </div>
 

@@ -38,6 +38,13 @@ const colorMap = {
   evento: "#9c27b0",
   patrimonio: "#795548",
   personalidad: "#e91e63",
+  comunidad_indigena: "#8B4513",
+  lugar_natural: "#2E7D32",
+  hospedaje: "#FF6F00",
+  productor: "#00695C",
+  experiencia: "#6A1B9A",
+  relato: "#D84315",
+  espacio_cultural: "#37474F",
 };
 
 const titleVariants = {

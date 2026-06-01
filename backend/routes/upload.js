@@ -13,10 +13,10 @@ cloudinary.v2.config({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB público
 });
 
-// POST /api/upload
+// POST /api/upload (auth required)
 const uploadFields = upload.fields([
   { name: "archivo", maxCount: 1 },
   { name: "thumbnail", maxCount: 1 },
@@ -33,7 +33,6 @@ router.post("/upload", authMiddleware, uploadFields, async (req, res) => {
     const resourceMap = { foto: "image", video: "video", audio: "video" };
     const resourceType = resourceMap[tipoRecurso] || "image";
 
-    // Subir thumbnail si viene
     let thumbnailUrl = null;
     const thumbFile = req.files?.thumbnail?.[0];
     if (thumbFile) {
@@ -72,6 +71,40 @@ router.post("/upload", authMiddleware, uploadFields, async (req, res) => {
   } catch (err) {
     console.error("Cloudinary upload error:", err);
     res.status(500).json({ error: "Error al subir archivo a Cloudinary" });
+  }
+});
+
+// POST /api/upload-public — sin auth, solo imágenes hasta 5MB
+const uploadPublic = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No se envió ningún archivo" });
+    }
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.v2.uploader.upload_stream(
+        {
+          resource_type: "image",
+          folder: "made-in-chaco/solicitudes",
+          public_id: `pub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        },
+      );
+      stream.end(req.file.buffer);
+    });
+
+    res.status(201).json({ url: result.secure_url });
+  } catch (err) {
+    console.error("Public upload error:", err);
+    res.status(500).json({ error: "Error al subir archivo" });
   }
 });
 

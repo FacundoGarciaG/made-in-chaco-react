@@ -13,6 +13,7 @@ import { AdminPanel } from "./admin/AdminPanel";
 import { EntidadDetallePage } from "./pages/EntidadDetallePage";
 import { RecorridosPage } from "./pages/RecorridosPage";
 import { RecorridoDetallePage } from "./pages/RecorridoDetallePage";
+import { SolicitarSelloPage } from "./pages/SolicitarSelloPage";
 
 function MadeInChacoApp() {
   const location = useLocation();
@@ -39,6 +40,7 @@ function MadeInChacoApp() {
         <Route path="/entidad/:slug" element={<EntidadDetallePage />} />
         <Route path="/recorridos" element={<RecorridosPage />} />
         <Route path="/recorrido/:slug" element={<RecorridoDetallePage />} />
+        <Route path="/solicitar-sello" element={<SolicitarSelloPage />} />
         <Route path="/*" element={<Navigate to="/" />}></Route>
       </Routes>
     </>

@@ -26,4 +26,22 @@ router.get("/departamentos", async (_req, res) => {
   }
 });
 
+// GET /api/provincia — devuelve el contorno unificado de toda la provincia
+router.get("/provincia", async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT ST_AsGeoJSON(ST_Union(geom))::jsonb AS geometry
+      FROM departamentos
+    `);
+    res.json({
+      type: "Feature",
+      geometry: rows[0].geometry,
+      properties: { nombre: "Chaco" },
+    });
+  } catch (err) {
+    console.error("Error GET /provincia:", err);
+    res.status(500).json({ error: "Error al obtener provincia" });
+  }
+});
+
 export default router;

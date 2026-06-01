@@ -5,6 +5,7 @@ import "../styles/AdminPanel.css";
 import { useAuth } from "../context/AuthContext";
 import { validarArchivo, validarFormato, INFO_FORMATOS } from "../utils/mediaValidation";
 import { subirArchivo, subirImagen } from "./uploadService";
+import TagSelector from "../components/TagSelector";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -21,6 +22,13 @@ const colorMapAdmin = {
   evento: "#9c27b0",
   patrimonio: "#795548",
   personalidad: "#e91e63",
+  comunidad_indigena: "#8B4513",
+  lugar_natural: "#2E7D32",
+  hospedaje: "#FF6F00",
+  productor: "#00695C",
+  experiencia: "#6A1B9A",
+  relato: "#D84315",
+  espacio_cultural: "#37474F",
 };
 
 const DetailField = ({ field, fieldVal, onFieldChange, label, type = "text", options, placeholder }) => {
@@ -94,6 +102,8 @@ const SOCIAL_PLATFORMS = [
   { value: "tiktok", label: "TikTok", url: (v) => `https://www.tiktok.com/@${v}` },
   { value: "twitter", label: "X / Twitter", url: (v) => `https://x.com/${v}` },
   { value: "whatsapp", label: "WhatsApp", url: (v) => `https://wa.me/${v.replace(/[^0-9]/g, "")}` },
+  { value: "telefono", label: "Teléfono", url: (v) => v },
+  { value: "email", label: "Email", url: (v) => `mailto:${v}` },
   { value: "otro", label: "Otro", url: (v) => v },
 ];
 
@@ -307,7 +317,60 @@ const GastronomiaSelector = ({ value, onChange, allEntities }) => {
   );
 };
 
-function SocialMediaManager({ value, onChange }) {
+const QUE_INCLUYE_EXPERIENCIA = [
+  "Guía especializado", "Equipo de seguridad", "Refrigerio", "Almuerzo",
+  "Traslado ida y vuelta", "Entrada", "Seguro", "Hidratación",
+  "Fotografía profesional", "Material didáctico", "Certificado",
+  "Alquiler de equipo", "Degustación", "Clase práctica",
+];
+
+const TIPOS_EXPERIENCIA = [
+  "Avistaje de aves", "Cabalgata", "Caminata / Trekking", "Cata de alimentos",
+  "Excursión en lancha", "Festival", "Feria artesanal", "Gastronomía",
+  "Observación de fauna", "Paseo en bicicleta", "Pesca deportiva",
+  "Ruta gastronómica", "Taller artesanal", "Taller de cocina",
+  "Tour fotográfico", "Visita a comunidades", "Visita guiada",
+  "Yoga y bienestar", "Ecoturismo", "Astroturismo",
+];
+
+const TIPOS_PRODUCTO = [
+  "Alfajores artesanales", "Alimentos y bebidas", "Artesanías en cuero",
+  "Artesanías en madera", "Carnes y embutidos", "Cerveza artesanal",
+  "Cestería y fibras naturales", "Conservas y dulces", "Decoración artesanal",
+  "Hilados y tejidos", "Indumentaria textil", "Instrumentos musicales",
+  "Joyería y bijouterie", "Lácteos artesanales", "Miel y derivados",
+  "Muebles artesanales", "Orfebrería y platería", "Panificación artesanal",
+  "Plantas y vivero", "Productos regionales", "Quesos artesanales",
+  "Textiles y bordados", "Velas y jabones artesanales", "Hierbas medicinales",
+];
+
+const SERVICIOS_SUGERIDOS = [
+  "WiFi gratis", "Desayuno incluido", "Aire acondicionado", "Calefacción",
+  "Estacionamiento", "Pileta", "Jardín", "Parrilla", "Cocina compartida",
+  "Habitación privada", "Baño privado", "Ropa de cama", "Toallas",
+  "TV", "Heladera", "Microondas", "Ventilador", "Agua caliente",
+  "Mascotas bienvenidas", "Acceso discapacitados", "Transporte al aeropuerto",
+  "Excursiones", "Bicicletas", "Lavandería", "Room service",
+  "Restaurante", "Bar", "Salón de eventos", "Seguridad 24h",
+];
+
+const ACTIVIDADES_SUGERIDAS = [
+  "Feria", "Exposición", "Concierto", "Espectáculo", "Taller",
+  "Feria gastronómica", "Feria artesanal", "Muestra de arte",
+  "Feria de productores", "Charla / Conferencia", "Feria de emprendedores",
+  "Encuentro cultural", "Festival", "Desfile", "Fiesta popular",
+  "Ronda de negocios", "Feria de artesanos", "Exposición de arte",
+  "Feria de la economía social", "Feria de diseño",
+];
+
+const TIPOS_RELATO = [
+  "Leyenda", "Historia", "Memoria", "Testimonio",
+  "Tradición oral", "Mitología", "Anécdota", "Crónica",
+  "Poesía", "Narrativa", "Relato de viaje", "Saberes ancestrales",
+];
+
+
+function SocialMediaManager({ value, onChange, label = "Redes sociales y contacto" }) {
   const list = parseSocialList(value);
   const add = () => {
     onChange(JSON.stringify([...list, { type: "instagram", value: "" }]));
@@ -323,9 +386,24 @@ function SocialMediaManager({ value, onChange }) {
     const digits = v.replace(/[^0-9]/g, "");
     return digits.length > 0 && (digits.length < 10 || digits.length > 15) ? "Número inválido (debe tener 10-15 dígitos)" : "";
   };
+  const emailError = (v) => {
+    if (!v) return "";
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Email inválido";
+  };
+  const phoneError = (v) => {
+    if (!v) return "";
+    const digits = v.replace(/[^0-9]/g, "");
+    return digits.length > 0 && digits.length < 7 ? "Teléfono muy corto" : "";
+  };
+  const placeholder = (type) => {
+    if (type === "whatsapp") return "Código país + número, ej: 5491123456789";
+    if (type === "telefono") return "Ej: 3624123456";
+    if (type === "email") return "ejemplo@correo.com";
+    return "usuario / URL";
+  };
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>Redes sociales</label>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>{label}</label>
       {list.map((item, i) => (
         <div key={i}>
           <div style={{ display: "flex", gap: 6, marginBottom: 2, alignItems: "center" }}>
@@ -333,7 +411,7 @@ function SocialMediaManager({ value, onChange }) {
               style={{ flex: "0 0 130px", padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, color: "#1c1c18", background: "white" }}>
               {SOCIAL_PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
-            <input value={item.value} onChange={(e) => update(i, "value", e.target.value)} placeholder={item.type === "whatsapp" ? "Código país + número, ej: 5491123456789" : "usuario / URL"}
+            <input value={item.value} onChange={(e) => update(i, "value", e.target.value)} placeholder={placeholder(item.type)}
               style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, color: "#1c1c18", background: "white" }} />
             <button onClick={() => remove(i)}
               style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16, padding: "4px 6px" }}>
@@ -341,11 +419,13 @@ function SocialMediaManager({ value, onChange }) {
             </button>
           </div>
           {item.type === "whatsapp" && item.value && <div style={{ fontSize: 11, color: whatsappError(item.value) ? "#c62828" : "#2e7d32", margin: "0 0 4px 136px" }}>{whatsappError(item.value) || "Número válido"}</div>}
+          {item.type === "email" && item.value && emailError(item.value) && <div style={{ fontSize: 11, color: "#c62828", margin: "0 0 4px 136px" }}>{emailError(item.value)}</div>}
+          {item.type === "telefono" && item.value && phoneError(item.value) && <div style={{ fontSize: 11, color: "#c62828", margin: "0 0 4px 136px" }}>{phoneError(item.value)}</div>}
         </div>
       ))}
       <button onClick={add}
         style={{ padding: "6px 14px", background: "#f5f2eb", border: "1px dashed #ccc", borderRadius: 6, cursor: "pointer", color: "#555", fontSize: 13 }}>
-        + Agregar red social
+        + Agregar {label.toLowerCase()}
       </button>
     </div>
   );
@@ -418,6 +498,10 @@ export const AdminPanel = () => {
   };
 
   const [allEntities, setAllEntities] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
+  const [solicitudesLoading, setSolicitudesLoading] = useState(false);
+  const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
+  const [approveFechas, setApproveFechas] = useState({ inicio: "", fin: "", estado_pago: "al_dia" });
   const [step, setStep] = useState(1);
   const [editingEntityId, setEditingEntityId] = useState(null);
 
@@ -516,11 +600,25 @@ export const AdminPanel = () => {
     } catch {}
   };
 
+  const cargarSolicitudes = async () => {
+    setSolicitudesLoading(true);
+    try {
+      const res = await fetch("/api/solicitudes", { headers: authHeaders() });
+      if (res.ok) setSolicitudes(await res.json());
+    } catch {} finally {
+      setSolicitudesLoading(false);
+    }
+  };
+
   useEffect(() => {
     cargarLocalidades();
     cargarEntidades();
     cargarRecorridos();
   }, []);
+
+  useEffect(() => {
+    if (view === "solicitudes") cargarSolicitudes();
+  }, [view]);
 
   const allEntitiesForConexiones = useMemo(
     () => allEntities.filter((e) => e.id !== editingEntityId),
@@ -752,9 +850,8 @@ export const AdminPanel = () => {
   // --- GUARDAR ---
   const guardarEntidad = async () => {
     setMultimediaError("");
-
     if (!multimediaItems[0]?.url_recurso) {
-      setMultimediaError("Agregá una foto principal para el encabezado");
+      showPopup("Agregá una foto principal para el encabezado", "warning");
       setStep(3);
       return;
     }
@@ -763,7 +860,7 @@ export const AdminPanel = () => {
       const hasUrl = item.url_recurso && item.url_recurso.trim();
       const hasTitle = item.titulo_alternativo && item.titulo_alternativo.trim();
       if (hasUrl && !hasTitle) {
-        setMultimediaError("Completá el título del recurso multimedia");
+        showPopup("Completá el título del recurso multimedia", "warning");
         setStep(3);
         return;
       }
@@ -948,16 +1045,16 @@ export const AdminPanel = () => {
       setGeoQuery(data.direccion_escrita || "");
       const fieldsMap = {
         artesano: [
-          "biografia_larga", "tecnica_principal",
+          "email", "biografia_larga", "tecnica_principal",
           "materiales_usados", "anios_experiencia", "taller_abierto",
           "fotos_galeria_url", "comunidad_etnica", "redes_sociales",
         ],
         gastronomia: [
-          "historia_plato", "ingredientes_clave",
+          "email", "historia_plato", "ingredientes_clave",
           "receta_destacada", "establecimientos_donde_probar",
         ],
         comercio: [
-          "razon_social", "cuit", "rubro_especifico",
+          "email", "razon_social", "cuit", "rubro_especifico",
           "sitio_web",
           "horario_apertura", "horario_cierre",
           "dias_abierto", "redes_sociales",
@@ -965,25 +1062,61 @@ export const AdminPanel = () => {
           "fecha_fin_suscripcion", "estado_pago",
         ],
         personalidad: [
-          "nombre_completo", "apodo", "biografia_resumida",
+          "email", "nombre_completo", "apodo", "biografia_resumida",
           "profesion", "fecha_nacimiento", "foto_perfil_url",
           "es_referente_comunidad", "comunidad_etnica",
           "contacto", "redes_sociales",
         ],
         patrimonio: [
-          "año_referencia", "estilo_arquitectonico",
+          "email", "año_referencia", "estilo_arquitectonico",
           "declaratoria_oficial", "estado_conservacion",
         ],
         evento: [
-          "fecha_evento", "duracion_dias",
+          "email", "razon_social", "cuit", "fecha_evento", "duracion_dias",
           "actividades_principales", "es_itinerante",
-          "link_entradas",
+          "link_entradas", "fecha_inicio_suscripcion",
+          "fecha_fin_suscripcion", "estado_pago",
+        ],
+        comunidad_indigena: [
+          "email", "biografia_larga", "etnia", "lenguas",
+          "territorio_tradicional", "cosmovision", "redes_sociales",
+        ],
+        lugar_natural: [
+          "email", "biografia_larga", "categoria_natural",
+          "actividades", "acceso",
+          "flora_fauna_destacada", "mejor_epoca",
+        ],
+        hospedaje: [
+          "email", "razon_social", "cuit", "biografia_larga", "categoria_hospedaje",
+          "servicios", "capacidad", "sitio_web",
+          "redes_sociales", "fecha_inicio_suscripcion",
+          "fecha_fin_suscripcion", "estado_pago",
+        ],
+        productor: [
+          "email", "razon_social", "cuit", "biografia_larga", "tipo_producto",
+          "metodos_produccion", "certificaciones",
+          "contacto_comercial", "sitio_web",
+          "redes_sociales", "fecha_inicio_suscripcion",
+          "fecha_fin_suscripcion", "estado_pago",
+        ],
+        experiencia: [
+          "email", "biografia_larga", "tipo_experiencia",
+          "duracion_experiencia", "que_incluye",
+          "precio_referencia", "redes_sociales", "operador",
+        ],
+        relato: [
+          "email", "autor", "fecha_relato", "tipo_relato",
+          "contenido_completo",
+        ],
+        espacio_cultural: [
+          "email", "biografia_larga", "tipo_espacio",
+          "horarios", "sitio_web", "redes_sociales",
         ],
       };
       const esp = {};
       (fieldsMap[data.tipo] || []).forEach((f) => {
         let val = data[f];
-        if ((f === "fecha_inicio_suscripcion" || f === "fecha_fin_suscripcion" || f === "fecha_evento" || f === "fecha_nacimiento") && val) {
+        if ((f === "fecha_inicio_suscripcion" || f === "fecha_fin_suscripcion" || f === "fecha_evento" || f === "fecha_nacimiento" || f === "fecha_relato") && val) {
           const d = new Date(val);
           if (!isNaN(d.getTime())) val = d.toISOString().split("T")[0];
         }
@@ -1026,6 +1159,34 @@ export const AdminPanel = () => {
               entidades_etiquetadas: tagsMap[m.id] || [],
             })),
           );
+        } else if (data.imagen) {
+          setMultimediaItems([
+            {
+              url_recurso: data.imagen,
+              titulo_alternativo: "",
+              descripcion_recurso: "",
+              tipo_recurso: "foto",
+              es_principal: true,
+              thumbnail_url: "",
+              public_id: "",
+              entidades_etiquetadas: [],
+            },
+          ]);
+        }
+      } catch {
+        if (data.imagen) {
+          setMultimediaItems([
+            {
+              url_recurso: data.imagen,
+              titulo_alternativo: "",
+              descripcion_recurso: "",
+              tipo_recurso: "foto",
+              es_principal: true,
+              thumbnail_url: "",
+              public_id: "",
+              entidades_etiquetadas: [],
+            },
+          ]);
         } else {
           setMultimediaItems([
             {
@@ -1040,19 +1201,6 @@ export const AdminPanel = () => {
             },
           ]);
         }
-      } catch {
-        setMultimediaItems([
-          {
-            url_recurso: "",
-            titulo_alternativo: "",
-            descripcion_recurso: "",
-            tipo_recurso: "foto",
-            es_principal: true,
-            thumbnail_url: "",
-            public_id: "",
-            entidades_etiquetadas: [],
-          },
-        ]);
       }
 
       // Cargar conexiones
@@ -1083,6 +1231,22 @@ export const AdminPanel = () => {
     } catch (err) {
       showPopup("Error al cargar: " + err.message, "error");
     }
+  };
+
+  const buildMailtoUrl = (e) => {
+    const lines = [
+      `Hola ${e.nombre},`,
+      "",
+      "Recibimos correctamente tu solicitud para el Sello Made in Chaco.",
+      "",
+      "Podés continuar con el proceso de suscripción respondiendo a este correo.",
+      "",
+      "Saludos,",
+      "Equipo Made in Chaco",
+    ];
+    const subject = encodeURIComponent("Made in Chaco — Confirmación de Sello");
+    const body = encodeURIComponent(lines.join("\n"));
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.email)}&su=${subject}&body=${body}`;
   };
 
   // --- ELIMINAR ---
@@ -1276,8 +1440,8 @@ export const AdminPanel = () => {
     const url = URL.createObjectURL(file);
     img.onload = async () => {
       URL.revokeObjectURL(url);
-      if (img.width < 800 || img.height < 600) {
-        showPopup(`Resolución muy baja: ${img.width}×${img.height}. Mínimo: 800×600 px. Formatos: JPG, PNG, WebP.`, "error");
+      if (img.width < 1920 || img.height < 1080) {
+        showPopup(`Resolución muy baja: ${img.width}×${img.height}. Mínimo: 1920×1080 px (16:9). Formatos: JPG, PNG, WebP.`, "error");
         return;
       }
       try {
@@ -1524,74 +1688,6 @@ export const AdminPanel = () => {
           </div>
           <DetailField field="acepta_tarjetas" fieldVal={especifico.acepta_tarjetas} onFieldChange={onFieldChange} label="Acepta tarjetas" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
           <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-          <div style={{ display: "flex", gap: "8px" }}>
-            <div style={{ flex: 1, marginBottom: "10px" }}>
-              <label
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#863819",
-                  display: "block",
-                  marginBottom: "4px",
-                  letterSpacing: "0.5px",
-                  textTransform: "uppercase",
-                }}
-              >
-                Inicio suscripción
-              </label>
-              <input
-                type="date"
-                style={styles.input}
-                value={especifico.fecha_inicio_suscripcion || ""}
-                onChange={(e) => onFieldChange("fecha_inicio_suscripcion", e.target.value)}
-              />
-            </div>
-            <div style={{ flex: 1, marginBottom: "10px" }}>
-              <label
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#863819",
-                  display: "block",
-                  marginBottom: "4px",
-                  letterSpacing: "0.5px",
-                  textTransform: "uppercase",
-                }}
-              >
-                Fin suscripción
-              </label>
-              <input
-                type="date"
-                style={styles.input}
-                value={especifico.fecha_fin_suscripcion || ""}
-                onChange={(e) => onFieldChange("fecha_fin_suscripcion", e.target.value)}
-              />
-            </div>
-          </div>
-          <div style={{ marginBottom: "10px" }}>
-            <label
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                color: "#863819",
-                display: "block",
-                marginBottom: "4px",
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-              }}
-            >
-              Estado de suscripción
-            </label>
-            <select
-              style={styles.input}
-              value={especifico.estado_pago || ""}
-              onChange={(e) => onFieldChange("estado_pago", e.target.value)}
-            >
-              <option value="">Seleccionar...</option>
-              <option value="al_dia">Al día</option>
-              <option value="atrasado">Atrasado</option>
-            </select>
-          </div>
         </>
       ),
       personalidad: () => (
@@ -1624,8 +1720,7 @@ export const AdminPanel = () => {
           </div>
           <DetailField field="es_referente_comunidad" fieldVal={especifico.es_referente_comunidad} onFieldChange={onFieldChange} label="Referente comunitario" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
           <DetailField field="comunidad_etnica" fieldVal={especifico.comunidad_etnica} onFieldChange={onFieldChange} label="Comunidad étnica" type="select" options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))} />
-          <DetailField field="contacto" fieldVal={especifico.contacto} onFieldChange={onFieldChange} label="Contacto" placeholder="Teléfono o email" />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Redes sociales" />
         </>
       ),
       patrimonio: () => (
@@ -1638,17 +1733,128 @@ export const AdminPanel = () => {
       ),
       evento: () => (
         <>
+          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
+          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
           <DetailField field="fecha_evento" fieldVal={especifico.fecha_evento} onFieldChange={onFieldChange} label="Fecha del evento" type="date" placeholder="" />
           <DetailField field="duracion_dias" fieldVal={especifico.duracion_dias} onFieldChange={onFieldChange} label="Duración (días)" type="number" placeholder="Ej: 1" />
-          <DetailField field="actividades_principales" fieldVal={especifico.actividades_principales} onFieldChange={onFieldChange} label="Actividades principales" type="textarea" placeholder="Ej: ferias, talleres, espectáculos..." />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Actividades principales</label>
+          <TagSelector value={especifico.actividades_principales || ""} onChange={(v) => onFieldChange("actividades_principales", v)} suggestions={ACTIVIDADES_SUGERIDAS} placeholder="Escribí o seleccioná actividades..." />
           <DetailField field="es_itinerante" fieldVal={especifico.es_itinerante} onFieldChange={onFieldChange} label="Evento itinerante" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
           <DetailField field="link_entradas" fieldVal={especifico.link_entradas} onFieldChange={onFieldChange} label="Link a compra de entradas" placeholder="https://..." />
+        </>
+      ),
+      comunidad_indigena: () => (
+        <>
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Historia / Descripción" type="textarea" placeholder="Historia, origen y contexto..." />
+          <DetailField field="etnia" fieldVal={especifico.etnia} onFieldChange={onFieldChange} label="Etnia" type="select" options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))} />
+          <DetailField field="lenguas" fieldVal={especifico.lenguas} onFieldChange={onFieldChange} label="Lenguas" placeholder="Ej: Qom, Castellano" />
+          <DetailField field="territorio_tradicional" fieldVal={especifico.territorio_tradicional} onFieldChange={onFieldChange} label="Territorio tradicional" type="textarea" placeholder="Ubicación y territorio..." />
+          <DetailField field="cosmovision" fieldVal={especifico.cosmovision} onFieldChange={onFieldChange} label="Cosmovisión" type="textarea" placeholder="Creencias, visión del mundo..." />
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
+        </>
+      ),
+      lugar_natural: () => (
+        <>
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del lugar..." />
+          <DetailField field="categoria_natural" fieldVal={especifico.categoria_natural} onFieldChange={onFieldChange} label="Categoría" placeholder="Ej: Parque, Reserva, Río, Laguna, Monte" />
+          <DetailField field="actividades" fieldVal={especifico.actividades} onFieldChange={onFieldChange} label="Actividades" type="textarea" placeholder="Ej: senderismo, avistaje de aves, pesca..." />
+          <DetailField field="acceso" fieldVal={especifico.acceso} onFieldChange={onFieldChange} label="Acceso" type="textarea" placeholder="Cómo llegar, rutas, accesos..." />
+          <DetailField field="flora_fauna_destacada" fieldVal={especifico.flora_fauna_destacada} onFieldChange={onFieldChange} label="Flora y fauna destacada" type="textarea" placeholder="Especies representativas..." />
+          <DetailField field="mejor_epoca" fieldVal={especifico.mejor_epoca} onFieldChange={onFieldChange} label="Mejor época para visitar" placeholder="Ej: Otoño, todo el año..." />
+        </>
+      ),
+      hospedaje: () => (
+        <>
+          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
+          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del alojamiento..." />
+          <DetailField field="categoria_hospedaje" fieldVal={especifico.categoria_hospedaje} onFieldChange={onFieldChange} label="Categoría" placeholder="Ej: Hotel, Cabaña, Hostel, Posada" />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Servicios</label>
+          <TagSelector value={especifico.servicios || ""} onChange={(v) => onFieldChange("servicios", v)} suggestions={SERVICIOS_SUGERIDOS} placeholder="Escribí o seleccioná servicios..." />
+          <DetailField field="capacidad" fieldVal={especifico.capacidad} onFieldChange={onFieldChange} label="Capacidad" placeholder="Ej: 20 personas, 5 habitaciones" />
+          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
+        </>
+      ),
+      productor: () => (
+        <>
+          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
+          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Historia del productor..." />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de producto</label>
+          <TagSelector value={especifico.tipo_producto || ""} onChange={(v) => onFieldChange("tipo_producto", v)} suggestions={TIPOS_PRODUCTO} placeholder="Escribí o seleccioná tipo de producto..." />
+          <DetailField field="metodos_produccion" fieldVal={especifico.metodos_produccion} onFieldChange={onFieldChange} label="Métodos de producción" type="textarea" placeholder="Ej: artesanal, tradicional, orgánico..." />
+          <DetailField field="certificaciones" fieldVal={especifico.certificaciones} onFieldChange={onFieldChange} label="Certificaciones" placeholder="Ej: Orgánico, Comercio Justo" />
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Redes sociales" />
+          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
+        </>
+      ),
+      experiencia: () => (
+        <>
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción de la experiencia..." />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de experiencia</label>
+          <TagSelector value={especifico.tipo_experiencia || ""} onChange={(v) => onFieldChange("tipo_experiencia", v)} suggestions={TIPOS_EXPERIENCIA} placeholder="Escribí o seleccioná tipo de experiencia..." />
+          <DetailField field="duracion_experiencia" fieldVal={especifico.duracion_experiencia} onFieldChange={onFieldChange} label="Duración" placeholder="Ej: 3 horas, 1 día completo" />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Qué incluye</label>
+          <TagSelector value={especifico.que_incluye || ""} onChange={(v) => onFieldChange("que_incluye", v)} suggestions={QUE_INCLUYE_EXPERIENCIA} placeholder="Escribí o seleccioná qué incluye..." />
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Precio de referencia</label>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <input
+              style={{ ...styles.input, flex: 1 }}
+              type="number"
+              placeholder="Ej: 5000"
+              value={(() => { const p = (especifico.precio_referencia || "").trim(); return p.includes(" ") ? p.split(" ")[0] : p })()}
+              onChange={(e) => {
+                const currency = (especifico.precio_referencia || "").includes("USD") ? "USD" : "ARS";
+                onFieldChange("precio_referencia", e.target.value ? `${e.target.value} ${currency}` : "");
+              }}
+            />
+            <select
+              style={{ ...styles.input, width: "120px", flexShrink: 0 }}
+              value={(especifico.precio_referencia || "").includes("USD") ? "USD" : "ARS"}
+              onChange={(e) => {
+                const amount = (especifico.precio_referencia || "").split(" ")[0];
+                onFieldChange("precio_referencia", amount ? `${amount} ${e.target.value}` : "");
+              }}
+            >
+              <option value="ARS">ARS $</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Reservas / Redes sociales" />
+          <DetailField field="operador" fieldVal={especifico.operador} onFieldChange={onFieldChange} label="Operador / Guía" placeholder="Nombre del operador o guía" />
+        </>
+      ),
+      relato: () => (
+        <>
+          <DetailField field="autor" fieldVal={especifico.autor} onFieldChange={onFieldChange} label="Autor del relato" placeholder="Nombre de quien narra" />
+          <div style={{ marginBottom: "10px" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fecha del relato</label>
+            <input type="date" style={styles.input} value={especifico.fecha_relato || ""} onChange={(e) => onFieldChange("fecha_relato", e.target.value)} />
+          </div>
+          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de relato</label>
+          <TagSelector value={especifico.tipo_relato || ""} onChange={(v) => onFieldChange("tipo_relato", v)} suggestions={TIPOS_RELATO} placeholder="Escribí o seleccioná tipo de relato..." />
+          <DetailField field="contenido_completo" fieldVal={especifico.contenido_completo} onFieldChange={onFieldChange} label="Contenido completo" type="textarea" placeholder="El relato completo..." />
+        </>
+      ),
+      espacio_cultural: () => (
+        <>
+          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del espacio..." />
+          <DetailField field="tipo_espacio" fieldVal={especifico.tipo_espacio} onFieldChange={onFieldChange} label="Tipo de espacio" placeholder="Ej: Museo, Teatro, Centro Cultural, Biblioteca" />
+          <DetailField field="horarios" fieldVal={especifico.horarios} onFieldChange={onFieldChange} label="Horarios" placeholder="Ej: Lun–Vie 9–18, Sáb 10–13" />
+          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
+          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
         </>
       ),
     };
 
     const render = fields[tipo];
-    return render ? render() : <p style={{ color: "#999" }}>Sin campos específicos</p>;
+    return render ? (
+      <>
+        <DetailField field="email" fieldVal={especifico.email} onFieldChange={onFieldChange} label="Email" type="email" placeholder="correo@ejemplo.com" />
+        {render()}
+      </>
+    ) : <p style={{ color: "#999" }}>Sin campos específicos</p>;
   };
 
   // --- RENDER ---
@@ -1667,6 +1873,7 @@ export const AdminPanel = () => {
           <div style={styles.sidebarNav}>
             {[
               { id: "entidades", label: "Entidades", icon: "/icons/book.png" },
+              { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png" },
               { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
               { id: "nuevo-recorrido", label: "Recorridos", icon: "/icons/route.png" },
               { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
@@ -1726,16 +1933,22 @@ export const AdminPanel = () => {
                     <img src="/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                     Entidades
                   </h2>
-                  <button
-                    onClick={() => {
-                      resetWizard();
-                      setView("nuevo-editar");
-                    }}
-                    className="admin-btn"
-                    style={{ ...styles.btnPrimary, background: "#2e7d32" }}
-                  >
-                    + NUEVA
-                  </button>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={cargarEntidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+                      ACTUALIZAR
+                    </button>
+                    <button
+                      onClick={() => {
+                        resetWizard();
+                        setView("nuevo-editar");
+                      }}
+                      className="admin-btn"
+                      style={{ ...styles.btnPrimary, background: "#2e7d32" }}
+                    >
+                      + NUEVA
+                    </button>
+                  </div>
                 </div>
                 {allEntities.length === 0 && (
                   <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>
@@ -1755,8 +1968,15 @@ export const AdminPanel = () => {
                     evento: "Eventos",
                     patrimonio: "Patrimonios",
                     personalidad: "Personalidades",
+                    comunidad_indigena: "Comunidades Indígenas",
+                    lugar_natural: "Lugares Naturales",
+                    hospedaje: "Hospedajes",
+                    productor: "Productores",
+                    experiencia: "Experiencias",
+                    relato: "Relatos",
+                    espacio_cultural: "Espacios Culturales",
                   };
-                  const tipoOrden = ["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad"];
+                  const tipoOrden = ["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"];
                   return tipoOrden.map((tipo) => {
                     const items = grupos[tipo];
                     if (!items || items.length === 0) return null;
@@ -1785,6 +2005,20 @@ export const AdminPanel = () => {
                                 <span style={{ fontWeight: 700, fontSize: "15px", color: "#1c1c18" }}>
                                   {e.nombre}
                                 </span>
+                                {e.estado_sello === "pendiente" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PENDIENTE</span>}
+                                {e.estado_sello === "rechazado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>RECHAZADO</span>}
+                                {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
+                                {e.fecha_fin_suscripcion && (() => {
+                                  try {
+                                    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+                                    const fin = new Date(e.fecha_fin_suscripcion);
+                                    fin.setHours(0, 0, 0, 0);
+                                    const diff = Math.ceil((fin - hoy) / 86400000);
+                                    if (diff < 0) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDA</span>;
+                                    if (diff <= 30) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
+                                  } catch {}
+                                  return null;
+                                })()}
                                 {e.tipo === "evento" && e.fecha_evento && (() => {
                                   const diff = Math.ceil((new Date(e.fecha_evento) - new Date(new Date().toDateString())) / 86400000);
                                   if (diff < 0) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDO</span>;
@@ -1796,30 +2030,38 @@ export const AdminPanel = () => {
                                 {e.tipo}
                               </div>
                             </div>
-                            <button
-                              onClick={() => cargarEntidadParaEditar(e.id)}
-                              className="admin-btn-ghost"
-                              style={styles.smallBtn("#863819")}
-                            >
-                              <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                              EDITAR
-                            </button>
-                            <button
-                              onClick={() => abrirConexModal(e)}
-                              className="admin-btn-ghost"
-                              style={styles.smallBtn("#2e7d32")}
-                            >
-                              <img src="/icons/link.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                              CONEXIÓN
-                            </button>
-                            <button
-                              onClick={() => eliminarEntidad(e.id, e.nombre)}
-                              className="admin-btn-danger"
-                              style={styles.smallBtn("#c0392b")}
-                            >
-                              <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                              ELIMINAR
-                            </button>
+                            {e.estado_sello !== "pendiente" && (
+                              <>
+                                {e.estado_sello !== "rechazado" && (
+                                  <>
+                                    <button
+                                      onClick={() => cargarEntidadParaEditar(e.id)}
+                                      className="admin-btn-ghost"
+                                      style={styles.smallBtn("#863819")}
+                                    >
+                                      <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                                      EDITAR
+                                    </button>
+                                    <button
+                                      onClick={() => abrirConexModal(e)}
+                                      className="admin-btn-ghost"
+                                      style={styles.smallBtn("#2e7d32")}
+                                    >
+                                      <img src="/icons/link.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                                      CONEXIÓN
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  onClick={() => eliminarEntidad(e.id, e.nombre)}
+                                  className="admin-btn-danger"
+                                  style={styles.smallBtn("#c0392b")}
+                                >
+                                  <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                                  ELIMINAR
+                                </button>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1987,7 +2229,7 @@ export const AdminPanel = () => {
 
                 {/* Stepper */}
                 <div style={styles.stepperNav}>
-                  {["Datos", "Detalles", "Multimedia"].map((label, idx) => {
+                  {["Datos", "Detalles", "Multimedia", "Suscripción"].map((label, idx) => {
                     const stepNum = idx + 1;
                     return (
                       <div key={label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2004,7 +2246,7 @@ export const AdminPanel = () => {
                         <span style={{ fontSize: "12px", fontWeight: step === stepNum ? 700 : 400, color: "#555" }}>
                           {label}
                         </span>
-                        {stepNum < 3 && (
+                        {stepNum < 4 && (
                           <span style={{ color: "#ddd", fontSize: "18px" }}>→</span>
                         )}
                       </div>
@@ -2030,6 +2272,13 @@ export const AdminPanel = () => {
                       <option value="evento">Evento</option>
                       <option value="patrimonio">Patrimonio</option>
                       <option value="personalidad">Personalidad</option>
+                      <option value="comunidad_indigena">Comunidad Indígena</option>
+                      <option value="lugar_natural">Lugar Natural</option>
+                      <option value="hospedaje">Hospedaje</option>
+                      <option value="productor">Productor</option>
+                      <option value="experiencia">Experiencia</option>
+                      <option value="relato">Relato</option>
+                      <option value="espacio_cultural">Espacio Cultural</option>
                     </select>
                     <input
                       style={styles.input}
@@ -2202,21 +2451,22 @@ export const AdminPanel = () => {
                     </button>
                     <button className="admin-btn" style={{ ...styles.btnNext, background: "#2e7d32", width: "100%" }} onClick={() => {
                         setDetailError("");
-                        if (general.tipo === "comercio") {
+
+                        if (general.tipo === "comercio" || general.tipo === "evento") {
                           const required = [
                             ["razon_social", "Razón social"],
                             ["cuit", "CUIT"],
-                            ["rubro_especifico", "Rubro específico"],
-                            ["horario_apertura", "Horario apertura"],
-                            ["horario_cierre", "Horario cierre"],
-                            ["estado_pago", "Estado de suscripción"],
                           ];
+                          if (general.tipo === "comercio") {
+                            required.push(["rubro_especifico", "Rubro específico"], ["horario_apertura", "Horario apertura"], ["horario_cierre", "Horario cierre"]);
+                          }
                           const missing = required.filter(([k]) => !especifico[k]?.trim());
                           if (missing.length > 0) {
-                            setDetailError("Completá los campos requeridos: " + missing.map(([,l]) => l).join(", "));
+                            showPopup("Completá los campos requeridos: " + missing.map(([,l]) => l).join(", "), "warning");
                             return;
                           }
                         }
+
                         setStep(3);
                       }}>
                         SIGUIENTE: MULTIMEDIA →
@@ -2320,17 +2570,13 @@ export const AdminPanel = () => {
                               />
                             </label>
 
-                            <div className="media-url-or">o ingresá una URL</div>
-
-                            <input
-                              style={styles.input}
-                              placeholder="URL del recurso (Cloudinary o externa)"
-                              value={item.url_recurso}
-                              onChange={(e) =>
-                                handleMultimediaChange(i, "url_recurso", e.target.value)
-                              }
-                            />
                           </div>
+
+                          {item.url_recurso && item.tipo_recurso === "foto" && (
+                            <div style={{ marginTop: 10, borderRadius: 8, overflow: "hidden", border: "1px solid #eee" }}>
+                              <img src={item.url_recurso} alt="Vista previa" style={{ width: "100%", maxHeight: 300, objectFit: "contain", display: "block", background: "#f5f2eb" }} />
+                            </div>
+                          )}
 
                           {item.tipo_recurso === "audio" && (
                             <div className="media-thumb-section">
@@ -2455,7 +2701,7 @@ export const AdminPanel = () => {
                                     }}
                                   >
                                     <option value="">Todos los tipos</option>
-                                    {["artesano", "gastronomía", "comercio", "evento", "patrimonio", "personalidad"].map((t) => (
+                                    {["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"].map((t) => (
                                       <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                                     ))}
                                   </select>
@@ -2481,7 +2727,7 @@ export const AdminPanel = () => {
                                           (!tagTypeFilters[i] || e.tipo === tagTypeFilters[i]),
                                       );
                                       const grouped = {};
-                                      const typeOrder = ["artesano", "gastronomía", "comercio", "evento", "patrimonio", "personalidad"];
+                                      const typeOrder = ["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"];
                                       filtered.forEach((e) => {
                                         if (!grouped[e.tipo]) grouped[e.tipo] = [];
                                         grouped[e.tipo].push(e);
@@ -2568,13 +2814,78 @@ export const AdminPanel = () => {
                         ← VOLVER
                       </button>
                       <button
+                        onClick={() => setStep(4)}
+                        disabled={uploadingIndex !== null}
+                        className="admin-btn"
+                        style={{
+                          ...styles.btnNext,
+                          background: "#2e7d32",
+                          width: "100%",
+                          opacity: uploadingIndex !== null ? 0.6 : 1,
+                          cursor: uploadingIndex !== null ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        SIGUIENTE: SUSCRIPCIÓN →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PASO 4 */}
+                {step === 4 && (
+                  <div className="fade-in" style={{ background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
+                    <h3 style={{ fontSize: "18px", color: "#1c1c18", marginBottom: "16px" }}>
+                      Suscripción de {general.tipo}
+                    </h3>
+                    {(general.tipo === "comercio" || general.tipo === "evento") && (
+                      <p style={{ fontSize: "12px", color: "#666", marginBottom: "12px" }}>
+                        Membresía opcional para {general.tipo === "comercio" ? "comercios" : "eventos privados/comerciales"}.
+                      </p>
+                    )}
+                    {(general.tipo === "hospedaje" || general.tipo === "productor") && (
+                      <p style={{ fontSize: "12px", color: "#b85c2a", marginBottom: "12px" }}>
+                        Suscripción obligatoria para {general.tipo === "hospedaje" ? "hospedajes" : "productores"}.
+                      </p>
+                    )}
+                    {![ "comercio", "evento", "hospedaje", "productor" ].includes(general.tipo) && (
+                      <p style={{ fontSize: "12px", color: "#999", marginBottom: "12px", fontStyle: "italic" }}>
+                        Este tipo de entidad no requiere suscripción.
+                      </p>
+                    )}
+                    {[ "comercio", "evento", "hospedaje", "productor" ].includes(general.tipo) && (
+                      <>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <div style={{ flex: 1, marginBottom: "10px" }}>
+                            <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Inicio suscripción</label>
+                            <input type="date" style={styles.input} value={especifico.fecha_inicio_suscripcion || ""} onChange={(e) => onFieldChange("fecha_inicio_suscripcion", e.target.value)} />
+                          </div>
+                          <div style={{ flex: 1, marginBottom: "10px" }}>
+                            <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fin suscripción</label>
+                            <input type="date" style={styles.input} value={especifico.fecha_fin_suscripcion || ""} onChange={(e) => onFieldChange("fecha_fin_suscripcion", e.target.value)} />
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: "10px" }}>
+                          <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Estado de suscripción</label>
+                          <select style={styles.input} value={especifico.estado_pago || ""} onChange={(e) => onFieldChange("estado_pago", e.target.value)}>
+                            <option value="">{general.tipo === "evento" ? "Sin membresía (evento libre)" : "Seleccionar..."}</option>
+                            <option value="al_dia">Al día</option>
+                            <option value="atrasado">Atrasado</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "16px" }}>
+                      <button onClick={() => setStep(3)} className="admin-btn-ghost" style={{ ...styles.btnSecondary, width: "100%" }}>
+                        ← VOLVER
+                      </button>
+                      <button
                         onClick={guardarEntidad}
-                        disabled={loading}
+                        disabled={loading || uploadingIndex !== null}
                         className="admin-btn"
                         style={{
                           ...styles.btnPrimary,
-                          opacity: loading ? 0.6 : 1,
-                          cursor: loading ? "not-allowed" : "pointer",
+                          opacity: loading || uploadingIndex !== null ? 0.6 : 1,
+                          cursor: loading || uploadingIndex !== null ? "not-allowed" : "pointer",
                           background: "#2e7d32",
                           width: "100%",
                         }}
@@ -2587,6 +2898,213 @@ export const AdminPanel = () => {
               </div>
             )}
 
+            {/* SOLICITUDES */}
+            {view === "solicitudes" && (
+              <div>
+                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h2 style={styles.sectionTitle}>
+                    <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                    Solicitudes de Sello
+                  </h2>
+                  <button onClick={cargarSolicitudes} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+                    ACTUALIZAR
+                  </button>
+                </div>
+
+                {solicitudesLoading ? (
+                  <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>Cargando solicitudes…</div>
+                ) : solicitudes.length === 0 ? (
+                  <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>No hay solicitudes pendientes</div>
+                ) : (
+                  solicitudes.map((sol) => {
+                    const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(sol.tipo);
+                    return (
+                      <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
+                        <img src={`/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0 }} alt="" />
+                        <div style={{ flex: 1, color: "#000" }}>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: "#000" }}>{sol.nombre}</div>
+                          <div style={{ fontSize: "11px", color: "#666", textTransform: "capitalize", marginTop: "2px" }}>{sol.tipo}</div>
+                          <div style={{ fontSize: "12px", marginTop: "4px", lineHeight: 1.5, color: "#000" }}>
+                            <div style={{ color: "#000" }}>{sol.email || "—"}</div>
+                            <div style={{ color: "#000" }}>{sol.razon_social || "—"}</div>
+                            <div style={{ color: "#000" }}>{sol.cuit ? "CUIT: " + sol.cuit : "—"}</div>
+                            <div style={{ color: "#000" }}>{sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR") : "—"}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {sol.email && (
+                            <a
+                              href={buildMailtoUrl(sol)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="admin-btn-ghost"
+                              style={{ ...styles.smallBtn("#2980b9"), textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
+                            >
+                              <img src="/icons/mail.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                              MAIL
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
+                              setApproveFechas({ inicio: "", fin: "", estado_pago: "al_dia" });
+                            }}
+                            className="admin-btn"
+                            style={{ background: "#2e7d32", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                          >
+                            ✓ APROBAR
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const ok = await showConfirm(`¿Rechazar "${sol.nombre}"?`, "RECHAZAR");
+                              if (!ok) return;
+                              try {
+                                const res = await fetch(`/api/solicitudes/${sol.id}/rechazar`, {
+                                  method: "POST",
+                                  headers: authHeaders({ "Content-Type": "application/json" }),
+                                });
+                                if (res.ok) {
+                                  showPopup("Solicitud rechazada", "success");
+                                  cargarSolicitudes();
+                                  if (sol.email) {
+                                    const lines = [
+                                      `Hola ${sol.nombre},`,
+                                      "",
+                                      "Lamentamos informarte que tu solicitud para el Sello Made in Chaco no ha sido aprobada en esta instancia.",
+                                      "",
+                                      "Cualquier consulta podés responder a este correo.",
+                                      "",
+                                      "Saludos,",
+                                      "Equipo Made in Chaco",
+                                    ];
+                                    const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello");
+                                    const body = encodeURIComponent(lines.join("\n"));
+                                    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sol.email)}&su=${subject}&body=${body}`;
+                                    window.open(url, "_blank", "noopener,noreferrer");
+                                  }
+                                } else {
+                                  const data = await res.json();
+                                  showPopup(data.error || "Error al rechazar", "warning");
+                                }
+                              } catch {
+                                showPopup("Error de conexión", "warning");
+                              }
+                            }}
+                            className="admin-btn"
+                            style={{ background: "#c62828", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                          >
+                            ✕ RECHAZAR
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* Modal aprobar */}
+                {approveModal && (() => {
+                  const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(approveModal.tipo);
+                  return (
+                    <div style={{
+                      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
+                    }}
+                      onClick={() => setApproveModal(null)}
+                    >
+                      <div style={{
+                        background: "white", borderRadius: "16px", padding: "28px", maxWidth: "440px",
+                        width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.15)",
+                      }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 8px", fontSize: "18px" }}>
+                          Aprobar solicitud
+                        </h3>
+                        <p style={{ fontSize: "14px", color: "#555", marginBottom: "16px" }}>
+                          {approveModal.nombre} ({approveModal.tipo})
+                        </p>
+                        {esComercial && (
+                          <>
+                            <p style={{ fontSize: "12px", color: "#666", marginBottom: "12px" }}>
+                              Esta entidad requiere membresía. Establecé las fechas de suscripción:
+                            </p>
+                            <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Inicio</label>
+                                <input type="date" style={styles.input} value={approveFechas.inicio} onChange={(e) => setApproveFechas((f) => ({ ...f, inicio: e.target.value }))} />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fin</label>
+                                <input type="date" style={styles.input} value={approveFechas.fin} onChange={(e) => setApproveFechas((f) => ({ ...f, fin: e.target.value }))} />
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: "12px" }}>
+                              <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Estado de pago</label>
+                              <select style={styles.input} value={approveFechas.estado_pago} onChange={(e) => setApproveFechas((f) => ({ ...f, estado_pago: e.target.value }))}>
+                                <option value="al_dia">Al día</option>
+                                <option value="atrasado">Atrasado</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                        {!esComercial && (
+                          <p style={{ fontSize: "12px", color: "#888", marginBottom: "12px" }}>
+                            Este tipo de entidad no requiere membresía.
+                          </p>
+                        )}
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                          <button onClick={() => setApproveModal(null)} className="admin-btn" style={{ background: "white", color: "#555", border: "1px solid #ccc", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+                            CANCELAR
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (esComercial && (!approveFechas.inicio || !approveFechas.fin)) {
+                                showPopup("Completá las fechas de inicio y fin de suscripción.", "warning");
+                                return;
+                              }
+                              if (esComercial && approveFechas.inicio && approveFechas.fin && new Date(approveFechas.inicio) >= new Date(approveFechas.fin)) {
+                                showPopup("La fecha de inicio debe ser anterior a la fecha de fin.", "warning");
+                                return;
+                              }
+                              try {
+                                const body = {};
+                                if (esComercial) {
+                                  body.fecha_inicio_suscripcion = approveFechas.inicio;
+                                  body.fecha_fin_suscripcion = approveFechas.fin;
+                                  body.estado_pago = approveFechas.estado_pago;
+                                }
+                                const res = await fetch(`/api/solicitudes/${approveModal.id}/aprobar`, {
+                                  method: "POST",
+                                  headers: authHeaders({ "Content-Type": "application/json" }),
+                                  body: JSON.stringify(body),
+                                });
+                                if (res.ok) {
+                                  showPopup(`"${approveModal.nombre}" aprobada con éxito`, "success");
+                                  setApproveModal(null);
+                                  cargarSolicitudes();
+                                  cargarEntidades();
+                                } else {
+                                  const data = await res.json();
+                                  showPopup(data.error || "Error al aprobar", "warning");
+                                }
+                              } catch {
+                                showPopup("Error de conexión", "warning");
+                              }
+                            }}
+                            className="admin-btn"
+                            style={{ background: "#2e7d32", color: "white", border: "none", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+                          >
+                            ✓ APROBAR
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* RECORRIDOS */}
             {view === "nuevo-recorrido" && (
               <div>
@@ -2596,13 +3114,19 @@ export const AdminPanel = () => {
                     Recorridos
                   </h2>
                   {!editingRecorridoId && (
-                    <button
-                      onClick={() => setEditingRecorridoId("new")}
-                      className="admin-btn"
-                      style={{ ...styles.btnPrimary, background: "#2e7d32" }}
-                    >
-                      + NUEVO
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={cargarRecorridos} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+                        ACTUALIZAR
+                      </button>
+                      <button
+                        onClick={() => setEditingRecorridoId("new")}
+                        className="admin-btn"
+                        style={{ ...styles.btnPrimary, background: "#2e7d32" }}
+                      >
+                        + NUEVO
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -2870,19 +3394,25 @@ export const AdminPanel = () => {
                     <img src="/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                     Localidades
                   </h2>
-                  <button
-                    onClick={guardarLocalidades}
-                    disabled={dirtyCount === 0}
-                    className="admin-btn"
-                    style={{
-                      ...styles.btnPrimary,
-                      opacity: dirtyCount === 0 ? 0.4 : 1,
-                      fontSize: "13px",
-                      padding: "10px 20px",
-                    }}
-                  >
-                    GUARDAR CAMBIOS{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                  </button>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={cargarLocalidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+                      ACTUALIZAR
+                    </button>
+                    <button
+                      onClick={guardarLocalidades}
+                      disabled={dirtyCount === 0}
+                      className="admin-btn"
+                      style={{
+                        ...styles.btnPrimary,
+                        opacity: dirtyCount === 0 ? 0.4 : 1,
+                        fontSize: "13px",
+                        padding: "10px 20px",
+                      }}
+                    >
+                      GUARDAR CAMBIOS{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ background: "white", borderRadius: "12px", border: "1px solid #eee", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 160px 160px 80px", gap: "40px", padding: "16px 16px 9px", fontWeight: 800, fontSize: "13px", textTransform: "uppercase", borderBottom: "1px solid #d4cfc4", background: "#f0ede8", borderRadius: "8px 8px 0 0" }}>
@@ -2927,7 +3457,9 @@ export const AdminPanel = () => {
               ? "white"
               : popup.type === "error"
                 ? "#fdecea"
-                : "#e8f5e9",
+                : popup.type === "warning"
+                  ? "#fff3e0"
+                  : "#e8f5e9",
             color: popup.isConfirm ? "#000" : "#1c1c18",
             padding: popup.isConfirm ? "32px" : "14px 24px",
             borderRadius: "14px",

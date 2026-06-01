@@ -47,3 +47,50 @@ ALTER TABLE entidades ADD COLUMN IF NOT EXISTS link_entradas TEXT;
 
 -- 12. Relación inversa para conexiones bidireccionales
 ALTER TABLE conexiones ADD COLUMN IF NOT EXISTS tipo_relacion_inversa TEXT DEFAULT '';
+
+-- 13. Nuevos tipos de entidad: comunidad_indigena
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS etnia VARCHAR(255);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS lenguas TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS territorio_tradicional TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS cosmovision TEXT;
+
+-- 14. Nuevos tipos de entidad: lugar_natural
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS categoria_natural VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS actividades TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS acceso TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS flora_fauna_destacada TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS mejor_epoca VARCHAR(255);
+
+-- 15. Nuevos tipos de entidad: hospedaje
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS categoria_hospedaje VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS servicios TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS capacidad VARCHAR(100);
+
+-- 16. Nuevos tipos de entidad: productor
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS tipo_producto VARCHAR(255);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS metodos_produccion TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS certificaciones TEXT;
+
+-- 17. Nuevos tipos de entidad: experiencia
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS tipo_experiencia VARCHAR(255);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS duracion_experiencia VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS que_incluye TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS precio_referencia VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS contacto_reserva TEXT;
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS operador VARCHAR(255);
+
+-- 18. Nuevos tipos de entidad: relato
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS autor VARCHAR(255);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS fecha_relato VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS tipo_relato VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS contenido_completo TEXT;
+
+-- 19. Nuevos tipos de entidad: espacio_cultural
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS tipo_espacio VARCHAR(100);
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS horarios VARCHAR(255);
+
+-- 20. Estado del sello para solicitudes públicas
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS estado_sello VARCHAR(20) DEFAULT NULL;
+
+-- 21. Email de contacto obligatorio para todas las entidades
+ALTER TABLE entidades ADD COLUMN IF NOT EXISTS email VARCHAR(255);

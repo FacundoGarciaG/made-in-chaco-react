@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS entidades (
   latitud DECIMAL(10,7),
   longitud DECIMAL(10,7),
   imagen VARCHAR(500),
+  email VARCHAR(255),
   visible BOOLEAN DEFAULT true,
+  estado_sello VARCHAR(20) DEFAULT NULL,
   biografia_larga TEXT,
 
   -- artesano
@@ -98,6 +100,47 @@ CREATE TABLE IF NOT EXISTS entidades (
   estilo_arquitectonico VARCHAR(255),
   declaratoria_oficial TEXT,
   estado_conservacion VARCHAR(100),
+
+  -- comunidad_indigena
+  etnia VARCHAR(255),
+  lenguas TEXT,
+  territorio_tradicional TEXT,
+  cosmovision TEXT,
+
+  -- lugar_natural
+  categoria_natural VARCHAR(100),
+  actividades TEXT,
+  acceso TEXT,
+  flora_fauna_destacada TEXT,
+  mejor_epoca VARCHAR(255),
+
+  -- hospedaje
+  categoria_hospedaje VARCHAR(100),
+  servicios TEXT,
+  capacidad VARCHAR(100),
+
+  -- productor
+  tipo_producto VARCHAR(255),
+  metodos_produccion TEXT,
+  certificaciones TEXT,
+
+  -- experiencia
+  tipo_experiencia VARCHAR(255),
+  duracion_experiencia VARCHAR(100),
+  que_incluye TEXT,
+  precio_referencia VARCHAR(100),
+  contacto_reserva TEXT,
+  operador VARCHAR(255),
+
+  -- relato
+  autor VARCHAR(255),
+  fecha_relato VARCHAR(100),
+  tipo_relato VARCHAR(100),
+  contenido_completo TEXT,
+
+  -- espacio_cultural
+  tipo_espacio VARCHAR(100),
+  horarios VARCHAR(255),
 
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()

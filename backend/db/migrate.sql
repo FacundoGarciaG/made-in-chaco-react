@@ -94,3 +94,13 @@ ALTER TABLE entidades ADD COLUMN IF NOT EXISTS estado_sello VARCHAR(20) DEFAULT 
 
 -- 21. Email de contacto obligatorio para todas las entidades
 ALTER TABLE entidades ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+
+-- 22. Tabla de mensajes de contacto
+CREATE TABLE IF NOT EXISTS contacto_mensajes (
+  id SERIAL PRIMARY KEY,
+  nombre VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  asunto VARCHAR(255) NOT NULL,
+  mensaje TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);

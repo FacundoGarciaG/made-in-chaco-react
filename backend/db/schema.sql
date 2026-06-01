@@ -209,3 +209,13 @@ CREATE TABLE IF NOT EXISTS multimedia_etiquetas (
 
 CREATE INDEX IF NOT EXISTS idx_mulet_multimedia ON multimedia_etiquetas(multimedia_id);
 CREATE INDEX IF NOT EXISTS idx_mulet_entidad ON multimedia_etiquetas(entidad_id);
+
+-- ============ CONTACTO ============
+CREATE TABLE IF NOT EXISTS contacto_mensajes (
+  id SERIAL PRIMARY KEY,
+  nombre VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  asunto VARCHAR(255) NOT NULL,
+  mensaje TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);

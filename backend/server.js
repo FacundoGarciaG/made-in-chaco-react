@@ -13,6 +13,7 @@ import recorridoRoutes from "./routes/recorridos.js";
 import localidadRoutes from "./routes/localidades.js";
 import departamentoRoutes from "./routes/departamentos.js";
 import uploadRoutes from "./routes/upload.js";
+import contactoRoutes from "./routes/contacto.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,7 @@ app.use("/api", recorridoRoutes);
 app.use("/api", localidadRoutes);
 app.use("/api", departamentoRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api", contactoRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

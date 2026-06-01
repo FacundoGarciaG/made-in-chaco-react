@@ -1,0 +1,373 @@
+.contact-page {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+.contact-form-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 80px 80px 120px;
+  position: relative;
+  z-index: 2;
+}
+
+.contact-map-side {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 50vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+/* Steps bar */
+.steps-bar {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  z-index: 10;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step-dot.active {
+  background: #1a1a1a;
+  width: 32px;
+  border-radius: 4px;
+}
+
+.step-dot.done {
+  background: #1a1a1a;
+  opacity: 0.2;
+}
+
+.step-line {
+  width: 40px;
+  height: 1px;
+  background: #e0e0e0;
+  transition: background 0.4s ease;
+}
+
+.step-line.done {
+  background: #1a1a1a;
+  opacity: 0.2;
+}
+
+.step-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.step-content {
+  max-width: 720px;
+  animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-content h2 {
+  font-size: clamp(40px, 5vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: #1a1a1a;
+  margin: 0 0 12px;
+}
+
+.step-content .step-hint {
+  font-size: clamp(16px, 1.4vw, 20px);
+  font-weight: 400;
+  color: #777;
+  margin: 0 0 56px;
+  letter-spacing: -0.01em;
+}
+
+/* Floating label groups */
+.floating-group {
+  position: relative;
+  margin-bottom: 40px;
+  padding-top: 28px;
+}
+
+.floating-group input,
+.floating-group textarea {
+  width: 100%;
+  max-width: 600px;
+  padding: 6px 0;
+  font-size: clamp(24px, 2.8vw, 40px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  border: none;
+  border-bottom: 1px solid #e8e8e8;
+  background: transparent;
+  color: #1a1a1a;
+  font-family: inherit;
+  outline: none;
+  border-radius: 0;
+  transition: border-color 0.25s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.floating-group input:focus,
+.floating-group textarea:focus {
+  border-bottom-color: #1a1a1a;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
+.floating-group textarea {
+  resize: none;
+}
+
+.floating-group textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.floating-group textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.floating-group textarea::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 2px;
+}
+
+.floating-group textarea::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+.floating-group label {
+  position: absolute;
+  left: 0;
+  top: 34px;
+  font-size: clamp(24px, 2.8vw, 40px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: #aaa;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-group input:focus ~ label,
+.floating-group textarea:focus ~ label,
+.floating-group input:not(:placeholder-shown) ~ label,
+.floating-group textarea:not(:placeholder-shown) ~ label {
+  top: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+/* Buttons */
+.btn-row {
+  display: flex;
+  gap: 24px;
+  margin-top: 56px;
+  align-items: center;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: clamp(15px, 1.2vw, 18px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1a1a1a;
+}
+
+.btn-ghost {
+  color: #999;
+}
+
+.btn-ghost:hover {
+  color: #555;
+}
+
+.btn-primary::after {
+  content: "→";
+  font-size: 1.2em;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.btn-primary:hover::after {
+  transform: translateX(6px);
+}
+
+.btn-primary:disabled {
+  color: #d4d4d4;
+  cursor: default;
+}
+
+.btn-primary:disabled::after {
+  transform: none;
+}
+
+/* Review */
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 48px;
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.review-item:last-child {
+  border-bottom: none;
+}
+
+.review-item-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+}
+
+.review-item-value {
+  font-size: clamp(22px, 2.6vw, 36px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+}
+
+/* Success */
+.success-screen {
+  animation: fadeUp 0.5s ease;
+}
+
+.success-icon {
+  font-size: clamp(56px, 6vw, 80px);
+  margin-bottom: 20px;
+  color: #1a1a1a;
+}
+
+.success-screen h2 {
+  font-size: clamp(40px, 5vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: #1a1a1a;
+  margin: 0 0 16px;
+}
+
+.success-screen p {
+  font-size: clamp(16px, 1.4vw, 20px);
+  font-weight: 400;
+  color: #777;
+  margin: 0 0 40px;
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+/* Error */
+.error-msg {
+  font-size: 14px;
+  color: #d32f2f;
+  margin-top: 8px;
+  font-weight: 400;
+  animation: fadeUp 0.2s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .contact-form-side {
+    padding: 60px 32px;
+  }
+  .contact-map-side {
+    display: none;
+  }
+
+  .steps-bar {
+    top: 28px;
+  }
+
+  .step-line {
+    width: 24px;
+  }
+
+  .step-content h2 {
+    font-size: 32px;
+  }
+
+  .floating-group {
+    margin-bottom: 32px;
+  }
+
+  .floating-group input,
+  .floating-group textarea {
+    font-size: 24px;
+  }
+
+  .floating-group label {
+    font-size: 24px;
+  }
+
+  .floating-group input:focus ~ label,
+  .floating-group textarea:focus ~ label,
+  .floating-group input:not(:placeholder-shown) ~ label,
+  .floating-group textarea:not(:placeholder-shown) ~ label {
+    font-size: 12px;
+  }
+
+  .review-item-value {
+    font-size: 24px;
+  }
+
+  .btn-row {
+    margin-top: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-form-side {
+    padding: 48px 20px;
+  }
+
+  .step-content h2 {
+    font-size: 26px;
+  }
+
+  .floating-group input,
+  .floating-group textarea {
+    font-size: 20px;
+  }
+
+  .floating-group label {
+    font-size: 20px;
+  }
+}

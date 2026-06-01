@@ -70,6 +70,13 @@ export const HeaderComponent = () => {
     { id: "evento", label: "Eventos", color: "#9c27b0" },
     { id: "patrimonio", label: "Patrimonios", color: "#795548" },
     { id: "personalidad", label: "Personalidades", color: "#e91e63" },
+    { id: "comunidad_indigena", label: "Comunidades", color: "#8B4513" },
+    { id: "lugar_natural", label: "Naturaleza", color: "#2E7D32" },
+    { id: "hospedaje", label: "Hospedajes", color: "#FF6F00" },
+    { id: "productor", label: "Productores", color: "#00695C" },
+    { id: "experiencia", label: "Experiencias", color: "#6A1B9A" },
+    { id: "relato", label: "Relatos", color: "#D84315" },
+    { id: "espacio_cultural", label: "Cultura", color: "#37474F" },
   ];
 
   // Resetear búsqueda al cerrar el panel
@@ -268,22 +275,29 @@ export const HeaderComponent = () => {
                 ✕
               </button>
             )}
-            {searchTerm && searchDropdownOpen && entidades.filter(e => {
-              if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-              if (activeFilter !== "todos" && e.tipo !== activeFilter) return false;
-              if (filtroLocalidad && e.localidad_id !== parseInt(filtroLocalidad)) return false;
-              return true;
-            }).length > 0 && (
-              <div className="header-search-dropdown">
-                {entidades
-                  .filter(e => {
-                    if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                    if (activeFilter !== "todos" && e.tipo !== activeFilter) return false;
-                    if (filtroLocalidad && e.localidad_id !== parseInt(filtroLocalidad)) return false;
-                    return true;
-                  })
-                  .slice(0, 8)
-                  .map(e => (
+            {(() => {
+              const filtrarEntidad = (e) => {
+                if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                if (activeFilter !== "todos" && e.tipo !== activeFilter) return false;
+                if (filtroLocalidad && e.localidad_id !== parseInt(filtroLocalidad)) return false;
+                if (!e.visible) return false;
+                if (["comercio", "hospedaje", "productor"].includes(e.tipo)) {
+                  if (e.estado_pago !== "al_dia") return false;
+                  if (e.fecha_fin_suscripcion && new Date(e.fecha_fin_suscripcion) < new Date(new Date().toDateString())) return false;
+                  if (e.fecha_inicio_suscripcion && new Date(e.fecha_inicio_suscripcion) > new Date(new Date().toDateString())) return false;
+                }
+                if (e.tipo === "evento") {
+                  if (e.fecha_evento && new Date(e.fecha_evento) < new Date(new Date().toDateString())) return false;
+                  if (e.estado_pago && e.estado_pago !== "al_dia") return false;
+                  if (e.estado_pago && e.fecha_fin_suscripcion && new Date(e.fecha_fin_suscripcion) < new Date(new Date().toDateString())) return false;
+                  if (e.estado_pago && e.fecha_inicio_suscripcion && new Date(e.fecha_inicio_suscripcion) > new Date(new Date().toDateString())) return false;
+                }
+                return true;
+              };
+              const resultados = entidades.filter(filtrarEntidad);
+              return searchTerm && searchDropdownOpen && resultados.length > 0 ? (
+                <div className="header-search-dropdown">
+                  {resultados.slice(0, 8).map(e => (
                     <button
                       key={e.id}
                       className="header-search-suggestion"
@@ -296,8 +310,9 @@ export const HeaderComponent = () => {
                       {e.nombre}
                     </button>
                   ))}
-              </div>
-            )}
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
 
@@ -312,6 +327,11 @@ export const HeaderComponent = () => {
           <li>
             <NavLink to="/" aria-current="page">
               Quienes somos
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/solicitar-sello" aria-current="page">
+              Solicitar sello
             </NavLink>
           </li>
           <li>
@@ -650,6 +670,14 @@ export const HeaderComponent = () => {
                 onClick={() => setSymbolMenuOpen(false)}
               >
                 Contacto
+              </NavLink>
+              <NavLink
+                to="/solicitar-sello"
+                className="train-item"
+                style={{ transitionDelay: "0.24s" }}
+                onClick={() => setSymbolMenuOpen(false)}
+              >
+                Solicitar sello
               </NavLink>
             </nav>
           </div>

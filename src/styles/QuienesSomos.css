@@ -1,0 +1,87 @@
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulseSlow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(6px); }
+}
+
+@keyframes drawLine {
+  from { width: 0; }
+  to   { width: 80px; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.quienes-hero {
+  animation: fadeIn 1s ease-out;
+}
+
+.quienes-hero-title {
+  animation: fadeInUp 0.9s ease-out 0.2s both;
+}
+
+.quienes-hero-sub {
+  animation: fadeInUp 0.9s ease-out 0.4s both;
+}
+
+.quienes-hero-line {
+  animation: drawLine 0.8s ease-out 0.7s both;
+}
+
+.quienes-scroll-hint {
+  animation: pulseSlow 2.2s ease-in-out infinite;
+}
+
+.quienes-section-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.quienes-section-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.quienes-card {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out, box-shadow 0.4s ease, background 0.4s ease;
+}
+
+.quienes-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.quienes-card:hover {
+  box-shadow: 0 20px 60px rgba(134, 56, 25, 0.12);
+  background: #fff !important;
+}
+
+.quienes-stat {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.quienes-stat.visible {
+  opacity: 1;
+  transform: translateY(0);
+}

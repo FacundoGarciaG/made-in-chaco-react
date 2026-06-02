@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import "../styles/HeaderComponent.css";
 import logoClaro from "../assets/imagenes/madeinchacoclaro.png";
 import logoSymbol from "../assets/imagenes/logo-sintitulo.png";
+import { SelloModal } from "./SelloModal";
 export const HeaderComponent = () => {
   const location = useLocation();
   const isMapPage = location.pathname === "/descubre";
@@ -415,7 +416,7 @@ export const HeaderComponent = () => {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/" aria-current="page">
+              <NavLink to="/quienes-somos" aria-current="page">
                 Quienes somos
               </NavLink>
             </li>
@@ -802,7 +803,7 @@ export const HeaderComponent = () => {
                 Proyecto
               </NavLink>
               <NavLink
-                to="/"
+                to="/quienes-somos"
                 className="train-item"
                 style={{ transitionDelay: "0.08s" }}
               >
@@ -841,62 +842,10 @@ export const HeaderComponent = () => {
         )}
       </header>
 
-      {showSelloModal && (
-        <div
-          className="sello-modal-overlay"
-          onClick={() => setShowSelloModal(false)}
-        >
-          <div className="sello-modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="sello-modal-close"
-              onClick={() => setShowSelloModal(false)}
-            >
-              ×
-            </button>
-            <h2 className="sello-modal-title">Solicitar Sello</h2>
-            <p className="sello-modal-text">
-              El <strong>Sello Made in Chaco</strong> es una distinción oficial
-              que reconoce y visibiliza a emprendedores, productores, artistas y
-              prestadores de servicios de la provincia del Chaco.
-            </p>
-            <p className="sello-modal-text">
-              Obtener este sello significa{" "}
-              <strong>formar parte de un mapa interactivo</strong> donde tu
-              emprendimiento será geolocalizado y descubierto por personas que
-              valoran lo auténtico, lo local y lo chaqueño. Además, te integrás
-              a una comunidad que promueve el consumo consciente y el desarrollo
-              económico de la región.
-            </p>
-            <p className="sello-modal-text">
-              <strong>Beneficios clave:</strong> presencia en el mapa oficial de
-              la provincia, visibilidad para turistas y vecinos, conexión con
-              otros actores locales, y la posibilidad de mostrar tu historia al
-              mundo a través de tu perfil público.
-            </p>
-            <p className="sello-modal-text">
-              Si te interesa pertenecer a esta red y dar a conocer tu trabajo,
-              completá el formulario y pronto nos pondremos en contacto.
-            </p>
-            <div className="sello-modal-actions">
-              <button
-                className="sello-modal-btn sello-modal-btn--primary"
-                onClick={() => {
-                  setShowSelloModal(false);
-                  navigate("/solicitar-sello");
-                }}
-              >
-                Aceptar
-              </button>
-              <button
-                className="sello-modal-btn sello-modal-btn--secondary"
-                onClick={() => setShowSelloModal(false)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SelloModal
+        isOpen={showSelloModal}
+        onClose={() => setShowSelloModal(false)}
+      />
     </>
   );
 };

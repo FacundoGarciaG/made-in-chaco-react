@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import "../styles/MapPage.css";
 import { FooterComponent } from "../components/FooterComponent";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -2410,7 +2411,7 @@ export const MapChaco = () => {
         />
       </div>
 
-      <div ref={mapContainer} style={{ width: "100%", height: "100vh" }} />
+      <div ref={mapContainer} className="map-container" style={{ width: "100%", height: "100vh" }} />
     </div>
   );
 };

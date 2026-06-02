@@ -109,22 +109,37 @@ const CAMPOS_POR_TIPO = {
 
 const sInput = {
   width: "100%",
-  padding: "12px 14px",
-  border: "1px solid #ddd",
-  borderRadius: "10px",
-  fontSize: "14px",
+  padding: "8px 0 6px",
+  border: "none",
+  borderBottom: "1px solid #e8e8e8",
+  borderRadius: 0,
+  fontSize: "24px",
+  fontWeight: 400,
+  letterSpacing: "-0.02em",
   outline: "none",
   boxSizing: "border-box",
-  background: "white",
+  background: "transparent",
+  color: "#1a1a1a",
+  fontFamily: "inherit",
+  WebkitAppearance: "none",
+  appearance: "none",
+  cursor: "text",
+};
+
+const sTextarea = {
+  ...sInput,
+  minHeight: 100,
+  resize: "vertical",
+  lineHeight: 1.4,
 };
 
 const sLabel = {
   display: "block",
-  fontSize: "11px",
-  fontWeight: 700,
-  color: "#863819",
-  marginBottom: "4px",
-  letterSpacing: "0.5px",
+  fontSize: "13px",
+  fontWeight: 500,
+  color: "#888",
+  marginBottom: 2,
+  letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
 
@@ -143,6 +158,7 @@ export const SolicitarSelloPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [submitHover, setSubmitHover] = useState(false);
   const [contactos, setContactos] = useState([]);
   const [geoQuery, setGeoQuery] = useState("");
   const [geoResults, setGeoResults] = useState([]);
@@ -303,11 +319,11 @@ export const SolicitarSelloPage = () => {
 
   if (success) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "0 20px" }}>
-        <div style={{ maxWidth: 600, textAlign: "center" }}>
-          <div style={{ fontSize: 48, marginBottom: 16, color: "#2e7d32" }}>✓</div>
-        <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 12 }}>Solicitud enviada</h1>
-        <p style={{ color: "#555", lineHeight: 1.6, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "0 40px" }}>
+        <div style={{ maxWidth: 600 }}>
+          <div style={{ fontSize: 72, marginBottom: 20, color: "#1a1a1a", fontWeight: 300, lineHeight: 1 }}>✓</div>
+        <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 16, fontSize: 48, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.05 }}>Solicitud enviada</h1>
+        <p style={{ color: "#777", fontSize: 20, lineHeight: 1.5, marginBottom: 40, maxWidth: 520, letterSpacing: "-0.01em" }}>
           Recibimos tu solicitud para el Sello Made in Chaco. Nuestro equipo la va a revisar y te
           vamos a contactar a la brevedad. Una vez aprobada, vas a poder gestionar el pago anual
           para activar tu membresía.
@@ -315,17 +331,18 @@ export const SolicitarSelloPage = () => {
         <button
           onClick={() => navigate("/")}
           style={{
-            padding: "12px 28px",
-            background: "#863819",
-            color: "white",
-            border: "none",
-            borderRadius: "12px",
-            fontSize: 15,
-            fontWeight: 600,
+            fontFamily: "inherit",
+            fontSize: 18,
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
             cursor: "pointer",
+            border: "none",
+            background: "none",
+            padding: 0,
+            color: "#1a1a1a",
           }}
         >
-          Volver al inicio
+          Volver al inicio <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a" }}>↑</span>
         </button>
       </div>
     </div>
@@ -333,17 +350,11 @@ export const SolicitarSelloPage = () => {
   }
 
   return (
-    <div style={{ maxWidth: 700, margin: "80px auto 0", padding: "40px 20px 80px" }}>
+    <div style={{ maxWidth: 720, margin: "80px auto 0", padding: "80px 40px 120px" }}>
       {/* Header */}
-      <div style={{ textAlign: "center", marginBottom: 40 }}>
-        <div style={{
-          width: 80, height: 80, margin: "0 auto 12px",
-          background: "#863819", borderRadius: "50%",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 32, color: "white", fontWeight: "bold",
-        }}>S</div>
-        <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: 28 }}>Solicitar el Sello</h1>
-        <p style={{ color: "#666", marginTop: 8, lineHeight: 1.5, fontSize: 15 }}>
+      <div style={{ marginBottom: 64, textAlign: "center" }}>
+        <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: 48, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.05 }}>Solicitar el Sello</h1>
+        <p style={{ color: "#777", marginTop: 12, lineHeight: 1.5, fontSize: 20, fontWeight: 400, letterSpacing: "-0.01em" }}>
           Obtené el Sello Made in Chaco para tu comercio, hospedaje, producto o evento.
           Formá parte del mapa cultural y comercial de la provincia.
         </p>
@@ -351,24 +362,26 @@ export const SolicitarSelloPage = () => {
 
       <form onSubmit={handleSubmit}>
         {/* Tipo */}
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 48 }}>
           <label style={sLabel}>Tipo de entidad</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
             {TIPOS.map((t) => (
               <button
                 key={t.value}
                 type="button"
                 onClick={() => { setTipo(t.value); setExtra({}); }}
                 style={{
-                  padding: "10px 20px",
-                  borderRadius: 10,
-                  border: tipo === t.value ? `2px solid ${t.color}` : "1px solid #ddd",
-                  background: tipo === t.value ? `${t.color}10` : "white",
-                  color: tipo === t.value ? t.color : "#555",
-                  fontWeight: tipo === t.value ? 700 : 400,
-                  fontSize: 14,
+                  padding: "14px 28px",
+                  borderRadius: 0,
+                  border: "none",
+                  borderBottom: tipo === t.value ? `2px solid ${t.color}` : "2px solid #e8e8e8",
+                  background: "transparent",
+                  color: tipo === t.value ? t.color : "#aaa",
+                  fontWeight: tipo === t.value ? 600 : 400,
+                  fontSize: 18,
+                  letterSpacing: "-0.01em",
                   cursor: "pointer",
-                  transition: "0.15s",
+                  transition: "0.2s",
                 }}
               >
                 {t.label}
@@ -381,13 +394,10 @@ export const SolicitarSelloPage = () => {
           <>
             {/* Básicos */}
             <div style={{
-              background: "#faf8f5",
-              borderRadius: 16,
-              padding: "24px",
-              marginBottom: 24,
+              marginBottom: 48,
             }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 16 }}>Información básica</h3>
-              <div style={{ marginBottom: 12 }}>
+              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Información básica</h3>
+              <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Nombre *</label>
                 <input
                   style={sInput}
@@ -396,7 +406,7 @@ export const SolicitarSelloPage = () => {
                   placeholder="Nombre de la entidad"
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Email *</label>
                 <input
                   type="email"
@@ -407,7 +417,7 @@ export const SolicitarSelloPage = () => {
                   onPaste={(e) => e.preventDefault()}
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Repetir Email *</label>
                 <input
                   type="email"
@@ -418,19 +428,19 @@ export const SolicitarSelloPage = () => {
                   onPaste={(e) => e.preventDefault()}
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Descripción *</label>
                 <textarea
-                  style={{ ...sInput, minHeight: 80, resize: "vertical" }}
+                  style={sTextarea}
                   value={resumen}
                   onChange={(e) => setResumen(e.target.value)}
                   placeholder="Contanos brevemente de qué se trata..."
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Localidad *</label>
                 <select
-                  style={sInput}
+                  style={{ ...sInput, cursor: "pointer", color: localidadId ? "#1a1a1a" : "#aaa" }}
                   value={localidadId}
                   onChange={(e) => setLocalidadId(e.target.value)}
                 >
@@ -499,16 +509,13 @@ export const SolicitarSelloPage = () => {
             {/* Campos específicos */}
             {CAMPOS_POR_TIPO[tipo] && (
               <div style={{
-                background: "#faf8f5",
-                borderRadius: 16,
-                padding: "24px",
-                marginBottom: 24,
+                marginBottom: 48,
               }}>
-                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 16 }}>
+                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>
                   Datos de {TIPOS.find((t) => t.value === tipo)?.label}
                 </h3>
                 {CAMPOS_POR_TIPO[tipo].map((campo) => (
-                  <div key={campo.key} style={{ marginBottom: 12 }}>
+                  <div key={campo.key} style={{ marginBottom: 32 }}>
                     <label style={sLabel}>{campo.label}</label>
                     {campo.type === "categoria" ? (
                       <>
@@ -533,7 +540,7 @@ export const SolicitarSelloPage = () => {
                     ) : campo.type === "rubro" ? (
                       <>
                         <select
-                          style={sInput}
+                          style={{ ...sInput, cursor: "pointer" }}
                           value={extra[campo.key] || ""}
                           onChange={(e) => handleExtraChange(campo.key, e.target.value)}
                         >
@@ -591,7 +598,7 @@ export const SolicitarSelloPage = () => {
                       </div>
                     ) : campo.type === "select" ? (
                       <select
-                        style={sInput}
+                        style={{ ...sInput, cursor: "pointer" }}
                         value={extra[campo.key] || ""}
                         onChange={(e) => handleExtraChange(campo.key, e.target.value)}
                       >
@@ -616,7 +623,7 @@ export const SolicitarSelloPage = () => {
                       />
                     ) : campo.type === "textarea" ? (
                       <textarea
-                        style={{ ...sInput, minHeight: 80, resize: "vertical" }}
+                        style={sTextarea}
                         value={extra[campo.key] || ""}
                         onChange={(e) => handleExtraChange(campo.key, e.target.value)}
                         placeholder={campo.placeholder || ""}
@@ -637,18 +644,15 @@ export const SolicitarSelloPage = () => {
 
             {/* Contacto */}
             <div style={{
-              background: "#faf8f5",
-              borderRadius: 16,
-              padding: "24px",
-              marginBottom: 24,
+              marginBottom: 48,
             }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 16 }}>Contacto / Redes sociales</h3>
+              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Contacto / Redes sociales</h3>
               {contactos.map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
                   <select
                     value={item.type}
                     onChange={(e) => actualizarContacto(i, "type", e.target.value)}
-                    style={{ ...sInput, width: 130, flexShrink: 0, marginBottom: 0 }}
+                    style={{ ...sInput, width: 150, flexShrink: 0, marginBottom: 0, fontSize: 16, cursor: "pointer" }}
                   >
                     <option value="instagram">Instagram</option>
                     <option value="whatsapp">WhatsApp</option>
@@ -672,10 +676,12 @@ export const SolicitarSelloPage = () => {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "#c62828",
+                      borderBottom: "1px solid #e8e8e8",
+                      color: "#d32f2f",
                       cursor: "pointer",
-                      fontSize: 16,
-                      padding: "4px 6px",
+                      fontSize: 18,
+                      padding: "8px 0",
+                      lineHeight: 1,
                     }}
                   >
                     ✕
@@ -686,13 +692,17 @@ export const SolicitarSelloPage = () => {
                 type="button"
                 onClick={agregarContacto}
                 style={{
-                  padding: "8px 16px",
-                  background: "white",
-                  border: "1px dashed #ccc",
-                  borderRadius: 8,
+                  fontFamily: "inherit",
+                  fontSize: 15,
+                  fontWeight: 400,
                   cursor: "pointer",
-                  color: "#555",
-                  fontSize: 13,
+                  border: "none",
+                  borderBottom: "1px solid #e8e8e8",
+                  background: "none",
+                  padding: "8px 0",
+                  color: "#aaa",
+                  letterSpacing: "-0.01em",
+                  marginTop: 8,
                 }}
               >
                 + Agregar contacto
@@ -701,44 +711,41 @@ export const SolicitarSelloPage = () => {
 
             {/* Foto */}
             <div style={{
-              background: "#faf8f5",
-              borderRadius: 16,
-              padding: "24px",
-              marginBottom: 24,
+              marginBottom: 48,
             }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 16 }}>Foto de portada</h3>
-              <p style={{ fontSize: 13, color: "#666", margin: "0 0 12px", lineHeight: 1.4 }}>
+              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Foto de portada</h3>
+              <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                 Esta foto se va a usar como imagen principal de tu entidad en el mapa y en su página de detalle.
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <label style={{
-                  padding: "10px 18px",
-                  background: "white",
-                  border: "1px dashed #ccc",
-                  borderRadius: 8,
+                  fontFamily: "inherit",
+                  fontSize: 15,
+                  letterSpacing: "-0.01em",
                   cursor: "pointer",
-                  color: "#555",
-                  fontSize: 13,
+                  border: "none",
+                  borderBottom: "1px solid #e8e8e8",
+                  background: "none",
+                  padding: "8px 0",
+                  color: "#aaa",
                 }}>
                   {uploading ? "Subiendo..." : "Seleccionar archivo"}
                   <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} disabled={uploading} />
                 </label>
                 {imagen && (
-                  <img src={imagen} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />
+                  <img src={imagen} alt="" style={{ width: 60, height: 60, borderRadius: 0, objectFit: "cover" }} />
                 )}
               </div>
-              <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
+              <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
             </div>
 
             {/* Error */}
             {error && (
               <div style={{
-                padding: "12px 16px",
-                background: "#fff3f0",
-                border: "1px solid #ffccc7",
-                borderRadius: 10,
-                color: "#c62828",
                 fontSize: 14,
+                color: "#d32f2f",
+                fontWeight: 400,
+                marginTop: 8,
                 marginBottom: 16,
               }}>
                 {error}
@@ -749,19 +756,28 @@ export const SolicitarSelloPage = () => {
             <button
               type="submit"
               disabled={submitting || uploading}
+              onMouseEnter={() => setSubmitHover(true)}
+              onMouseLeave={() => setSubmitHover(false)}
               style={{
-                width: "100%",
-                padding: "16px",
-                background: submitting || uploading ? "#aaa" : "#863819",
-                color: "white",
+                fontFamily: "inherit",
+                fontSize: 18,
+                fontWeight: 500,
+                letterSpacing: "-0.01em",
+                cursor: submitting || uploading ? "default" : "pointer",
                 border: "none",
-                borderRadius: 14,
-                fontSize: 16,
-                fontWeight: 700,
-                cursor: submitting || uploading ? "not-allowed" : "pointer",
+                background: "none",
+                boxShadow: "none",
+                padding: "4px 0",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                color: submitting || uploading ? "#d4d4d4" : "#1a1a1a",
+                marginTop: 48,
+                transition: "color 0.2s ease",
               }}
             >
               {submitting ? "Enviando solicitud..." : uploading ? "Subiendo imagen..." : "Enviar solicitud"}
+              {!submitting && !uploading && <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a", transform: submitHover ? "translateX(6px)" : "none", transition: "transform 0.2s ease" }}>→</span>}
             </button>
           </>
         )}

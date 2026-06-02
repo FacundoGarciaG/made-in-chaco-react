@@ -14,6 +14,16 @@ const authHeaders = (extra = {}) => {
   const token = getToken();
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 };
+const authFetch = async (url, opts = {}) => {
+  const res = await fetch(url, opts);
+  if (res.status === 401) {
+    localStorage.removeItem("made_in_chaco_token");
+    localStorage.removeItem("made_in_chaco_user");
+    window.location.href = "/admin/login";
+    throw new Error("Sesión expirada");
+  }
+  return res;
+};
 
 const colorMapAdmin = {
   artesano: "#ff5722",
@@ -465,7 +475,7 @@ export const AdminPanel = () => {
     await Promise.all(
       dirty.map((loc) => {
         const vals = editValues[loc.id];
-        return fetch(`/api/localidades/${loc.id}`, {
+        return authFetch(`/api/localidades/${loc.id}`, {
           method: "PUT",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
@@ -581,21 +591,21 @@ export const AdminPanel = () => {
   // --- CARGAR DATOS ---
   const cargarLocalidades = async () => {
     try {
-      const res = await fetch("/api/localidades");
+      const res = await authFetch("/api/localidades");
       if (res.ok) setLocalidades(await res.json());
     } catch {}
   };
 
   const cargarEntidades = async () => {
     try {
-      const res = await fetch("/api/entidades");
+      const res = await authFetch("/api/entidades");
       if (res.ok) setAllEntities(await res.json());
     } catch {}
   };
 
   const cargarRecorridos = async () => {
     try {
-      const res = await fetch("/api/recorridos");
+      const res = await authFetch("/api/recorridos");
       if (res.ok) setRecorridos(await res.json());
     } catch {}
   };
@@ -603,7 +613,7 @@ export const AdminPanel = () => {
   const cargarSolicitudes = async () => {
     setSolicitudesLoading(true);
     try {
-      const res = await fetch("/api/solicitudes", { headers: authHeaders() });
+      const res = await authFetch("/api/solicitudes", { headers: authHeaders() });
       if (res.ok) setSolicitudes(await res.json());
     } catch {} finally {
       setSolicitudesLoading(false);
@@ -871,7 +881,7 @@ export const AdminPanel = () => {
     try {
       const payload = { ...general, imagen: multimediaItems[0].url_recurso };
       if (editingEntityId) {
-        const r1 = await fetch(
+        const r1 = await authFetch(
           `/api/entidades/${editingEntityId}`,
           {
             method: "PUT",
@@ -884,7 +894,7 @@ export const AdminPanel = () => {
           if (r1.status === 401) throw new Error("Sesión expirada. Iniciá sesión de nuevo.");
           throw new Error(errBody.error || "Error al actualizar datos base");
         }
-        const r2 = await fetch(
+        const r2 = await authFetch(
           `/api/entidades/${editingEntityId}/detalles`,
           {
             method: "PUT",
@@ -896,13 +906,13 @@ export const AdminPanel = () => {
           const errBody2 = await r2.json().catch(() => ({}));
           throw new Error(errBody2.error || "Error al actualizar detalles");
         }
-        const multimediaExistentes = await fetch(
+        const multimediaExistentes = await authFetch(
           `/api/entidades/${editingEntityId}/multimedia`,
         );
         const datosMulti = await multimediaExistentes.json();
         if (multimediaExistentes.ok) {
           for (const m of datosMulti) {
-            await fetch(`/api/multimedia/${m.id}`, {
+            await authFetch(`/api/multimedia/${m.id}`, {
               method: "DELETE",
               headers: authHeaders(),
             });
@@ -911,7 +921,7 @@ export const AdminPanel = () => {
         for (const item of multimediaItems) {
           if (!item.url_recurso) continue;
           const { entidades_etiquetadas, ...itemData } = item;
-          const resM = await fetch(`/api/multimedia`, {
+          const resM = await authFetch(`/api/multimedia`, {
             method: "POST",
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
@@ -924,7 +934,7 @@ export const AdminPanel = () => {
             const mData = await resM.json();
             const multimediaId = mData.id;
             if (multimediaId) {
-              await fetch(
+              await authFetch(
                 `/api/multimedia/${multimediaId}/etiquetas`,
                 {
                   method: "PUT",
@@ -941,13 +951,13 @@ export const AdminPanel = () => {
             }
           }
         }
-        await fetch(`/api/entidades/${editingEntityId}/conexiones`, {
+        await authFetch(`/api/entidades/${editingEntityId}/conexiones`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(conexiones),
         });
       } else {
-        const r1 = await fetch("/api/entidades", {
+        const r1 = await authFetch("/api/entidades", {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(payload),
@@ -956,7 +966,7 @@ export const AdminPanel = () => {
         if (!r1.ok) throw new Error(d1.error);
         const id = d1.id;
         createdEntityId = id;
-        const r2 = await fetch(
+        const r2 = await authFetch(
             `/api/entidades/${id}/detalles`,
             {
               method: "POST",
@@ -971,7 +981,7 @@ export const AdminPanel = () => {
         for (const item of multimediaItems) {
           if (!item.url_recurso) continue;
           const { entidades_etiquetadas, ...itemData } = item;
-          const resM = await fetch(`/api/multimedia`, {
+          const resM = await authFetch(`/api/multimedia`, {
             method: "POST",
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
@@ -984,7 +994,7 @@ export const AdminPanel = () => {
             const mData = await resM.json();
             const multimediaId = mData.id;
             if (multimediaId) {
-              await fetch(
+              await authFetch(
                 `/api/multimedia/${multimediaId}/etiquetas`,
                 {
                   method: "PUT",
@@ -1001,7 +1011,7 @@ export const AdminPanel = () => {
             }
           }
         }
-        await fetch(`/api/entidades/${id}/conexiones`, {
+        await authFetch(`/api/entidades/${id}/conexiones`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(conexiones),
@@ -1013,7 +1023,7 @@ export const AdminPanel = () => {
       setView("entidades");
     } catch (err) {
       if (createdEntityId) {
-        await fetch(`/api/entidades/${createdEntityId}`, {
+        await authFetch(`/api/entidades/${createdEntityId}`, {
           method: "DELETE",
           headers: authHeaders(),
         }).catch(() => {});
@@ -1027,7 +1037,7 @@ export const AdminPanel = () => {
   // --- CARGAR PARA EDITAR ---
   const cargarEntidadParaEditar = async (id) => {
     try {
-      const res = await fetch(`/api/entidades/${id}`);
+      const res = await authFetch(`/api/entidades/${id}`);
       if (!res.ok) throw new Error("No se pudo cargar");
       const data = await res.json();
       setEditingEntityId(data.id);
@@ -1125,7 +1135,7 @@ export const AdminPanel = () => {
       setEspecifico(esp);
 
       try {
-        const resMulti = await fetch(
+        const resMulti = await authFetch(
           `/api/entidades/${id}/multimedia`,
         );
         const dataMulti = await resMulti.json();
@@ -1134,7 +1144,7 @@ export const AdminPanel = () => {
           const ids = dataMulti.map((m) => m.id).filter(Boolean);
           if (ids.length > 0) {
             try {
-              const resTags = await fetch(
+              const resTags = await authFetch(
                 `/api/multimedia/etiquetas?multimedia_ids=${ids.join(",")}`,
               );
               if (resTags.ok) {
@@ -1205,7 +1215,7 @@ export const AdminPanel = () => {
 
       // Cargar conexiones
       try {
-        const resC = await fetch(
+        const resC = await authFetch(
           `/api/entidades/${id}/conexiones`,
         );
         if (resC.ok) {
@@ -1257,7 +1267,7 @@ export const AdminPanel = () => {
     );
     if (!confirmed) return;
     try {
-      const res = await fetch(`/api/entidades/${id}`, {
+      const res = await authFetch(`/api/entidades/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -1273,7 +1283,7 @@ export const AdminPanel = () => {
     setConexSearch("");
     setConexResults([]);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/entidades/${entidad.id}/conexiones`,
       );
       if (res.ok) {
@@ -1310,7 +1320,7 @@ export const AdminPanel = () => {
     if (!conexModal) return;
     setConexSaving(true);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/entidades/${conexModal.id}/conexiones`,
         {
           method: "POST",
@@ -1340,7 +1350,7 @@ export const AdminPanel = () => {
 
   const cargarRecorridoParaEditar = async (r) => {
     try {
-      const res = await fetch(`/api/recorridos/${r.slug}`);
+      const res = await authFetch(`/api/recorridos/${r.slug}`);
       if (!res.ok) throw new Error("No se pudo cargar");
       const data = await res.json();
       setEditingRecorridoId(data.id);
@@ -1365,13 +1375,13 @@ export const AdminPanel = () => {
     setRecSaving(true);
     try {
       if (editingRecorridoId && editingRecorridoId !== "new") {
-        const r1 = await fetch(`/api/recorridos/${editingRecorridoId}`, {
+        const r1 = await authFetch(`/api/recorridos/${editingRecorridoId}`, {
           method: "PUT",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(recForm),
         });
         if (!r1.ok) throw new Error("Error al actualizar");
-        await fetch(`/api/recorridos/${editingRecorridoId}/pasos`, {
+        await authFetch(`/api/recorridos/${editingRecorridoId}/pasos`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(recPasos.map((p, i) => ({
@@ -1382,14 +1392,14 @@ export const AdminPanel = () => {
         });
         showPopup("Recorrido actualizado");
       } else {
-        const r1 = await fetch("/api/recorridos", {
+        const r1 = await authFetch("/api/recorridos", {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(recForm),
         });
         if (!r1.ok) throw new Error("Error al crear");
         const data = await r1.json();
-        await fetch(`/api/recorridos/${data.id}/pasos`, {
+        await authFetch(`/api/recorridos/${data.id}/pasos`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(recPasos.map((p, i) => ({
@@ -1413,7 +1423,7 @@ export const AdminPanel = () => {
     const ok = await showConfirm(`¿Eliminar el recorrido "${nombre}"?`, "ELIMINAR");
     if (!ok) return;
     try {
-      const res = await fetch(`/api/recorridos/${id}`, {
+      const res = await authFetch(`/api/recorridos/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -2321,7 +2331,7 @@ export const AdminPanel = () => {
                           geoTimeoutRef.current = setTimeout(async () => {
                             try {
                               const q = e.target.value.includes(",") ? e.target.value : `${e.target.value}, Chaco, Argentina`;
-                              const r = await fetch(
+                              const r = await authFetch(
                                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=ar`,
                                 { headers: { "User-Agent": "MadeInChaco/1.0", "Accept-Language": "es" } },
                               );
@@ -2960,7 +2970,7 @@ export const AdminPanel = () => {
                               const ok = await showConfirm(`¿Rechazar "${sol.nombre}"?`, "RECHAZAR");
                               if (!ok) return;
                               try {
-                                const res = await fetch(`/api/solicitudes/${sol.id}/rechazar`, {
+                                const res = await authFetch(`/api/solicitudes/${sol.id}/rechazar`, {
                                   method: "POST",
                                   headers: authHeaders({ "Content-Type": "application/json" }),
                                 });
@@ -3074,7 +3084,7 @@ export const AdminPanel = () => {
                                   body.fecha_fin_suscripcion = approveFechas.fin;
                                   body.estado_pago = approveFechas.estado_pago;
                                 }
-                                const res = await fetch(`/api/solicitudes/${approveModal.id}/aprobar`, {
+                                const res = await authFetch(`/api/solicitudes/${approveModal.id}/aprobar`, {
                                   method: "POST",
                                   headers: authHeaders({ "Content-Type": "application/json" }),
                                   body: JSON.stringify(body),

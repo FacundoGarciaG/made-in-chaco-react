@@ -14,6 +14,7 @@ import { EntidadDetallePage } from "./pages/EntidadDetallePage";
 import { RecorridosPage } from "./pages/RecorridosPage";
 import { RecorridoDetallePage } from "./pages/RecorridoDetallePage";
 import { SolicitarSelloPage } from "./pages/SolicitarSelloPage";
+import { QuienesSomosPage } from "./pages/QuienesSomosPage";
 
 function MadeInChacoApp() {
   const location = useLocation();
@@ -41,6 +42,7 @@ function MadeInChacoApp() {
         <Route path="/recorridos" element={<RecorridosPage />} />
         <Route path="/recorrido/:slug" element={<RecorridoDetallePage />} />
         <Route path="/solicitar-sello" element={<SolicitarSelloPage />} />
+        <Route path="/quienes-somos" element={<QuienesSomosPage />} />
         <Route path="/*" element={<Navigate to="/" />}></Route>
       </Routes>
     </>

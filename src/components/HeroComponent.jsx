@@ -66,13 +66,12 @@ export const HeroComponent = () => {
     <>
       <section className="hero">
         <div className="hero-text">
-          <h5>Chaco, su gente y su tierra</h5>
+          <h5>El interior del mapa</h5>
           <h1 ref={heroLogoRef}>
             <img src={logoHero} alt="Made in Chaco" className="hero-logo-img" />
           </h1>
           <p>
-            Explora las historias, sonidos y colores que hacen único al secreto
-            de Argentina
+            Historias, sonidos y colores del secreto de Argentina
           </p>
         </div>
 
@@ -86,9 +85,11 @@ export const HeroComponent = () => {
             onTouchEnd={cancelRedirect}
             onClick={() => navigate("/descubre")}
           >
-            <span>Navegar</span>
+            <span>Descubrir el mapa</span>
           </button>
+          <p className="hero-hint">Presioná o mantené el mouse 2 segundos para explorar</p>
         </div>
+        <div className="hero-badge">200+ entidades mapeadas</div>
         <video autoPlay muted loop className="video">
           <source src={backgroundVideo} type="video/mp4" />
           Tu navegador no soporta video.

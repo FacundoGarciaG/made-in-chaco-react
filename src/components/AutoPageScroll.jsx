@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-const SCROLL_SPEED = 2; // píxeles por tick
-const INTERVAL_MS = 30; // ms entre scrolls (~66px/s, crawl cinematográfico)
+const SCROLL_SPEED = 1;
+const INTERVAL_MS = 30;
 
-export const AutoPageScroll = ({ isActive, onStop, blockScroll }) => {
-  // Bloquear scroll mientras blockScroll sea true
+export const AutoPageScroll = ({ isActive, onStop, onResume, blockScroll }) => {
+  const wasActiveRef = useRef(false);
+
   useEffect(() => {
     if (!blockScroll) return;
 
@@ -19,10 +20,10 @@ export const AutoPageScroll = ({ isActive, onStop, blockScroll }) => {
     };
   }, [blockScroll]);
 
-  // Auto-scroll cuando isActive es true
   useEffect(() => {
     if (!isActive) return;
 
+    wasActiveRef.current = true;
     let isStopped = false;
 
     const intervalId = setInterval(() => {
@@ -38,9 +39,7 @@ export const AutoPageScroll = ({ isActive, onStop, blockScroll }) => {
       onStop?.();
     };
 
-    // Click sobre la página -> frena el autoscroll
     document.addEventListener("click", handleStop, { once: true });
-    // Wheel / touch también frenan para mejor UX
     document.addEventListener("wheel", handleStop, { once: true });
     document.addEventListener("touchstart", handleStop, { once: true });
 
@@ -54,5 +53,17 @@ export const AutoPageScroll = ({ isActive, onStop, blockScroll }) => {
     };
   }, [isActive, onStop]);
 
-  return null; // componente invisible, solo lógica
+  // Reanudar con click cuando está pausado
+  useEffect(() => {
+    if (isActive || !wasActiveRef.current) return;
+
+    const resume = () => {
+      onResume?.();
+    };
+
+    document.addEventListener("click", resume, { once: true });
+    return () => document.removeEventListener("click", resume);
+  }, [isActive, onResume]);
+
+  return null;
 };

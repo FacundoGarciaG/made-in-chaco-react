@@ -1,6 +1,6 @@
 import "../styles/ProjectPage.css";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
 import { BackgroundParallax } from "../components/BackgroundParallax";
 import { useParallax } from "../hooks/useParallax";
@@ -10,6 +10,8 @@ export const ProjectPage = () => {
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollLocked, setScrollLocked] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
+  const [showResumeHint, setShowResumeHint] = useState(false);
+  const hintTimerRef = useRef(null);
   const { scrollYProgress } = useScroll();
   const offset = useParallax(0.4);
   const scaleX = useSpring(scrollYProgress, {
@@ -39,12 +41,34 @@ export const ProjectPage = () => {
     setAutoScroll(false);
   }, []);
 
+  const resumeAutoScroll = useCallback(() => {
+    setShowResumeHint(false);
+    setAutoScroll(true);
+  }, []);
+
+  // Mostrar hint a los 5s de pausado
+  useEffect(() => {
+    if (!hasStarted || autoScroll) {
+      setShowResumeHint(false);
+      return;
+    }
+
+    hintTimerRef.current = setTimeout(() => {
+      setShowResumeHint(true);
+    }, 5000);
+
+    return () => {
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+  }, [hasStarted, autoScroll]);
+
   return (
-    <>
+    <div className="project-page">
       {/* Bloquear scroll mientras scrollLocked sea true */}
       <AutoPageScroll
         isActive={autoScroll}
         onStop={stopAutoScroll}
+        onResume={resumeAutoScroll}
         blockScroll={scrollLocked}
       />
 
@@ -54,7 +78,8 @@ export const ProjectPage = () => {
       {!hasStarted && (
         <div className="project-start-overlay">
           <div className="project-start-cta" onClick={handleStartAutoScroll}>
-            <p className="project-start-text">Hacé click aquí</p>
+            <img src="/icons/touch.png" className="project-start-icon" />
+            <p className="project-start-text">Hacé click o tocá la pantalla</p>
             <motion.div
               className="project-start-arrow"
               animate={{ y: [0, 15, 0] }}
@@ -264,6 +289,13 @@ export const ProjectPage = () => {
 
         <motion.div className="progress" style={{ scaleX, originX: 0 }} />
       </section>
-    </>
+
+      {showResumeHint && (
+        <div className="resume-hint" onClick={resumeAutoScroll}>
+          <img src="/icons/touch.png" className="resume-hint-icon" />
+          <span>Hacé click en la pantalla para reanudar</span>
+        </div>
+      )}
+    </div>
   );
 };

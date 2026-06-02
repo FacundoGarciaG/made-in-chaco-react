@@ -1,7 +1,18 @@
 import { Router } from "express";
+import nodemailer from "nodemailer";
 import pool from "../config/db.js";
 
 const router = Router();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.MAIL_HOST,
+  port: process.env.MAIL_PORT,
+  secure: false,
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
+  },
+});
 
 router.post("/contacto", async (req, res) => {
   try {
@@ -20,9 +31,23 @@ router.post("/contacto", async (req, res) => {
       [nombre.trim(), email.trim(), asunto.trim(), mensaje.trim()],
     );
 
+    await transporter.sendMail({
+      from: `"${nombre}" <${process.env.MAIL_USER}>`,
+      replyTo: email.trim(),
+      to: process.env.MAIL_USER,
+      subject: `[Contacto Web] ${asunto.trim()}`,
+      html: `
+        <p><strong>Nombre:</strong> ${nombre.trim()}</p>
+        <p><strong>Email:</strong> ${email.trim()}</p>
+        <p><strong>Asunto:</strong> ${asunto.trim()}</p>
+        <hr>
+        <p>${mensaje.trim().replace(/\n/g, "<br>")}</p>
+      `,
+    });
+
     res.json({ success: true });
   } catch (err) {
-    console.error("Error al guardar mensaje de contacto:", err);
+    console.error("Error al enviar mensaje de contacto:", err);
     res.status(500).json({ error: "Error al enviar el mensaje" });
   }
 });

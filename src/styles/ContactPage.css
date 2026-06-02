@@ -23,6 +23,11 @@
   z-index: 1;
 }
 
+.contact-map-side .mapboxgl-ctrl-logo,
+.contact-map-side .mapboxgl-ctrl-attrib {
+  display: none !important;
+}
+
 /* Steps bar */
 .steps-bar {
   position: fixed;
@@ -219,6 +224,10 @@
 
 .btn-primary:hover::after {
   transform: translateX(6px);
+}
+
+.btn-up::after {
+  content: "↑" !important;
 }
 
 .btn-primary:disabled {

@@ -2018,6 +2018,7 @@ export const AdminPanel = () => {
                                 </span>
                                 {e.estado_sello === "pendiente" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PENDIENTE</span>}
                                 {e.estado_sello === "rechazado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>RECHAZADO</span>}
+                                {e.estado_sello === "aprobado" && e.visible === true && (!e.latitud || !e.longitud) && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e67e22", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>REVISAR MAPA</span>}
                                 {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
                                 {e.fecha_fin_suscripcion && (() => {
                                   try {

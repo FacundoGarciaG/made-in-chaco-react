@@ -4,15 +4,21 @@ import pool from "../config/db.js";
 
 const router = Router();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST,
-  port: process.env.MAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
+const mailReady =
+  process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS;
+
+let transporter = null;
+if (mailReady) {
+  transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST,
+    port: process.env.MAIL_PORT || 587,
+    secure: false,
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+}
 
 router.post("/contacto", async (req, res) => {
   try {
@@ -31,19 +37,23 @@ router.post("/contacto", async (req, res) => {
       [nombre.trim(), email.trim(), asunto.trim(), mensaje.trim()],
     );
 
-    await transporter.sendMail({
-      from: `"${nombre}" <${process.env.MAIL_USER}>`,
-      replyTo: email.trim(),
-      to: process.env.MAIL_USER,
-      subject: `[Contacto Web] ${asunto.trim()}`,
-      html: `
-        <p><strong>Nombre:</strong> ${nombre.trim()}</p>
-        <p><strong>Email:</strong> ${email.trim()}</p>
-        <p><strong>Asunto:</strong> ${asunto.trim()}</p>
-        <hr>
-        <p>${mensaje.trim().replace(/\n/g, "<br>")}</p>
-      `,
-    });
+    if (transporter) {
+      transporter
+        .sendMail({
+          from: `"${nombre}" <${process.env.MAIL_USER}>`,
+          replyTo: email.trim(),
+          to: process.env.MAIL_USER,
+          subject: `[Contacto Web] ${asunto.trim()}`,
+          html: `
+            <p><strong>Nombre:</strong> ${nombre.trim()}</p>
+            <p><strong>Email:</strong> ${email.trim()}</p>
+            <p><strong>Asunto:</strong> ${asunto.trim()}</p>
+            <hr>
+            <p>${mensaje.trim().replace(/\n/g, "<br>")}</p>
+          `,
+        })
+        .catch((e) => console.warn("Mail no enviado:", e.message));
+    }
 
     res.json({ success: true });
   } catch (err) {

@@ -1007,28 +1007,6 @@ export const EntidadDetallePage = () => {
           </motion.section>
         )}
 
-        {/* Mini mapa */}
-        {entidad.latitud && entidad.longitud && (
-          <motion.section
-            className="entidad-section"
-            variants={sectionVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-          >
-            <div className="entidad-section-header">
-              <span className="entidad-section-label">Ubicación</span>
-              <h2 className="entidad-section-title">Mapa</h2>
-            </div>
-            <MiniMap
-              lat={entidad.latitud}
-              lng={entidad.longitud}
-              nombre={entidad.nombre}
-              tipo={entidad.tipo}
-            />
-          </motion.section>
-        )}
-
         {/* Conexiones */}
         {conexiones.length > 0 && (
           <motion.section
@@ -1306,6 +1284,28 @@ export const EntidadDetallePage = () => {
                   </motion.div>
                 );
               })()}
+          </motion.section>
+        )}
+
+        {/* Mini mapa */}
+        {entidad.latitud && entidad.longitud && (
+          <motion.section
+            className="entidad-section"
+            variants={sectionVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+          >
+            <div className="entidad-section-header">
+              <span className="entidad-section-label">Ubicación</span>
+              <h2 className="entidad-section-title">Mapa</h2>
+            </div>
+            <MiniMap
+              lat={entidad.latitud}
+              lng={entidad.longitud}
+              nombre={entidad.nombre}
+              tipo={entidad.tipo}
+            />
           </motion.section>
         )}
 

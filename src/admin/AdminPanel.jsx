@@ -2944,6 +2944,13 @@ export const AdminPanel = () => {
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <button
+                            onClick={() => setSolicitudDetalle(sol)}
+                            className="admin-btn-ghost"
+                            style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
+                          >
+                            👁 VER DETALLE
+                          </button>
                           {sol.email && (
                             <a
                               href={buildMailtoUrl(sol)}
@@ -2956,13 +2963,6 @@ export const AdminPanel = () => {
                               MAIL
                             </a>
                           )}
-                          <button
-                            onClick={() => setSolicitudDetalle(sol)}
-                            className="admin-btn-ghost"
-                            style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
-                          >
-                            👁 VER DETALLE
-                          </button>
                           <button
                             onClick={() => {
                               setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
@@ -3187,7 +3187,7 @@ export const AdminPanel = () => {
                                     return (
                                       <div key={i} style={{ fontSize: "13px", color: "#000", marginBottom: "2px" }}>
                                         <span style={{ fontWeight: 600, color: "#555" }}>{platform ? platform.label : item.type}: </span>
-                                        <span>{item.value}</span>
+                                        <span style={{ color: "#000" }}>{item.value}</span>
                                       </div>
                                     );
                                   });

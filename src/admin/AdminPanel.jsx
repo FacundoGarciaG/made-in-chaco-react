@@ -512,6 +512,7 @@ export const AdminPanel = () => {
   const [solicitudesLoading, setSolicitudesLoading] = useState(false);
   const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
   const [approveFechas, setApproveFechas] = useState({ inicio: "", fin: "", estado_pago: "al_dia" });
+  const [solicitudDetalle, setSolicitudDetalle] = useState(null);
   const [step, setStep] = useState(1);
   const [editingEntityId, setEditingEntityId] = useState(null);
 
@@ -2956,6 +2957,13 @@ export const AdminPanel = () => {
                             </a>
                           )}
                           <button
+                            onClick={() => setSolicitudDetalle(sol)}
+                            className="admin-btn-ghost"
+                            style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
+                          >
+                            👁 VER DETALLE
+                          </button>
+                          <button
                             onClick={() => {
                               setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
                               setApproveFechas({ inicio: "", fin: "", estado_pago: "al_dia" });
@@ -3108,6 +3116,86 @@ export const AdminPanel = () => {
                             ✓ APROBAR
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Modal detalle solicitud */}
+                {solicitudDetalle && (() => {
+                  const sol = solicitudDetalle;
+                  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+                  return (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+                      onClick={() => setSolicitudDetalle(null)}
+                    >
+                      <div style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "640px", width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                          <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: "20px" }}>
+                            Detalle de Solicitud
+                          </h3>
+                          <button onClick={() => setSolicitudDetalle(null)}
+                            style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", padding: "4px 8px", borderRadius: "6px" }}
+                          >✕</button>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
+                          {sol.imagen && (
+                            <img src={sol.imagen} alt="" style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", flexShrink: 0, border: "1px solid #eee" }} />
+                          )}
+                          <div>
+                            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1c1c18" }}>{sol.nombre}</div>
+                            <div style={{ fontSize: "12px", color: "#863819", textTransform: "capitalize", fontWeight: 600, marginTop: "4px" }}>{sol.tipo}</div>
+                            <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>#{sol.id} — {sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
+                          </div>
+                        </div>
+
+                        {[
+                          { label: "Contacto", fields: ["email", "sitio_web"] },
+                          { label: "Información legal", fields: ["razon_social", "cuit", "resumen", "direccion_escrita"] },
+                          ...(sol.tipo === "comercio" ? [{ label: "Comercio", fields: ["rubro_especifico", "horario_apertura", "horario_cierre", "dias_abierto", "acepta_tarjetas"] }] : []),
+                          ...(sol.tipo === "hospedaje" ? [{ label: "Hospedaje", fields: ["categoria_hospedaje", "servicios", "capacidad"] }] : []),
+                          ...(sol.tipo === "productor" ? [{ label: "Productor", fields: ["tipo_producto", "metodos_produccion", "certificaciones", "biografia_larga"] }] : []),
+                          ...(sol.tipo === "evento" ? [{ label: "Evento", fields: ["fecha_evento", "duracion_dias", "actividades_principales", "link_entradas"] }] : []),
+                        ].map((section) => (
+                          <div key={section.label} style={{ marginBottom: "16px" }}>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "#863819", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}>{section.label}</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                              {section.fields.map((field) => {
+                                let val = sol[field];
+                                if (field === "acepta_tarjetas") val = val ? "Sí" : "No";
+                                if (field === "fecha_evento" && val) val = new Date(val).toLocaleDateString("es-AR");
+                                if (field === "capacidad" && val) val = `${val} personas`;
+                                return (
+                                  <div key={field}>
+                                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{label(field)}</div>
+                                    <div style={{ fontSize: "13px", color: "#000", wordBreak: "break-word" }}>{val || "—"}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {sol.redes_sociales && section.label === "Contacto" && (
+                              <div style={{ marginTop: "8px" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "4px" }}>Redes sociales</div>
+                                {(() => {
+                                  const items = parseSocialList(sol.redes_sociales);
+                                  if (items.length === 0) return <div style={{ fontSize: "13px", color: "#000" }}>—</div>;
+                                  return items.map((item, i) => {
+                                    const platform = SOCIAL_PLATFORMS.find((p) => p.value === item.type) || SOCIAL_PLATFORMS.find((p) => p.value === "otro");
+                                    return (
+                                      <div key={i} style={{ fontSize: "13px", color: "#000", marginBottom: "2px" }}>
+                                        <span style={{ fontWeight: 600, color: "#555" }}>{platform ? platform.label : item.type}: </span>
+                                        <span>{item.value}</span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );

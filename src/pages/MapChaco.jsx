@@ -176,7 +176,6 @@ export const MapChaco = () => {
           center: target.center,
           zoom: target.zoom || 14,
           speed: 0.3,
-          curve: 1.5,
           pitch: 30,
           essential: true,
         });
@@ -683,17 +682,17 @@ export const MapChaco = () => {
           center: [localidad.longitud, localidad.latitud],
           zoom: 12,
           essential: true,
-          speed: 0.8, // Rápido para filtros
+          speed: 0.8,
         });
       }
     } else {
       // Volver al zoom original de la provincia
-      map.flyTo({
-        center: [-60.44, -26],
-        zoom: 7,
-        essential: true,
-        speed: 0.8, // Rápido para quitar filtro
-      });
+        map.flyTo({
+          center: [-60.44, -26],
+          zoom: 7,
+          essential: true,
+          speed: 0.8,
+        });
     }
   }, [filtroLocalidad]); // Solo depender de filtroLocalidad, no de localidades
 
@@ -929,25 +928,35 @@ export const MapChaco = () => {
             popupRef.current = null;
           }
 
-          // Fetch conexiones para calcular bounds
+          // Determinar si es la misma entidad ANTES del fetch
+          const isSameEntity = lastClickedEntityRef.current === id;
+          lastClickedEntityRef.current = id;
+          setEntityActive(true);
+
+          // Arrancar easeTo INMEDIATAMENTE (sin esperar fetch)
+          if (isSameEntity) {
+            map.easeTo({
+              center: coordinates,
+              zoom: 14,
+              duration: 2500,
+            });
+          } else {
+            map.easeTo({
+              center: coordinates,
+              zoom: 9,
+              duration: 1800,
+            });
+          }
+
+          // Fetch conexiones en paralelo (mientras se anima el mapa)
           let conexionesData = [];
           try {
             const res = await fetch(`/api/entidades/${id}/conexiones`);
             conexionesData = await res.json();
           } catch (_) {}
 
-          // Si es la misma entidad → zoom de cerca; si no → fitBounds para mostrar conexiones
-          const isSameEntity = lastClickedEntityRef.current === id;
-          lastClickedEntityRef.current = id;
-          setEntityActive(true);
-          if (isSameEntity) {
-            map.flyTo({
-              center: coordinates,
-              zoom: 14,
-              speed: 0.5,
-              essential: true,
-            });
-          } else {
+          // Si es nueva entidad con conexiones → fitBounds
+          if (!isSameEntity && conexionesData.length > 0) {
             const bounds = new mapboxgl.LngLatBounds(coordinates, coordinates);
             const lookup = entidadCoordsRef.current;
             for (const c of conexionesData) {
@@ -961,6 +970,8 @@ export const MapChaco = () => {
             map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
           }
 
+          // Esperar a que termine la animación del mapa antes de crear el popup
+          const mostrarPopup = () => {
           // Determinar si el comercio está abierto ahora
           const getOpenBadge = () => {
             if (
@@ -1205,6 +1216,14 @@ export const MapChaco = () => {
                 ["literal", allIds],
               ]);
             }
+          }
+          };
+
+          // Mostrar popup después de que terminen todas las animaciones del mapa
+          if (map.isMoving()) {
+            map.once("moveend", mostrarPopup);
+          } else {
+            mostrarPopup();
           }
         });
 
@@ -1519,7 +1538,6 @@ export const MapChaco = () => {
           center: [-60.44, -26.05],
           zoom: 7,
           speed: 0.8,
-          curve: 1.5,
           essential: true,
         });
       }
@@ -1790,7 +1808,6 @@ export const MapChaco = () => {
           center: [-60.44, -26.05],
           zoom: 7,
           speed: 0.8,
-          curve: 1.5,
           essential: true,
         });
         // Sincronizar header
@@ -1833,7 +1850,6 @@ export const MapChaco = () => {
         center: [-60.44, -26.05],
         zoom: 7,
         speed: 0.8,
-        curve: 1.5,
         essential: true,
       });
       window.dispatchEvent(

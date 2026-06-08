@@ -328,6 +328,8 @@ export const HeaderComponent = () => {
               </button>
             )}
             {(() => {
+              const d = new Date();
+              const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
               const filtrarEntidad = (e) => {
                 if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
                   return false;
@@ -343,37 +345,32 @@ export const HeaderComponent = () => {
                   if (e.estado_pago !== "al_dia") return false;
                   if (
                     e.fecha_fin_suscripcion &&
-                    new Date(e.fecha_fin_suscripcion) <
-                      new Date(new Date().toDateString())
+                    e.fecha_fin_suscripcion.split('T')[0] < todayStr
                   )
                     return false;
                   if (
                     e.fecha_inicio_suscripcion &&
-                    new Date(e.fecha_inicio_suscripcion) >
-                      new Date(new Date().toDateString())
+                    e.fecha_inicio_suscripcion.split('T')[0] > todayStr
                   )
                     return false;
                 }
                 if (e.tipo === "evento") {
                   if (
                     e.fecha_evento &&
-                    new Date(e.fecha_evento) <
-                      new Date(new Date().toDateString())
+                    e.fecha_evento.split('T')[0] < todayStr
                   )
                     return false;
                   if (e.estado_pago && e.estado_pago !== "al_dia") return false;
                   if (
                     e.estado_pago &&
                     e.fecha_fin_suscripcion &&
-                    new Date(e.fecha_fin_suscripcion) <
-                      new Date(new Date().toDateString())
+                    e.fecha_fin_suscripcion.split('T')[0] < todayStr
                   )
                     return false;
                   if (
                     e.estado_pago &&
                     e.fecha_inicio_suscripcion &&
-                    new Date(e.fecha_inicio_suscripcion) >
-                      new Date(new Date().toDateString())
+                    e.fecha_inicio_suscripcion.split('T')[0] > todayStr
                   )
                     return false;
                 }

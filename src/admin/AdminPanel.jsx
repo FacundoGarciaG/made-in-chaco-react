@@ -758,6 +758,7 @@ export const AdminPanel = () => {
       style: "mapbox://styles/mapbox/light-v10",
       center: [general.longitud, general.latitud],
       zoom: 8,
+      attributionControl: false,
     });
     const mk = new mapboxgl.Marker({ draggable: true, color: "#863819" })
       .setLngLat([general.longitud, general.latitud])
@@ -2018,7 +2019,7 @@ export const AdminPanel = () => {
                                 </span>
                                 {e.estado_sello === "pendiente" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PENDIENTE</span>}
                                 {e.estado_sello === "rechazado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>RECHAZADO</span>}
-                                {e.estado_sello === "aprobado" && e.visible === true && (!e.latitud || !e.longitud) && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e67e22", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>REVISAR MAPA</span>}
+                                {e.estado_sello === "aprobado" && e.visible && (e.latitud == null || e.longitud == null) && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e67e22", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>REVISAR MAPA</span>}
                                 {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
                                 {e.fecha_fin_suscripcion && (() => {
                                   try {
@@ -2041,6 +2042,35 @@ export const AdminPanel = () => {
                               <div style={{ fontSize: "11px", color: "#999", textTransform: "capitalize" }}>
                                 {e.tipo}
                               </div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                              <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", fontSize: "10px", fontWeight: 600, color: e.visible ? "#2e7d32" : "#999", userSelect: "none" }}
+                                onClick={async (ev) => {
+                                  ev.stopPropagation();
+                                  const nuevo = !e.visible;
+                                  try {
+                                    const res = await authFetch(`/api/entidades/${e.id}/visible`, {
+                                      method: "PATCH",
+                                      headers: authHeaders({ "Content-Type": "application/json" }),
+                                      body: JSON.stringify({ visible: nuevo }),
+                                    });
+                                    if (res.ok) {
+                                      setAllEntities((prev) => prev.map((ent) => ent.id === e.id ? { ...ent, visible: nuevo } : ent));
+                                    }
+                                  } catch {}
+                                }}
+                              >
+                                <div style={{
+                                  width: 32, height: 18, borderRadius: 9, background: e.visible ? "#2e7d32" : "#ccc",
+                                  position: "relative", transition: "0.2s", cursor: "pointer",
+                                }}>
+                                  <div style={{
+                                    width: 14, height: 14, borderRadius: "50%", background: "white",
+                                    position: "absolute", top: 2, left: e.visible ? 16 : 2, transition: "0.2s",
+                                  }} />
+                                </div>
+                                MAPA
+                              </label>
                             </div>
                             {e.estado_sello !== "pendiente" && (
                               <>
@@ -3072,6 +3102,11 @@ export const AdminPanel = () => {
                             Este tipo de entidad no requiere membresía.
                           </p>
                         )}
+                        <div style={{ background: "#fff3e0", border: "1px solid #ffcc80", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
+                            <p style={{ fontSize: "12px", color: "#e65100", margin: 0, lineHeight: 1.4 }}>
+                              ⚠ Esta entidad no se mostrará en el mapa hasta que la revises en la sección <strong style={{ color: "#e65100" }}>Entidades</strong> y actives manualmente "MAPA". Recordá revisar sus datos y ubicación primero.
+                            </p>
+                          </div>
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                           <button onClick={() => setApproveModal(null)} className="admin-btn" style={{ background: "white", color: "#555", border: "1px solid #ccc", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
                             CANCELAR
@@ -3099,7 +3134,7 @@ export const AdminPanel = () => {
                                   body: JSON.stringify(body),
                                 });
                                 if (res.ok) {
-                                  showPopup(`"${approveModal.nombre}" aprobada con éxito`, "success");
+                                  showPopup(`"${approveModal.nombre}" aprobada — revisá sus datos y activá "MAPA" en Entidades`, "success");
                                   setApproveModal(null);
                                   cargarSolicitudes();
                                   cargarEntidades();
@@ -3155,7 +3190,7 @@ export const AdminPanel = () => {
 
                         {[
                           { label: "Contacto", fields: ["email", "sitio_web"] },
-                          { label: "Información legal", fields: ["razon_social", "cuit", "resumen", "direccion_escrita"] },
+                          { label: "Información legal", fields: ["localidad_id", "razon_social", "cuit", "resumen", "direccion_escrita"] },
                           ...(sol.tipo === "comercio" ? [{ label: "Comercio", fields: ["rubro_especifico", "horario_apertura", "horario_cierre", "dias_abierto", "acepta_tarjetas"] }] : []),
                           ...(sol.tipo === "hospedaje" ? [{ label: "Hospedaje", fields: ["categoria_hospedaje", "servicios", "capacidad"] }] : []),
                           ...(sol.tipo === "productor" ? [{ label: "Productor", fields: ["tipo_producto", "metodos_produccion", "certificaciones", "biografia_larga"] }] : []),
@@ -3166,12 +3201,18 @@ export const AdminPanel = () => {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                               {section.fields.map((field) => {
                                 let val = sol[field];
+                                let fieldLabel = label(field);
+                                if (field === "localidad_id") {
+                                  const loc = localidades.find((l) => l.id === Number(val));
+                                  val = loc ? loc.nombre : (val || "—");
+                                  fieldLabel = "Localidad";
+                                }
                                 if (field === "acepta_tarjetas") val = val ? "Sí" : "No";
                                 if (field === "fecha_evento" && val) val = new Date(val).toLocaleDateString("es-AR");
                                 if (field === "capacidad" && val) val = `${val} personas`;
                                 return (
                                   <div key={field}>
-                                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{label(field)}</div>
+                                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{fieldLabel}</div>
                                     <div style={{ fontSize: "13px", color: "#000", wordBreak: "break-word" }}>{val || "—"}</div>
                                   </div>
                                 );

@@ -854,7 +854,7 @@ export const AdminPanel = () => {
       longitud: loc?.longitud || g.longitud,
     }));
     if (loc?.latitud && loc?.longitud && map.current) {
-      map.current.flyTo({ center: [loc.longitud, loc.latitud], zoom: 10 });
+      map.current.flyTo({ center: [loc.longitud, loc.latitud], zoom: 10, speed: 1.2 });
       marker.current?.setLngLat([loc.longitud, loc.latitud]);
     }
   };
@@ -2023,18 +2023,29 @@ export const AdminPanel = () => {
                                 {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
                                 {e.fecha_fin_suscripcion && (() => {
                                   try {
-                                    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-                                    const fin = new Date(e.fecha_fin_suscripcion);
-                                    fin.setHours(0, 0, 0, 0);
-                                    const diff = Math.ceil((fin - hoy) / 86400000);
-                                    if (diff < 0) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDA</span>;
-                                    if (diff <= 30) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
+                                    const d = new Date();
+                                    const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                    const fin = e.fecha_fin_suscripcion.split('T')[0];
+                                    if (fin < hoy) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDA</span>;
+                                  } catch {}
+                                  return null;
+                                })()}
+                                {e.fecha_fin_suscripcion && e.estado_pago === "al_dia" && (() => {
+                                  try {
+                                    const d = new Date();
+                                    const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                    const fin = e.fecha_fin_suscripcion.split('T')[0];
+                                    const diff = Math.ceil((new Date(fin + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
+                                    if (diff >= 0 && diff <= 30) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
                                   } catch {}
                                   return null;
                                 })()}
                                 {e.tipo === "evento" && e.fecha_evento && (() => {
-                                  const diff = Math.ceil((new Date(e.fecha_evento) - new Date(new Date().toDateString())) / 86400000);
-                                  if (diff < 0) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDO</span>;
+                                  const d = new Date();
+                                  const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                  const fe = e.fecha_evento.split('T')[0];
+                                  if (fe < hoy) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDO</span>;
+                                  const diff = Math.ceil((new Date(fe + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
                                   if (diff <= 7) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRONTO ({diff}d)</span>;
                                   return <span style={{ fontSize: "10px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>FALTAN {diff}d</span>;
                                 })()}
@@ -2394,7 +2405,7 @@ export const AdminPanel = () => {
                                 const lon = parseFloat(r.lon);
                                 setGeneral((g) => ({ ...g, latitud: lat, longitud: lon, direccion_escrita: r.display_name }));
                                 if (map.current) {
-                                  map.current.flyTo({ center: [lon, lat], zoom: 14 });
+                                  map.current.flyTo({ center: [lon, lat], zoom: 14, speed: 1 });
                                   marker.current?.setLngLat([lon, lat]);
                                 }
                                 setGeoQuery(r.display_name);

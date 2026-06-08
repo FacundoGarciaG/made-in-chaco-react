@@ -3,48 +3,18 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/MapPage.css";
 import { FooterComponent } from "../components/FooterComponent";
+import { guardarEstadoMapa } from "../utils/mapUtils";
+import { WelcomeOverlay } from "../components/map/WelcomeOverlay";
+import { EscHint } from "../components/map/EscHint";
+import { RecorridoPopup } from "../components/map/RecorridoPopup";
+import { LocalidadDetailPanel } from "../components/map/LocalidadDetailPanel";
+import { useMapConexiones } from "../hooks/useMapConexiones";
+import { useMapRecorridos } from "../hooks/useMapRecorridos";
+import { useMapHeaderSync } from "../hooks/useMapHeaderSync";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// Estilos para la animación del overlay de bienvenida
-const welcomeOverlayStyles = `
-  @keyframes pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1.1);
-      opacity: 0.8;
-    }
-  }
-`;
-
-// Guarda el estado del mapa en sessionStorage y navega sin recargar
-window.__guardarEstadoMapa = function (linkEl) {
-  const map = window.__mapInstance;
-  if (map) {
-    const center = map.getCenter();
-    const filtros = window.__filtrosActuales || {};
-    sessionStorage.setItem(
-      "mapState",
-      JSON.stringify({
-        center: [center.lng, center.lat],
-        zoom: map.getZoom(),
-        bearing: map.getBearing(),
-        pitch: map.getPitch(),
-        filtro: filtros.filtro || "todos",
-        filtroLocalidad: filtros.filtroLocalidad || "",
-      }),
-    );
-  }
-  if (linkEl) {
-    const href = linkEl.getAttribute?.("href") || linkEl.href;
-    history.pushState(null, "", href);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }
-  return false;
-};
+window.__guardarEstadoMapa = guardarEstadoMapa;
 
 export const MapChaco = () => {
   const mapContainer = useRef(null);
@@ -71,16 +41,6 @@ export const MapChaco = () => {
   const audioRef = useRef(null);
   const escHintTimerRef = useRef(null);
   const returningRef = useRef(false);
-  const savedPuntosFilterRef = useRef(null);
-  const conexionesLayerRef = useRef(null);
-  const conexionesSourceRef = useRef(null);
-  const recorridoLayerRef = useRef(null);
-  const recorridoGlowLayerRef = useRef(null);
-  const recorridoSourceRef = useRef(null);
-  const recorridoRouteDataRef = useRef(null);
-  const routeAnimRef = useRef(null);
-  const prevRecorridoRef = useRef(null);
-  const hoveredLineIdRef = useRef(null);
   const entidadCoordsRef = useRef({});
   const entidadDataRef = useRef({});
   const lastClickedEntityRef = useRef(null);
@@ -88,6 +48,9 @@ export const MapChaco = () => {
   const filtroRef = useRef(filtro);
   const filtroLocalidadRef = useRef(filtroLocalidad);
   const showDepartamentosRef = useRef(showDepartamentos);
+
+  const { limpiarConexiones, dibujarConexiones } = useMapConexiones(entidadCoordsRef, entidadDataRef, popupRef);
+  const { limpiarRutaRecorrido, recorridoRouteDataRef, savedPuntosFilterRef, prevRecorridoRef, recorridoLayerRef, recorridoGlowLayerRef, recorridoSourceRef, routeAnimRef } = useMapRecorridos();
 
   // 0. Restaurar estado del mapa al volver
   const savedState = sessionStorage.getItem("mapState");
@@ -382,286 +345,7 @@ export const MapChaco = () => {
     entidadDataRef.current = data;
   }, [geoData]);
 
-  // Limpiar líneas de conexión
-  const limpiarConexiones = useCallback((map) => {
-    hoveredLineIdRef.current = null;
-    try {
-      if (
-        conexionesLayerRef.current &&
-        map?.getLayer(conexionesLayerRef.current)
-      ) {
-        map.removeLayer(conexionesLayerRef.current);
-        conexionesLayerRef.current = null;
-      }
-      if (
-        conexionesSourceRef.current &&
-        map?.getSource(conexionesSourceRef.current)
-      ) {
-        map.removeSource(conexionesSourceRef.current);
-        conexionesSourceRef.current = null;
-      }
-    } catch (_) {}
-  }, []);
-
-  // Limpiar ruta del recorrido
-  const limpiarRutaRecorrido = useCallback((map) => {
-    if (routeAnimRef.current) {
-      clearInterval(routeAnimRef.current);
-      routeAnimRef.current = null;
-    }
-    if (
-      recorridoGlowLayerRef.current &&
-      map?.getLayer(recorridoGlowLayerRef.current)
-    ) {
-      map.removeLayer(recorridoGlowLayerRef.current);
-      recorridoGlowLayerRef.current = null;
-    }
-    if (recorridoLayerRef.current && map?.getLayer(recorridoLayerRef.current)) {
-      map.removeLayer(recorridoLayerRef.current);
-      recorridoLayerRef.current = null;
-    }
-    if (
-      recorridoSourceRef.current &&
-      map?.getSource(recorridoSourceRef.current)
-    ) {
-      map.removeSource(recorridoSourceRef.current);
-      recorridoSourceRef.current = null;
-    }
-    recorridoRouteDataRef.current = null;
-  }, []);
-
-  // Generar curva bezier entre dos puntos con gap visual en los extremos
-  const generarCurva = useCallback((from, to) => {
-    const [lng1, lat1] = from;
-    const [lng2, lat2] = to;
-    const dlng = lng2 - lng1;
-    const dlat = lat2 - lat1;
-    const dist = Math.sqrt(dlng * dlng + dlat * dlat) || 0.001;
-    // Acortar los extremos ~0.001° para dejar espacio entre la línea y el ícono
-    const gap = Math.min(0.001, dist * 0.15);
-    const ratio = gap / dist;
-    const f1 = [lng1 + dlng * ratio, lat1 + dlat * ratio];
-    const f2 = [lng2 - dlng * ratio, lat2 - dlat * ratio];
-    const steps = 30;
-    const points = [];
-    const midLng = (f1[0] + f2[0]) / 2;
-    const midLat = (f1[1] + f2[1]) / 2;
-    const d2 = Math.sqrt((f2[0] - f1[0]) ** 2 + (f2[1] - f1[1]) ** 2) || 0.001;
-    const offsetAmt = d2 * 0.12;
-    const cpLng = midLng + (-(f2[1] - f1[1]) / d2) * offsetAmt;
-    const cpLat = midLat + ((f2[0] - f1[0]) / d2) * offsetAmt;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const t1 = 1 - t;
-      points.push([
-        t1 * t1 * f1[0] + 2 * t1 * t * cpLng + t * t * f2[0],
-        t1 * t1 * f1[1] + 2 * t1 * t * cpLat + t * t * f2[1],
-      ]);
-    }
-    return points;
-  }, []);
-
-  // Dibujar líneas de conexión con animación de trazado
-  const dibujarConexiones = useCallback(
-    async (entityId, clickedCoords, map, existingData) => {
-      limpiarConexiones(map);
-      try {
-        let data;
-        if (existingData) {
-          data = existingData;
-        } else {
-          try {
-            const res = await fetch(`/api/entidades/${entityId}/conexiones`);
-            if (!res.ok) return;
-            data = await res.json();
-          } catch (_) {
-            return;
-          }
-        }
-        const lookup = entidadCoordsRef.current;
-        const fullCurves = [];
-        const conectados = [];
-        const seenIds = new Set();
-        let featIndex = 0;
-        for (const c of data) {
-          const isOrigin = c.entidad_origen_id === entityId;
-          const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-          if (seenIds.has(otherId)) continue;
-          seenIds.add(otherId);
-          const otherCoords = lookup[otherId];
-          if (!otherCoords) continue;
-          const tipo = isOrigin ? c.tipo_destino : c.tipo_origen;
-          const nombre = isOrigin ? c.nombre_destino : c.nombre_origen;
-          const slug = isOrigin ? c.slug_destino : c.slug_origen;
-          const entData = entidadDataRef.current[otherId];
-          const resumen = entData?.resumen || "";
-          featIndex++;
-          fullCurves.push({
-            curve: generarCurva(clickedCoords, otherCoords),
-            id: featIndex,
-            properties: { id: otherId, nombre, slug, tipo, resumen },
-          });
-          conectados.push({ nombre, slug, tipo });
-        }
-        if (fullCurves.length === 0) return;
-
-        const sourceId = `conexiones-${entityId}`;
-        const layerId = `capa-conexiones-${entityId}`;
-
-        map.addSource(sourceId, {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-
-        map.addLayer({
-          id: layerId,
-          type: "line",
-          source: sourceId,
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-color": [
-              "match",
-              ["get", "tipo"],
-              "artesano",
-              "#ff5722",
-              "gastronomia",
-              "#4caf50",
-              "comercio",
-              "#2196f3",
-              "evento",
-              "#9c27b0",
-              "patrimonio",
-              "#795548",
-              "personalidad",
-              "#e91e63",
-              "comunidad_indigena",
-              "#8B4513",
-              "lugar_natural",
-              "#2E7D32",
-              "hospedaje",
-              "#FF6F00",
-              "productor",
-              "#00695C",
-              "experiencia",
-              "#6A1B9A",
-              "relato",
-              "#D84315",
-              "espacio_cultural",
-              "#37474F",
-              "#863819",
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              5,
-              2.5,
-            ],
-            "line-opacity": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              1,
-              0.6,
-            ],
-          },
-        });
-
-        // Hover: resaltar solo la línea hovereada con feature-state
-        map.on("mouseenter", layerId, (e) => {
-          map.getCanvas().style.cursor = "";
-          const fid = e.features?.[0]?.id;
-          if (fid != null) {
-            if (hoveredLineIdRef.current != null) {
-              map.setFeatureState(
-                { source: sourceId, id: hoveredLineIdRef.current },
-                { hover: false },
-              );
-            }
-            hoveredLineIdRef.current = fid;
-            map.setFeatureState({ source: sourceId, id: fid }, { hover: true });
-          }
-        });
-        map.on("mouseleave", layerId, () => {
-          map.getCanvas().style.cursor = "";
-          if (hoveredLineIdRef.current != null) {
-            try {
-              map.setFeatureState(
-                { source: sourceId, id: hoveredLineIdRef.current },
-                { hover: false },
-              );
-            } catch (_) {}
-            hoveredLineIdRef.current = null;
-          }
-        });
-
-        conexionesSourceRef.current = sourceId;
-        conexionesLayerRef.current = layerId;
-
-        // Animación de trazado progresivo
-        const duracionMs = 1500;
-        const fps = 30;
-        const totalFrames = Math.ceil(duracionMs / (1000 / fps));
-        let frame = 0;
-
-        const anim = setInterval(() => {
-          frame++;
-          const progress = Math.min(frame / totalFrames, 1);
-          const partialFeatures = fullCurves.map((fc) => ({
-            type: "Feature",
-            id: fc.id,
-            geometry: {
-              type: "LineString",
-              coordinates: fc.curve.slice(
-                0,
-                Math.max(2, Math.ceil(fc.curve.length * progress)),
-              ),
-            },
-            properties: fc.properties,
-          }));
-          try {
-            map.getSource(sourceId)?.setData({
-              type: "FeatureCollection",
-              features: partialFeatures,
-            });
-          } catch (e) {
-            clearInterval(anim);
-          }
-          if (frame >= totalFrames) clearInterval(anim);
-        }, 1000 / fps);
-
-        // Actualizar popup con chips de entidades conectadas
-        if (conectados.length > 0 && popupRef.current) {
-          const popupEl = popupRef.current.getElement();
-          const container = popupEl?.querySelector(".conexiones-container");
-          if (container) {
-            container.innerHTML = conectados
-              .map((c) => {
-                const chipColor =
-                  {
-                    artesano: "#ff5722",
-                    gastronomia: "#4caf50",
-                    comercio: "#2196f3",
-                    evento: "#9c27b0",
-                    patrimonio: "#795548",
-                    personalidad: "#e91e63",
-                    comunidad_indigena: "#8B4513",
-                    lugar_natural: "#2E7D32",
-                    hospedaje: "#FF6F00",
-                    productor: "#00695C",
-                    experiencia: "#6A1B9A",
-                    relato: "#D84315",
-                    espacio_cultural: "#37474F",
-                  }[c.tipo] || "#863819";
-                return `<a href="/entidad/${c.slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:${chipColor}15;color:${chipColor};font-size:10px;font-weight:800;letter-spacing:0.5px;text-decoration:none;text-transform:uppercase;white-space:nowrap">${c.nombre}</a>`;
-              })
-              .join("");
-          }
-        }
-      } catch (err) {
-        console.error("Error al cargar conexiones:", err);
-      }
-    },
-    [limpiarConexiones, generarCurva],
-  );
+  // (limpiarConexiones, limpiarRutaRecorrido, dibujarConexiones movidas a hooks)
 
   // 3. Efecto para manejar el zoom cuando se selecciona una localidad
   useEffect(() => {
@@ -1328,223 +1012,162 @@ export const MapChaco = () => {
     showControls,
   ]); // Se encarga de todo cuando algo cambia
 
-  // Escuchar búsqueda desde el HeaderComponent
-  useEffect(() => {
-    const handler = (e) => {
-      setTerminoBusqueda(e.detail);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const handleSearchSelect = useCallback(async (e) => {
+    const nombre = e.detail;
+    if (!nombre || !geoData || !mapRef.current) return;
+    const map = mapRef.current;
+    const coincidencia = geoData.features.find(
+      (f) => f.properties.nombre?.toLowerCase() === nombre.toLowerCase(),
+    );
+    if (!coincidencia) return;
+    const coords = coincidencia.geometry.coordinates;
+    const coincId = coincidencia.properties.id;
+
+    if (popupRef.current) popupRef.current.remove();
+
+    limpiarConexiones(map);
+
+    let conexData = [];
+    try {
+      const r = await fetch(`/api/entidades/${coincId}/conexiones`);
+      conexData = await r.json();
+    } catch (_) {}
+    lastClickedEntityRef.current = coincId;
+    setEntityActive(true);
+
+    const bounds = new mapboxgl.LngLatBounds(coords, coords);
+    const lookup = entidadCoordsRef.current;
+    for (const c of conexData) {
+      const isOrigin = c.entidad_origen_id === coincId;
+      const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
+      const otherCoords = lookup[otherId];
+      if (otherCoords) bounds.extend(otherCoords);
+    }
+    map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
+
+    const {
+      nombre: n,
+      resumen,
+      slug,
+      tipo,
+      imagen,
+      horario_apertura,
+      horario_cierre,
+      dias_abierto,
+      fecha_evento,
+    } = coincidencia.properties;
+    const colorMap = {
+      artesano: "#ff5722",
+      gastronomia: "#4caf50",
+      comercio: "#2196f3",
+      evento: "#9c27b0",
+      patrimonio: "#795548",
+      personalidad: "#e91e63",
+      comunidad_indigena: "#8B4513",
+      lugar_natural: "#2E7D32",
+      hospedaje: "#FF6F00",
+      productor: "#00695C",
+      experiencia: "#6A1B9A",
+      relato: "#D84315",
+      espacio_cultural: "#37474F",
     };
-    window.addEventListener("header-search", handler);
-    return () => window.removeEventListener("header-search", handler);
-  }, []);
-
-  // Escuchar cambios de filtro desde HeaderComponent
-  useEffect(() => {
-    const handler = (e) => setFiltro(e.detail);
-    window.addEventListener("header-filter", handler);
-    return () => window.removeEventListener("header-filter", handler);
-  }, []);
-
-  // Escuchar cambios de localidad desde HeaderComponent
-  useEffect(() => {
-    const handler = (e) => setFiltroLocalidad(e.detail);
-    window.addEventListener("header-localidad", handler);
-    return () => window.removeEventListener("header-localidad", handler);
-  }, []);
-
-  // Escuchar selección de recorrido desde HeaderComponent
-  useEffect(() => {
-    const handler = (e) => setRecorridoActivo(e.detail);
-    window.addEventListener("header-recorrido", handler);
-    return () => window.removeEventListener("header-recorrido", handler);
-  }, []);
-
-  // Buscar y hacer zoom a una entidad cuando se selecciona del autocomplete
-  useEffect(() => {
-    const handler = async (e) => {
-      const nombre = e.detail;
-      if (!nombre || !geoData || !mapRef.current) return;
-      const map = mapRef.current;
-      const coincidencia = geoData.features.find(
-        (f) => f.properties.nombre?.toLowerCase() === nombre.toLowerCase(),
+    const catColor = colorMap[tipo] || "#863819";
+    const openBadge2 = (() => {
+      if (
+        tipo !== "comercio" ||
+        !dias_abierto ||
+        !horario_apertura ||
+        !horario_cierre
+      )
+        return "";
+      const diasSemana = [
+        "Domingo",
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes",
+        "Sábado",
+      ];
+      const hoy = diasSemana[new Date().getDay()];
+      const dias = dias_abierto.split(",").map((d) => d.trim());
+      if (!dias.includes(hoy))
+        return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
+      const ahora = new Date();
+      const [hA, mA] = horario_apertura.split(":").map(Number);
+      const [hC, mC] = horario_cierre.split(":").map(Number);
+      const minActual = ahora.getHours() * 60 + ahora.getMinutes();
+      const minApertura = hA * 60 + mA;
+      const minCierre = hC * 60 + mC;
+      if (minActual >= minApertura && minActual < minCierre)
+        return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Abierto</span>`;
+      return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
+    })();
+    const eventBadge2 = (() => {
+      if (tipo !== "evento" || !fecha_evento) return "";
+      const diff = Math.ceil(
+        (new Date(fecha_evento) - new Date(new Date().toDateString())) /
+          86400000,
       );
-      if (!coincidencia) return;
-      const coords = coincidencia.geometry.coordinates;
-      const coincId = coincidencia.properties.id;
+      if (diff === 0)
+        return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
+      if (diff <= 7)
+        return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
+      return "";
+    })();
 
-      if (popupRef.current) popupRef.current.remove();
+    const html = `<div style="padding:16px;min-width:240px;max-width:280px;font-family:'Epilogue',sans-serif;position:relative;"><div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${catColor};border-radius:3px 0 0 3px;"></div><div style="margin-left:8px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="display:inline-block;padding:2px 10px;border-radius:20px;background:${catColor}15;color:${catColor};font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">${tipo}</div>${openBadge2}${eventBadge2}</div><div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px 0;"><h3 style="margin:0;flex:1;color:#2D1A12;font-family:'Cinzel',serif;font-size:16px;font-weight:700;line-height:1.3;">${n}</h3>${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ""}</div><p style="font-size:12px;color:#666;line-height:1.5;margin:0 0 12px 0;">${resumen}</p><div style="display:flex;gap:6px;flex-wrap:wrap;"><a href="/entidad/${slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:linear-gradient(135deg,${catColor},${catColor}dd);color:white;text-decoration:none;border-radius:25px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px ${catColor}40;">Explorar <span style="font-size:14px;line-height:1;">→</span></a><div style="margin-top:6px;position:relative;display:inline-block;"><button onclick="var m=this.nextElementSibling;m.style.display=m.style.display==='flex'?'none':'flex';" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:transparent;color:#4285F4;border:1px solid #4285F4;border-radius:25px;font-size:10px;font-weight:600;cursor:pointer;font-family:'Epilogue',sans-serif;line-height:1.4;">Cómo llegar</button><div style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:white;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:6px;gap:4px;z-index:10;flex-direction:column;min-width:140px;"><a href="https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Google Maps</a><a href="https://waze.com/ul?ll=${coords[1]},${coords[0]}&navigate=yes" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Waze</a><a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Apple Maps</a></div></div></div></div></div>`;
 
-      // Cerrar popup y limpiar conexiones previas
-      limpiarConexiones(map);
-
-      let conexData = [];
-      try {
-        const r = await fetch(`/api/entidades/${coincId}/conexiones`);
-        conexData = await r.json();
-      } catch (_) {}
-      lastClickedEntityRef.current = coincId;
-      setEntityActive(true);
-
-      const bounds = new mapboxgl.LngLatBounds(coords, coords);
-      const lookup = entidadCoordsRef.current;
+    popupRef.current = new mapboxgl.Popup({
+      offset: 15,
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: "320px",
+    })
+      .setLngLat(coords)
+      .setHTML(html)
+      .addTo(map);
+    popupRef.current.on("close", () => {
+      const m = mapRef.current;
+      if (m && m.getLayer("capa-puntos")) {
+        if (savedPuntosFilterRef.current !== null) {
+          m.setFilter("capa-puntos", savedPuntosFilterRef.current);
+          savedPuntosFilterRef.current = null;
+        } else if (recorridoRouteDataRef.current) {
+          m.setFilter("capa-puntos", [
+            "in",
+            ["get", "id"],
+            ["literal", recorridoRouteDataRef.current.entityIds],
+          ]);
+        }
+      }
+      limpiarConexiones(m);
+    });
+    dibujarConexiones(coincId, coords, map, conexData);
+    if (map.getLayer("capa-puntos")) {
+      savedPuntosFilterRef.current = map.getFilter("capa-puntos");
+      const ids = recorridoRouteDataRef.current
+        ? recorridoRouteDataRef.current.entityIds
+        : [];
+      const allIds = [...ids, coincId];
       for (const c of conexData) {
         const isOrigin = c.entidad_origen_id === coincId;
         const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-        const otherCoords = lookup[otherId];
-        if (otherCoords) bounds.extend(otherCoords);
+        if (!allIds.includes(otherId)) allIds.push(otherId);
       }
-      map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
+      map.setFilter("capa-puntos", [
+        "in",
+        ["get", "id"],
+        ["literal", allIds],
+      ]);
+    }
 
-      const {
-        nombre: n,
-        resumen,
-        slug,
-        tipo,
-        imagen,
-        horario_apertura,
-        horario_cierre,
-        dias_abierto,
-        fecha_evento,
-      } = coincidencia.properties;
-      const colorMap = {
-        artesano: "#ff5722",
-        gastronomia: "#4caf50",
-        comercio: "#2196f3",
-        evento: "#9c27b0",
-        patrimonio: "#795548",
-        personalidad: "#e91e63",
-        comunidad_indigena: "#8B4513",
-        lugar_natural: "#2E7D32",
-        hospedaje: "#FF6F00",
-        productor: "#00695C",
-        experiencia: "#6A1B9A",
-        relato: "#D84315",
-        espacio_cultural: "#37474F",
-      };
-      const catColor = colorMap[tipo] || "#863819";
-      const openBadge2 = (() => {
-        if (
-          tipo !== "comercio" ||
-          !dias_abierto ||
-          !horario_apertura ||
-          !horario_cierre
-        )
-          return "";
-        const diasSemana = [
-          "Domingo",
-          "Lunes",
-          "Martes",
-          "Miércoles",
-          "Jueves",
-          "Viernes",
-          "Sábado",
-        ];
-        const hoy = diasSemana[new Date().getDay()];
-        const dias = dias_abierto.split(",").map((d) => d.trim());
-        if (!dias.includes(hoy))
-          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
-        const ahora = new Date();
-        const [hA, mA] = horario_apertura.split(":").map(Number);
-        const [hC, mC] = horario_cierre.split(":").map(Number);
-        const minActual = ahora.getHours() * 60 + ahora.getMinutes();
-        const minApertura = hA * 60 + mA;
-        const minCierre = hC * 60 + mC;
-        if (minActual >= minApertura && minActual < minCierre)
-          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Abierto</span>`;
-        return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#e74c3c15;color:#e74c3c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">Cerrado</span>`;
-      })();
-      const eventBadge2 = (() => {
-        if (tipo !== "evento" || !fecha_evento) return "";
-        const diff = Math.ceil(
-          (new Date(fecha_evento) - new Date(new Date().toDateString())) /
-            86400000,
-        );
-        if (diff === 0)
-          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#2e7d3215;color:#2e7d32;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Hoy!</span>`;
-        if (diff <= 7)
-          return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:#f39c1215;color:#f39c12;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-left:6px;">¡Pronto! (${diff}d)</span>`;
-        return "";
-      })();
-
-      const html = `<div style="padding:16px;min-width:240px;max-width:280px;font-family:'Epilogue',sans-serif;position:relative;"><div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${catColor};border-radius:3px 0 0 3px;"></div><div style="margin-left:8px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="display:inline-block;padding:2px 10px;border-radius:20px;background:${catColor}15;color:${catColor};font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">${tipo}</div>${openBadge2}${eventBadge2}</div><div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px 0;"><h3 style="margin:0;flex:1;color:#2D1A12;font-family:'Cinzel',serif;font-size:16px;font-weight:700;line-height:1.3;">${n}</h3>${imagen ? `<img src="${imagen}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ""}</div><p style="font-size:12px;color:#666;line-height:1.5;margin:0 0 12px 0;">${resumen}</p><div style="display:flex;gap:6px;flex-wrap:wrap;"><a href="/entidad/${slug}" onclick="return window.__guardarEstadoMapa(this)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:linear-gradient(135deg,${catColor},${catColor}dd);color:white;text-decoration:none;border-radius:25px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px ${catColor}40;">Explorar <span style="font-size:14px;line-height:1;">→</span></a><div style="margin-top:6px;position:relative;display:inline-block;"><button onclick="var m=this.nextElementSibling;m.style.display=m.style.display==='flex'?'none':'flex';" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:transparent;color:#4285F4;border:1px solid #4285F4;border-radius:25px;font-size:10px;font-weight:600;cursor:pointer;font-family:'Epilogue',sans-serif;line-height:1.4;">Cómo llegar</button><div style="display:none;position:absolute;top:100%;left:0;margin-top:6px;background:white;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:6px;gap:4px;z-index:10;flex-direction:column;min-width:140px;"><a href="https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Google Maps</a><a href="https://waze.com/ul?ll=${coords[1]},${coords[0]}&navigate=yes" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Waze</a><a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;color:#333;">Apple Maps</a></div></div></div></div></div>`;
-
-      popupRef.current = new mapboxgl.Popup({
-        offset: 15,
-        closeButton: false,
-        closeOnClick: false,
-        maxWidth: "320px",
-      })
-        .setLngLat(coords)
-        .setHTML(html)
-        .addTo(map);
-      popupRef.current.on("close", () => {
-        const m = mapRef.current;
-        if (m && m.getLayer("capa-puntos")) {
-          if (savedPuntosFilterRef.current !== null) {
-            m.setFilter("capa-puntos", savedPuntosFilterRef.current);
-            savedPuntosFilterRef.current = null;
-          } else if (recorridoRouteDataRef.current) {
-            m.setFilter("capa-puntos", [
-              "in",
-              ["get", "id"],
-              ["literal", recorridoRouteDataRef.current.entityIds],
-            ]);
-          }
-        }
-        limpiarConexiones(m);
-      });
-      dibujarConexiones(coincId, coords, map, conexData);
-      if (map.getLayer("capa-puntos")) {
-        savedPuntosFilterRef.current = map.getFilter("capa-puntos");
-        const ids = recorridoRouteDataRef.current
-          ? recorridoRouteDataRef.current.entityIds
-          : [];
-        const allIds = [...ids, coincId];
-        for (const c of conexData) {
-          const isOrigin = c.entidad_origen_id === coincId;
-          const otherId = isOrigin ? c.entidad_destino_id : c.entidad_origen_id;
-          if (!allIds.includes(otherId)) allIds.push(otherId);
-        }
-        map.setFilter("capa-puntos", [
-          "in",
-          ["get", "id"],
-          ["literal", allIds],
-        ]);
-      }
-
-      // Restaurar el texto en el input
-      window.dispatchEvent(
-        new CustomEvent("header-search-set", { detail: nombre }),
-      );
-    };
-    window.addEventListener("header-search-select", handler);
-    return () => window.removeEventListener("header-search-select", handler);
-  }, [geoData]);
-
-  // Estado para saber si un panel del header está abierto
-  const [panelOpen, setPanelOpen] = useState(false);
-
-  useEffect(() => {
-    const handler = (e) => setPanelOpen(e.detail.open);
-    window.addEventListener("header-panel", handler);
-    return () => window.removeEventListener("header-panel", handler);
-  }, []);
-
-  // Volver a la vista general cuando se limpia el recorrido
-  useEffect(() => {
-    const handler = () => {
-      const map = mapRef.current;
-      if (map) {
-        map.flyTo({
-          center: [-60.44, -26.05],
-          zoom: 7,
-          speed: 0.8,
-          essential: true,
-        });
-      }
-    };
-    window.addEventListener("header-recorrido-fly", handler);
-    return () => window.removeEventListener("header-recorrido-fly", handler);
-  }, []);
+    window.dispatchEvent(
+      new CustomEvent("header-search-set", { detail: nombre }),
+    );
+  }, [geoData, limpiarConexiones, dibujarConexiones]);
 
   // Dibujar ruta del recorrido en el mapa
   useEffect(() => {
@@ -1824,45 +1447,61 @@ export const MapChaco = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Resetear mapa desde el header (logo símbolo)
-  useEffect(() => {
+  const handleResetMap = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+    setEntityActive(false);
+    setRecorridoPopup(null);
+    limpiarConexiones(map);
+    lastClickedEntityRef.current = null;
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+    setFiltro("todos");
+    setFiltroLocalidad("");
+    setTerminoBusqueda("");
+    setRecorridoActivo(null);
+    limpiarRutaRecorrido(map);
+    window.dispatchEvent(
+      new CustomEvent("header-recorrido", { detail: null }),
+    );
+    map.flyTo({
+      center: [-60.44, -26.05],
+      zoom: 7,
+      speed: 0.8,
+      essential: true,
+    });
+    window.dispatchEvent(
+      new CustomEvent("header-filter-reset", { detail: "todos" }),
+    );
+    window.dispatchEvent(
+      new CustomEvent("header-localidad-reset", { detail: "" }),
+    );
+  }, []);
 
-    const handleReset = () => {
-      setEntityActive(false);
-      setRecorridoPopup(null);
-      limpiarConexiones(map);
-      lastClickedEntityRef.current = null;
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-      }
-      setFiltro("todos");
-      setFiltroLocalidad("");
-      setTerminoBusqueda("");
-      setRecorridoActivo(null);
-      limpiarRutaRecorrido(map);
-      window.dispatchEvent(
-        new CustomEvent("header-recorrido", { detail: null }),
-      );
+  const handleRecorridoFly = useCallback(() => {
+    const map = mapRef.current;
+    if (map) {
       map.flyTo({
         center: [-60.44, -26.05],
         zoom: 7,
         speed: 0.8,
         essential: true,
       });
-      window.dispatchEvent(
-        new CustomEvent("header-filter-reset", { detail: "todos" }),
-      );
-      window.dispatchEvent(
-        new CustomEvent("header-localidad-reset", { detail: "" }),
-      );
-    };
-
-    window.addEventListener("header-reset-map", handleReset);
-    return () => window.removeEventListener("header-reset-map", handleReset);
+    }
   }, []);
+
+  useMapHeaderSync({
+    setTerminoBusqueda,
+    setFiltro,
+    setFiltroLocalidad,
+    setRecorridoActivo,
+    setPanelOpen,
+    onSearchSelect: handleSearchSelect,
+    onRecorridoFly: handleRecorridoFly,
+    onResetMap: handleResetMap,
+  });
 
   // 4b. Toggle dark mode on map canvas, persist, and broadcast
   useEffect(() => {
@@ -1882,7 +1521,6 @@ export const MapChaco = () => {
     );
   }, [darkMode]);
 
-  // 5. Cerrar popups y limpiar conexiones cuando cambian los filtros
   useEffect(() => {
     if (clickResetFilterRef.current) {
       clickResetFilterRef.current = false;
@@ -1944,8 +1582,18 @@ export const MapChaco = () => {
       }}
     >
       {/* Estilos para animaciones */}
-      <style>{welcomeOverlayStyles}</style>
       <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.1);
+            opacity: 0.8;
+          }
+        }
+
         .mapboxgl-ctrl-bottom-left {
           display: none !important;
         }
@@ -2066,329 +1714,31 @@ export const MapChaco = () => {
         }
       `}</style>
 
-      {/* OVERLAY DE BIENVENIDA - Requiere interacción del usuario */}
       {showStartOverlay && (
-        <div
-          onClick={handleStartExperience}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            zIndex: 2000,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            color: "white",
-            fontFamily: "Epilogue, sans-serif",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: "30px",
-              animation: "pulse 2s infinite",
-            }}
-          >
-            <img src="/icons/touch.png" />
-          </div>
-          <h2
-            style={{
-              fontSize: "38px",
-              opacity: 0.9,
-              marginBottom: "15px",
-              textAlign: "center",
-              fontFamily: "Epilogue, sans-serif",
-              color: "#fcf9f2",
-            }}
-          >
-            Bienvenido a Made in Chaco
-          </h2>
-          <p
-            style={{
-              fontSize: "25px",
-              opacity: 0.8,
-              textAlign: "center",
-              maxWidth: "400px",
-              marginBottom: "30px",
-              fontFamily: "Epilogue, sans-serif",
-              color: "#fcf9f2",
-            }}
-          >
-            Hacé click o tocá la pantalla para comenzar la experiencia
-          </p>
-        </div>
+        <WelcomeOverlay onClick={handleStartExperience} />
       )}
 
-      {/* ESC HINT - aparece tras 5s con filtro/ruta activa */}
       {showEscHint && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "90px",
-            left: 0,
-            right: 0,
-            display: "flex",
-            justifyContent: "center",
-            zIndex: 1500,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            className="esc-hint-overlay"
-            onClick={() => setShowEscHint(false)}
-            style={{
-              background: "rgba(0,0,0,0.45)",
-              backdropFilter: "blur(4px)",
-              WebkitBackdropFilter: "blur(4px)",
-              color: "rgba(252,249,242,0.7)",
-              padding: "10px 20px",
-              borderRadius: "10px",
-              fontFamily: "Manrope, sans-serif",
-              fontSize: "13px",
-              fontWeight: 400,
-              textShadow: "none",
-              cursor: "pointer",
-              pointerEvents: "auto",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-              maxWidth: "80%",
-              textAlign: "center",
-              animation: "filterPanelSlideIn 0.6s ease-out",
-              lineHeight: 1.3,
-              letterSpacing: "0.2px",
-            }}
-          >
-            Presioná ESC o{" "}
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(252,249,242,0.7)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ verticalAlign: "middle", margin: "0 2px" }}
-            >
-              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-            </svg>{" "}
-            para volver a la vista principal
-          </div>
-        </div>
+        <EscHint onDismiss={() => setShowEscHint(false)} />
       )}
 
-      {/* RECORRIDO POPUP OVERLAY - borde superior centrado */}
       {recorridoPopup && (
-        <div
-          style={{
-            position: "absolute",
-            top: "95px",
-            left: 0,
-            right: 0,
-            display: "flex",
-            justifyContent: "center",
-            zIndex: 1500,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            className="recorrido-popup-overlay"
-            onClick={() => setRecorridoPopup(null)}
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
-              backdropFilter: "blur(16px) saturate(1.2)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.2)",
-              borderRadius: "12px",
-              padding: "10px 16px",
-              pointerEvents: "auto",
-              cursor: "pointer",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              maxHeight: "500px",
-              overflowY: "auto",
-              animation: "filterPanelSlideIn 0.3s ease-out",
-            }}
-          >
-            <div>
-              <div
-                className="recorrido-label"
-                style={{
-                  fontSize: "10px",
-                  color: "#863819",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  textShadow: "none",
-                }}
-              >
-                Recorrido
-              </div>
-              <div
-                className="recorrido-name"
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  color: "#2d1a12",
-                  textShadow: "none",
-                }}
-              >
-                {recorridoPopup.nombre}
-              </div>
-            </div>
-            <a
-              href={`/recorrido/${recorridoPopup.slug}`}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                display: "inline-block",
-                padding: "6px 12px",
-                background: "#863819",
-                color: "white",
-                borderRadius: "8px",
-                textDecoration: "none",
-                fontSize: "11px",
-                fontWeight: 600,
-                textShadow: "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Ver en detalle →
-            </a>
-          </div>
-        </div>
+        <RecorridoPopup
+          nombre={recorridoPopup.nombre}
+          slug={recorridoPopup.slug}
+          onDismiss={() => setRecorridoPopup(null)}
+        />
       )}
 
-      {/* LOCALIDAD DETAIL PANEL - borde superior derecho */}
-      {filtroLocalidad &&
-        (() => {
-          const loc = localidades.find(
-            (l) => l.id === parseInt(filtroLocalidad),
-          );
-          if (!loc) return null;
-          const fundDate = loc.fecha_fundacion
-            ? new Date(loc.fecha_fundacion).getFullYear()
-            : null;
-          return (
-            <div
-              className="localidad-detail-panel"
-              style={{
-                position: "absolute",
-                top: panelOpen ? "680px" : "95px",
-                right: "16px",
-                zIndex: 1500,
-                pointerEvents: "auto",
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(210,195,165,0.35) 40%, rgba(210,195,165,0.6) 100%)",
-                backdropFilter: "blur(16px) saturate(1.2)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.2)",
-                borderRadius: "12px",
-                padding: "12px 16px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                animation: "filterPanelSlideIn 0.3s ease-out",
-                transition: "top 0.35s ease-out",
-                minWidth: "180px",
-              }}
-            >
-              <div
-                className="localidad-name"
-                style={{
-                  fontSize: "15px",
-                  color: "#863819",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  textShadow: "none",
-                  marginBottom: "6px",
-                }}
-              >
-                {loc.nombre}
-              </div>
-              {(loc.departamento_nombre || loc.departamento) && (
-                <div
-                  className="localidad-value"
-                  style={{
-                    fontSize: "13px",
-                    color: "#000",
-                    textShadow: "none",
-                    marginBottom: "3px",
-                  }}
-                >
-                  <span
-                    className="localidad-label"
-                    style={{ opacity: 0.6, color: "#000" }}
-                  >
-                    Departamento:
-                  </span>{" "}
-                  {loc.departamento_nombre || loc.departamento}
-                </div>
-              )}
-              {loc.habitantes != null && (
-                <div
-                  className="localidad-value"
-                  style={{
-                    fontSize: "13px",
-                    color: "#000",
-                    textShadow: "none",
-                    marginBottom: "3px",
-                  }}
-                >
-                  <span
-                    className="localidad-label"
-                    style={{ opacity: 0.6, color: "#000" }}
-                  >
-                    Población:
-                  </span>{" "}
-                  {loc.habitantes.toLocaleString()}
-                </div>
-              )}
-              {fundDate && (
-                <div
-                  className="localidad-value"
-                  style={{
-                    fontSize: "13px",
-                    color: "#000",
-                    textShadow: "none",
-                    marginBottom: "3px",
-                  }}
-                >
-                  <span
-                    className="localidad-label"
-                    style={{ opacity: 0.6, color: "#000" }}
-                  >
-                    Fundación:
-                  </span>{" "}
-                  {fundDate}
-                </div>
-              )}
-              {loc.gentilicio && (
-                <div
-                  className="localidad-value"
-                  style={{
-                    fontSize: "13px",
-                    color: "#000",
-                    textShadow: "none",
-                  }}
-                >
-                  <span
-                    className="localidad-label"
-                    style={{ opacity: 0.6, color: "#000" }}
-                  >
-                    Gentilicio:
-                  </span>{" "}
-                  {loc.gentilicio}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+      {filtroLocalidad && (() => {
+        const loc = localidades.find(
+          (l) => l.id === parseInt(filtroLocalidad),
+        );
+        if (!loc) return null;
+        return (
+          <LocalidadDetailPanel localidad={loc} panelOpen={panelOpen} />
+        );
+      })()}
 
       {/* FOOTER ESTILO MAPA ANTIGUO */}
       <div

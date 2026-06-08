@@ -515,7 +515,7 @@ export const SolicitarSelloPage = () => {
                     setLocalidadId(id);
                     const loc = localidades.find((l) => l.id === parseInt(id));
                     if (loc?.latitud && loc?.longitud && mapRef.current && markerRef.current) {
-                      mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 10 });
+                      mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 10, speed: 1.2 });
                       markerRef.current.setLngLat([parseFloat(loc.longitud), parseFloat(loc.latitud)]);
                       setLatitud(loc.latitud);
                       setLongitud(loc.longitud);
@@ -577,7 +577,7 @@ export const SolicitarSelloPage = () => {
                           setLatitud(lat.toFixed(7));
                           setLongitud(lon.toFixed(7));
                           if (mapRef.current && markerRef.current) {
-                            mapRef.current.flyTo({ center: [lon, lat], zoom: 14 });
+                            mapRef.current.flyTo({ center: [lon, lat], zoom: 14, speed: 1 });
                             markerRef.current.setLngLat([lon, lat]);
                           }
                         }}

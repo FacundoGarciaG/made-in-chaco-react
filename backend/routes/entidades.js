@@ -348,7 +348,7 @@ router.get("/mapa-puntos", async (_req, res) => {
 router.get("/solicitudes", authMiddleware, async (_req, res) => {
   try {
     const { rows } = await pool.query(
-       `SELECT id, tipo, nombre, slug, resumen, localidad_id, email,
+       `       SELECT id, tipo, nombre, slug, resumen, localidad_id, email,
                (created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires' as created_at, imagen, direccion_escrita, redes_sociales,
               razon_social, cuit, rubro_especifico, horario_apertura,
               horario_cierre, dias_abierto, sitio_web, acepta_tarjetas,
@@ -356,7 +356,7 @@ router.get("/solicitudes", authMiddleware, async (_req, res) => {
               tipo_producto, metodos_produccion, certificaciones,
               fecha_evento, duracion_dias, actividades_principales,
               link_entradas, fecha_inicio_suscripcion, fecha_fin_suscripcion,
-              estado_pago
+              estado_pago, latitud, longitud
        FROM entidades
        WHERE visible = false AND estado_sello = 'pendiente'
        ORDER BY created_at DESC`,
@@ -379,7 +379,7 @@ router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
     let idx = 1;
 
     updates.push(`visible = $${idx++}`);
-    values.push(true);
+    values.push(false);
     updates.push(`estado_sello = $${idx++}`);
     values.push("aprobado");
 
@@ -436,6 +436,22 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Error POST /solicitudes/:id/rechazar:", err);
     res.status(500).json({ error: "Error al rechazar solicitud" });
+  }
+});
+
+// PATCH /api/entidades/:id/visible — toggle visibilidad en el mapa
+router.patch("/entidades/:id/visible", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { visible } = req.body;
+    await pool.query(
+      "UPDATE entidades SET visible = $1 WHERE id = $2",
+      [visible, id],
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error PATCH /entidades/:id/visible:", err);
+    res.status(500).json({ error: "Error al cambiar visibilidad" });
   }
 });
 

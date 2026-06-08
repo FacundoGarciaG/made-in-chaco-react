@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import TagSelector from "../components/TagSelector";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const TIPOS = [
   { value: "comercio", label: "Comercio", color: "#2196f3" },
@@ -124,7 +127,9 @@ const sInput = {
   WebkitAppearance: "none",
   appearance: "none",
   cursor: "text",
+  transition: "border-color 0.2s",
 };
+sInput[":focus"] = { borderBottomColor: "#863819" };
 
 const sTextarea = {
   ...sInput,
@@ -141,6 +146,26 @@ const sLabel = {
   marginBottom: 2,
   letterSpacing: "0.06em",
   textTransform: "uppercase",
+};
+
+const sectionStyle = {
+  marginBottom: 64,
+};
+
+const sectionHeaderStyle = {
+  fontFamily: "Cinzel, serif",
+  color: "#1a1a1a",
+  margin: "0 0 8px",
+  fontSize: 22,
+  fontWeight: 500,
+  letterSpacing: "-0.02em",
+};
+
+const sectionDividerStyle = {
+  width: 40,
+  height: 3,
+  background: "#863819",
+  marginBottom: 28,
 };
 
 export const SolicitarSelloPage = () => {
@@ -163,6 +188,11 @@ export const SolicitarSelloPage = () => {
   const [geoQuery, setGeoQuery] = useState("");
   const [geoResults, setGeoResults] = useState([]);
   const geoTimeoutRef = useRef(null);
+  const [latitud, setLatitud] = useState(null);
+  const [longitud, setLongitud] = useState(null);
+  const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
 
   const [extra, setExtra] = useState({});
 
@@ -172,6 +202,39 @@ export const SolicitarSelloPage = () => {
       .then((data) => setLocalidades(data))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!mapContainer.current || mapRef.current) return;
+    const m = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/light-v10",
+      center: [-58.9861, -27.4511],
+      zoom: 8,
+      attributionControl: false,
+    });
+    const mk = new mapboxgl.Marker({ draggable: true, color: "#863819" })
+      .setLngLat([-58.9861, -27.4511])
+      .addTo(m);
+    mk.on("dragend", () => {
+      const ll = mk.getLngLat();
+      setLatitud(ll.lat.toFixed(7));
+      setLongitud(ll.lng.toFixed(7));
+    });
+    m.on("click", (e) => {
+      mk.setLngLat(e.lngLat);
+      setLatitud(e.lngLat.lat.toFixed(7));
+      setLongitud(e.lngLat.lng.toFixed(7));
+    });
+    mapRef.current = m;
+    markerRef.current = mk;
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [tipo]);
 
   const handleExtraChange = (key, val) => {
     setExtra((prev) => ({ ...prev, [key]: val }));
@@ -264,6 +327,10 @@ export const SolicitarSelloPage = () => {
       setError("Completá la dirección");
       return;
     }
+    if (!imagen) {
+      setError("Subí una foto de portada");
+      return;
+    }
     if (["comercio", "hospedaje", "productor", "evento"].includes(tipo)) {
       if (!extra.razon_social?.trim()) {
         setError("Completá la razón social");
@@ -282,6 +349,8 @@ export const SolicitarSelloPage = () => {
         nombre: nombre.trim(),
         resumen,
         localidad_id: localidadId || null,
+        latitud: latitud || null,
+        longitud: longitud || null,
         direccion_escrita: direccion,
         imagen,
         email: email.trim(),
@@ -320,32 +389,32 @@ export const SolicitarSelloPage = () => {
   if (success) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "0 40px" }}>
-        <div style={{ maxWidth: 600 }}>
+        <div style={{ maxWidth: 600, textAlign: "center" }}>
           <div style={{ fontSize: 72, marginBottom: 20, color: "#1a1a1a", fontWeight: 300, lineHeight: 1 }}>✓</div>
-        <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 16, fontSize: 48, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.05 }}>Solicitud enviada</h1>
-        <p style={{ color: "#777", fontSize: 20, lineHeight: 1.5, marginBottom: 40, maxWidth: 520, letterSpacing: "-0.01em" }}>
-          Recibimos tu solicitud para el Sello Made in Chaco. Nuestro equipo la va a revisar y te
-          vamos a contactar a la brevedad. Una vez aprobada, vas a poder gestionar el pago anual
-          para activar tu membresía.
-        </p>
-        <button
-          onClick={() => navigate("/")}
-          style={{
-            fontFamily: "inherit",
-            fontSize: 18,
-            fontWeight: 500,
-            letterSpacing: "-0.01em",
-            cursor: "pointer",
-            border: "none",
-            background: "none",
-            padding: 0,
-            color: "#1a1a1a",
-          }}
-        >
-          Volver al inicio <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a" }}>↑</span>
-        </button>
+          <h1 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 16, fontSize: 48, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1.05 }}>Solicitud enviada</h1>
+          <p style={{ color: "#777", fontSize: 20, lineHeight: 1.5, marginBottom: 40, maxWidth: 520, letterSpacing: "-0.01em", margin: "0 auto 40px" }}>
+            Recibimos tu solicitud para el Sello Made in Chaco. Nuestro equipo la va a revisar y te
+            vamos a contactar a la brevedad. Una vez aprobada, vas a poder gestionar el pago anual
+            para activar tu membresía.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            style={{
+              fontFamily: "inherit",
+              fontSize: 18,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
+              cursor: "pointer",
+              border: "none",
+              background: "none",
+              padding: 0,
+              color: "#1a1a1a",
+            }}
+          >
+            Volver al inicio <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a" }}>↑</span>
+          </button>
+        </div>
       </div>
-    </div>
     );
   }
 
@@ -393,10 +462,9 @@ export const SolicitarSelloPage = () => {
         {tipo && (
           <>
             {/* Básicos */}
-            <div style={{
-              marginBottom: 48,
-            }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Información básica</h3>
+            <div style={sectionStyle}>
+              <h3 style={sectionHeaderStyle}>Información básica</h3>
+              <div style={sectionDividerStyle} />
               <div style={{ marginBottom: 32 }}>
                 <label style={sLabel}>Nombre *</label>
                 <input
@@ -442,7 +510,17 @@ export const SolicitarSelloPage = () => {
                 <select
                   style={{ ...sInput, cursor: "pointer", color: localidadId ? "#1a1a1a" : "#aaa" }}
                   value={localidadId}
-                  onChange={(e) => setLocalidadId(e.target.value)}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setLocalidadId(id);
+                    const loc = localidades.find((l) => l.id === parseInt(id));
+                    if (loc?.latitud && loc?.longitud && mapRef.current && markerRef.current) {
+                      mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 10 });
+                      markerRef.current.setLngLat([parseFloat(loc.longitud), parseFloat(loc.latitud)]);
+                      setLatitud(loc.latitud);
+                      setLongitud(loc.longitud);
+                    }
+                  }}
                 >
                   <option value="">Seleccionar localidad...</option>
                   {localidades.map((l) => (
@@ -494,6 +572,14 @@ export const SolicitarSelloPage = () => {
                           setDireccion(r.display_name);
                           setGeoQuery(r.display_name);
                           setGeoResults([]);
+                          const lat = parseFloat(r.lat);
+                          const lon = parseFloat(r.lon);
+                          setLatitud(lat.toFixed(7));
+                          setLongitud(lon.toFixed(7));
+                          if (mapRef.current && markerRef.current) {
+                            mapRef.current.flyTo({ center: [lon, lat], zoom: 14 });
+                            markerRef.current.setLngLat([lon, lat]);
+                          }
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = "#f5f2eb"}
                         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
@@ -504,16 +590,30 @@ export const SolicitarSelloPage = () => {
                   </div>
                 )}
               </div>
+
+              <div style={{ marginBottom: 32 }}>
+                <label style={sLabel}>Ubicación en el mapa</label>
+                <p style={{ fontSize: 13, color: "#999", margin: "0 0 8px" }}>Hacé clic o arrastrá el marcador para ubicar tu entidad en el mapa</p>
+                <div style={{ position: "relative" }}>
+                  <div ref={mapContainer} style={{ height: 250, borderRadius: 12, overflow: "hidden" }} />
+                  <div style={{ position: "absolute", bottom: 10, right: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <button type="button" onClick={() => mapRef.current?.zoomIn()} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#333" }}>+</button>
+                    <button type="button" onClick={() => mapRef.current?.zoomOut()} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#333" }}>−</button>
+                  </div>
+                </div>
+                {latitud && longitud && (
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
+                    Lat: {latitud}, Lng: {longitud}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Campos específicos */}
             {CAMPOS_POR_TIPO[tipo] && (
-              <div style={{
-                marginBottom: 48,
-              }}>
-                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>
-                  Datos de {TIPOS.find((t) => t.value === tipo)?.label}
-                </h3>
+              <div style={sectionStyle}>
+                <h3 style={sectionHeaderStyle}>Datos de {TIPOS.find((t) => t.value === tipo)?.label}</h3>
+                <div style={sectionDividerStyle} />
                 {CAMPOS_POR_TIPO[tipo].map((campo) => (
                   <div key={campo.key} style={{ marginBottom: 32 }}>
                     <label style={sLabel}>{campo.label}</label>
@@ -643,12 +743,11 @@ export const SolicitarSelloPage = () => {
             )}
 
             {/* Contacto */}
-            <div style={{
-              marginBottom: 48,
-            }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Contacto / Redes sociales</h3>
+            <div style={sectionStyle}>
+              <h3 style={sectionHeaderStyle}>Contacto / Redes sociales</h3>
+              <div style={sectionDividerStyle} />
               {contactos.map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "center", background: "#fafaf8", padding: "8px 12px" }}>
                   <select
                     value={item.type}
                     onChange={(e) => actualizarContacto(i, "type", e.target.value)}
@@ -710,30 +809,29 @@ export const SolicitarSelloPage = () => {
             </div>
 
             {/* Foto */}
-            <div style={{
-              marginBottom: 48,
-            }}>
-              <h3 style={{ fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 28px", fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em" }}>Foto de portada</h3>
+            <div style={sectionStyle}>
+              <h3 style={sectionHeaderStyle}>Foto de portada *</h3>
+              <div style={sectionDividerStyle} />
               <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                 Esta foto se va a usar como imagen principal de tu entidad en el mapa y en su página de detalle.
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, border: "1px dashed #ddd", padding: "20px 24px", background: "#fafaf8" }}>
                 <label style={{
                   fontFamily: "inherit",
                   fontSize: 15,
                   letterSpacing: "-0.01em",
                   cursor: "pointer",
                   border: "none",
-                  borderBottom: "1px solid #e8e8e8",
+                  borderBottom: "1px solid #bbb",
                   background: "none",
-                  padding: "8px 0",
-                  color: "#aaa",
+                  padding: "4px 0",
+                  color: "#555",
                 }}>
                   {uploading ? "Subiendo..." : "Seleccionar archivo"}
                   <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} disabled={uploading} />
                 </label>
                 {imagen && (
-                  <img src={imagen} alt="" style={{ width: 60, height: 60, borderRadius: 0, objectFit: "cover" }} />
+                  <img src={imagen} alt="" style={{ width: 72, height: 72, borderRadius: 4, objectFit: "cover", border: "1px solid #eee" }} />
                 )}
               </div>
               <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
@@ -764,16 +862,15 @@ export const SolicitarSelloPage = () => {
                 fontWeight: 500,
                 letterSpacing: "-0.01em",
                 cursor: submitting || uploading ? "default" : "pointer",
-                border: "none",
-                background: "none",
-                boxShadow: "none",
-                padding: "4px 0",
+                border: "2px solid #1a1a1a",
+                background: submitHover && !submitting && !uploading ? "#1a1a1a" : "transparent",
+                padding: "12px 32px",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
-                color: submitting || uploading ? "#d4d4d4" : "#1a1a1a",
-                marginTop: 48,
-                transition: "color 0.2s ease",
+                gap: 10,
+                color: submitHover && !submitting && !uploading ? "white" : "#1a1a1a",
+                marginTop: 56,
+                transition: "all 0.25s ease",
               }}
             >
               {submitting ? "Enviando solicitud..." : uploading ? "Subiendo imagen..." : "Enviar solicitud"}

@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 import "../styles/FooterComponent.css";
+import { useMapStore } from "../store/useMapStore";
+
+function geolocate() {
+  useMapStore.getState()._geolocateControl?.trigger();
+}
 
 function fitAll() {
   window.__hideEscHint?.();
-  window.__mapInstance?.flyTo({
+  const map = useMapStore.getState()._mapInstance;
+  map?.flyTo({
     center: [-60.44, -26.05],
     zoom: 7,
     speed: 0.8,
@@ -13,7 +19,7 @@ function fitAll() {
 }
 
 function resetNorth() {
-  window.__mapInstance?.easeTo({ bearing: 0, pitch: 0, duration: 600 });
+  useMapStore.getState()._mapInstance?.easeTo({ bearing: 0, pitch: 0, duration: 600 });
 }
 
 function toggleFullscreen() {
@@ -25,18 +31,18 @@ function toggleFullscreen() {
 }
 
 export const FooterComponent = ({
-  onFilterChange,
-  activeFilter,
   localidades,
-  filtroLocalidad,
-  onLocalidadChange,
-  darkMode,
-  onToggleDarkMode,
   showDepartamentos,
   onToggleDepartamentos,
 }) => {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const filtro = useMapStore((s) => s.filtro);
+  const filtroLocalidad = useMapStore((s) => s.filtroLocalidad);
+  const darkMode = useMapStore((s) => s.darkMode);
+  const setFiltro = useMapStore((s) => s.setFiltro);
+  const setFiltroLocalidad = useMapStore((s) => s.setFiltroLocalidad);
+  const setDarkMode = useMapStore((s) => s.setDarkMode);
 
   useEffect(() => {
     const handler = () => {
@@ -87,7 +93,7 @@ export const FooterComponent = ({
           <div className="footer-map__header-center">
             <button
               className="footer-map__geo-btn"
-              onClick={() => window.__geolocateControl?.trigger()}
+              onClick={geolocate}
               aria-label="Geolocalizar"
               title="Geolocalizar"
               type="button"
@@ -104,7 +110,7 @@ export const FooterComponent = ({
             <div className="footer-map__zoom">
               <button
                 className="footer-map__zoom-btn"
-                onClick={() => window.__mapInstance?.zoomOut()}
+                onClick={() => useMapStore.getState()._mapInstance?.zoomOut()}
                 aria-label="Alejar"
                 title="Alejar"
                 type="button"
@@ -114,7 +120,7 @@ export const FooterComponent = ({
               <div className="footer-map__zoom-divider" />
               <button
                 className="footer-map__zoom-btn"
-                onClick={() => window.__mapInstance?.zoomIn()}
+                onClick={() => useMapStore.getState()._mapInstance?.zoomIn()}
                 aria-label="Acercar"
                 title="Acercar"
                 type="button"
@@ -162,7 +168,7 @@ export const FooterComponent = ({
             <button
               className="footer-map__ctrl-btn"
               onClick={() => {
-                const map = window.__mapInstance;
+                const map = useMapStore.getState()._mapInstance;
                 if (!map) return;
                 const is3D = map.getPitch() > 0;
                 map.easeTo({
@@ -197,7 +203,7 @@ export const FooterComponent = ({
           <div className="footer-map__header-right">
             <button
               className="footer-map__darkmode-btn"
-              onClick={onToggleDarkMode}
+              onClick={() => setDarkMode(!darkMode)}
               aria-label={darkMode ? "Modo claro" : "Modo oscuro"}
               title={darkMode ? "Modo claro" : "Modo oscuro"}
               type="button"
@@ -257,10 +263,10 @@ export const FooterComponent = ({
                 {categorias.map((cat) => (
                   <button
                     key={cat.id}
-                    className={`footer-map__menu-item ${activeFilter === cat.id ? "footer-map__menu-item--active" : ""}`}
+                    className={`footer-map__menu-item ${filtro === cat.id ? "footer-map__menu-item--active" : ""}`}
                     style={{ "--cat-color": cat.color }}
                     onClick={() => {
-                      if (onFilterChange) onFilterChange(cat.id);
+                      setFiltro(cat.id);
                       setMenuAbierto(false);
                     }}
                     type="button"
@@ -271,7 +277,7 @@ export const FooterComponent = ({
                       className="footer-map__menu-icon"
                       style={{
                         filter:
-                          activeFilter === cat.id
+                          filtro === cat.id
                             ? "brightness(0) invert(1)"
                             : "none",
                       }}
@@ -292,7 +298,7 @@ export const FooterComponent = ({
                 <button
                   className={`footer-map__menu-item footer-map__menu-item--localidad ${!filtroLocalidad ? "footer-map__menu-item--active" : ""}`}
                   onClick={() => {
-                    if (onLocalidadChange) onLocalidadChange("");
+                    setFiltroLocalidad("");
                     setMenuAbierto(false);
                   }}
                   type="button"
@@ -309,8 +315,7 @@ export const FooterComponent = ({
                     key={loc.id}
                     className={`footer-map__menu-item footer-map__menu-item--localidad ${filtroLocalidad === loc.id.toString() ? "footer-map__menu-item--active" : ""}`}
                     onClick={() => {
-                      if (onLocalidadChange)
-                        onLocalidadChange(loc.id.toString());
+                      setFiltroLocalidad(loc.id.toString());
                       setMenuAbierto(false);
                     }}
                     type="button"

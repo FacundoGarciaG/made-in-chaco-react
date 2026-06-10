@@ -4,22 +4,29 @@ import "../styles/HeaderComponent.css";
 import logoClaro from "../assets/imagenes/madeinchacoclaro.png";
 import logoSymbol from "../assets/imagenes/logo-sintitulo.png";
 import { SelloModal } from "./SelloModal";
+import { useMapStore } from "../store/useMapStore";
 export const HeaderComponent = () => {
   const location = useLocation();
   const isMapPage = location.pathname === "/descubre";
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("made-in-chaco-dark-mode") === "true",
-  );
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchTerm = useMapStore((s) => s.searchTerm);
+  const filtro = useMapStore((s) => s.filtro);
+  const filtroLocalidad = useMapStore((s) => s.filtroLocalidad);
+  const headerVisible = useMapStore((s) => s.headerVisible);
+  const darkMode = useMapStore((s) => s.darkMode);
+  const recorridoActivo = useMapStore((s) => s.recorridoActivo);
+  const setSearchTerm = useMapStore((s) => s.setSearchTerm);
+  const setFiltro = useMapStore((s) => s.setFiltro);
+  const setFiltroLocalidad = useMapStore((s) => s.setFiltroLocalidad);
+  const setPanelOpen = useMapStore((s) => s.setPanelOpen);
+  const setRecorridoActivo = useMapStore((s) => s.setRecorridoActivo);
+  const triggerSearchSelect = useMapStore((s) => s.triggerSearchSelect);
+  const triggerRecorridoFly = useMapStore((s) => s.triggerRecorridoFly);
+
   const [filtroPanelOpen, setFiltroPanelOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("todos");
   const [hoveredFilter, setHoveredFilter] = useState(null);
-  const [filtroLocalidad, setFiltroLocalidad] = useState("");
   const [localidades, setLocalidades] = useState([]);
-  const [showHeader, setShowHeader] = useState(false);
   const [recorridosPanelOpen, setRecorridosPanelOpen] = useState(false);
   const [recorridosList, setRecorridosList] = useState([]);
-  const [selectedRecorrido, setSelectedRecorrido] = useState(null);
   const [entidades, setEntidades] = useState([]);
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
@@ -57,17 +64,15 @@ export const HeaderComponent = () => {
     };
   }, []);
 
-  // Resetear visibilidad al entrar al mapa y escuchar evento desde MapChaco
+  // Reset shared state when leaving the map page
   useEffect(() => {
     if (!isMapPage) {
-      setShowHeader(false);
-      return;
+      setFiltro("todos");
+      setFiltroLocalidad("");
+      setSearchTerm("");
+      setRecorridoActivo(null);
     }
-    setShowHeader(false);
-    const handler = () => setShowHeader(true);
-    window.addEventListener("header-show", handler);
-    return () => window.removeEventListener("header-show", handler);
-  }, [isMapPage]);
+  }, [isMapPage, setFiltro, setFiltroLocalidad, setSearchTerm, setRecorridoActivo]);
 
   const categorias = [
     { id: "todos", label: "Todos", color: "#333" },
@@ -95,9 +100,8 @@ export const HeaderComponent = () => {
   }, [filtroPanelOpen]);
 
   useEffect(() => {
-    const open = !!(filtroPanelOpen || recorridosPanelOpen);
-    window.dispatchEvent(new CustomEvent("header-panel", { detail: { open } }));
-  }, [filtroPanelOpen, recorridosPanelOpen]);
+    setPanelOpen(!!(filtroPanelOpen || recorridosPanelOpen));
+  }, [filtroPanelOpen, recorridosPanelOpen, setPanelOpen]);
 
   // Cargar localidades para el filtro
   useEffect(() => {
@@ -108,13 +112,7 @@ export const HeaderComponent = () => {
       .catch((err) => console.error("Error cargando localidades:", err));
   }, [isMapPage]);
 
-  // Escuchar cuando MapChaco confirma la selección de búsqueda
-  useEffect(() => {
-    if (!isMapPage) return;
-    const handler = (e) => setSearchTerm(e.detail);
-    window.addEventListener("header-search-set", handler);
-    return () => window.removeEventListener("header-search-set", handler);
-  }, [isMapPage]);
+
 
   // Cargar entidades para el autocomplete del buscador
   useEffect(() => {
@@ -135,55 +133,11 @@ export const HeaderComponent = () => {
     }
   }, [recorridosPanelOpen, isMapPage]);
 
-  // Notificar a MapChaco cuando se selecciona un recorrido
-  useEffect(() => {
-    if (!isMapPage) return;
-    window.dispatchEvent(
-      new CustomEvent("header-recorrido", { detail: selectedRecorrido }),
-    );
-  }, [selectedRecorrido, isMapPage]);
 
-  // Sincronizar selectedRecorrido cuando MapChaco lo resetea (ej. Escape)
-  useEffect(() => {
-    if (!isMapPage) return;
-    const handler = (e) => setSelectedRecorrido(e.detail);
-    window.addEventListener("header-recorrido", handler);
-    return () => window.removeEventListener("header-recorrido", handler);
-  }, [isMapPage]);
 
-  // Notify MapChaco when search term changes
-  useEffect(() => {
-    if (!isMapPage) return;
-    window.dispatchEvent(
-      new CustomEvent("header-search", { detail: searchTerm }),
-    );
-  }, [searchTerm, isMapPage]);
 
-  // Notify MapChaco when filter changes
-  useEffect(() => {
-    if (!isMapPage) return;
-    window.dispatchEvent(
-      new CustomEvent("header-filter", { detail: activeFilter }),
-    );
-  }, [activeFilter, isMapPage]);
 
-  // Notify MapChaco when localidad filter changes
-  useEffect(() => {
-    if (!isMapPage) return;
-    window.dispatchEvent(
-      new CustomEvent("header-localidad", { detail: filtroLocalidad }),
-    );
-  }, [filtroLocalidad, isMapPage]);
 
-  // Reset search when leaving map page
-  useEffect(() => {
-    if (!isMapPage) {
-      setSearchTerm("");
-      setActiveFilter("todos");
-      setFiltroLocalidad("");
-      closeFilterPanel();
-    }
-  }, [isMapPage]);
 
   // Closing animation for filter and rutas panels
   useEffect(() => {
@@ -200,34 +154,7 @@ export const HeaderComponent = () => {
     }
   }, [recorridosPanelOpen, rutasPanelClosing]);
 
-  // Listen for external reset (e.g. from FooterComponent filter change)
-  useEffect(() => {
-    if (!isMapPage) return;
-    const handler = (e) => setActiveFilter(e.detail);
-    window.addEventListener("header-filter-reset", handler);
-    return () => window.removeEventListener("header-filter-reset", handler);
-  }, [isMapPage]);
 
-  // Listen for external localidad reset (e.g. from MapChaco restoring state)
-  useEffect(() => {
-    if (!isMapPage) return;
-    const handler = (e) => setFiltroLocalidad(e.detail);
-    window.addEventListener("header-localidad-reset", handler);
-    return () => window.removeEventListener("header-localidad-reset", handler);
-  }, [isMapPage]);
-
-  // Listen for dark mode toggle from map
-  useEffect(() => {
-    if (!isMapPage) return;
-    const handler = (e) => setDarkMode(e.detail);
-    window.addEventListener("darkmode-toggle", handler);
-    return () => window.removeEventListener("darkmode-toggle", handler);
-  }, [isMapPage]);
-
-  const handleFilterClick = useCallback((catId) => {
-    setActiveFilter(catId);
-    closeFilterPanel();
-  }, []);
 
   const closeFilterPanel = useCallback(() => {
     setFilterPanelClosing(true);
@@ -238,6 +165,11 @@ export const HeaderComponent = () => {
     setFilterPanelClosing(false);
     setFiltroPanelOpen(true);
   }, []);
+
+  const handleFilterClick = useCallback((catId) => {
+    setFiltro(catId);
+    closeFilterPanel();
+  }, [setFiltro, closeFilterPanel]);
 
   const closeRutasPanel = useCallback(() => {
     setRutasPanelClosing(true);
@@ -252,7 +184,7 @@ export const HeaderComponent = () => {
   return (
     <>
       <header
-        className={`${isMapPage ? "header--map-view" : ""} ${isMapPage && !showHeader ? "header--hidden" : ""} ${darkMode && isMapPage ? "dark-mode" : ""}`}
+        className={`${isMapPage ? "header--map-view" : ""} ${isMapPage && !headerVisible ? "header--hidden" : ""} ${darkMode && isMapPage ? "dark-mode" : ""}`}
       >
         <div className="header-left">
           {/* LOGO  */}
@@ -333,7 +265,7 @@ export const HeaderComponent = () => {
               const filtrarEntidad = (e) => {
                 if (!e.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
                   return false;
-                if (activeFilter !== "todos" && e.tipo !== activeFilter)
+                if (filtro !== "todos" && e.tipo !== filtro)
                   return false;
                 if (
                   filtroLocalidad &&
@@ -388,11 +320,7 @@ export const HeaderComponent = () => {
                       onMouseDown={() => {
                         setSearchTerm(e.nombre);
                         setSearchDropdownOpen(false);
-                        window.dispatchEvent(
-                          new CustomEvent("header-search-select", {
-                            detail: e.nombre,
-                          }),
-                        );
+                        triggerSearchSelect(e.nombre);
                       }}
                     >
                       {e.nombre}
@@ -569,18 +497,18 @@ export const HeaderComponent = () => {
                 onClick={() => handleFilterClick(cat.id)}
                 onMouseEnter={() => setHoveredFilter(cat.id)}
                 onMouseLeave={() => setHoveredFilter(null)}
-                className={`filter-panel-cat-btn ${activeFilter === cat.id ? "cat-active" : ""}`}
+                className={`filter-panel-cat-btn ${filtro === cat.id ? "cat-active" : ""}`}
                 style={{
                   background:
                     hoveredFilter === cat.id
                       ? cat.color
-                      : activeFilter === cat.id
+                      : filtro === cat.id
                         ? cat.color
                         : darkMode
                           ? "rgba(50, 50, 60, 0.6)"
                           : "rgba(252, 249, 242, 0.9)",
                   color:
-                    hoveredFilter === cat.id || activeFilter === cat.id
+                    hoveredFilter === cat.id || filtro === cat.id
                       ? "white"
                       : darkMode
                         ? "#d0c8b0"
@@ -595,7 +523,7 @@ export const HeaderComponent = () => {
                     height: "20px",
                     objectFit: "contain",
                     filter:
-                      hoveredFilter === cat.id || activeFilter === cat.id
+                      hoveredFilter === cat.id || filtro === cat.id
                         ? "brightness(0) invert(1)"
                         : "none",
                   }}
@@ -605,7 +533,7 @@ export const HeaderComponent = () => {
             ))}
             <button
               onClick={() => {
-                setActiveFilter("todos");
+                setFiltro("todos");
                 setFiltroLocalidad("");
                 setSearchTerm("");
                 closeFilterPanel();
@@ -650,7 +578,7 @@ export const HeaderComponent = () => {
               </div>
             )}
             {recorridosList.map((r) => {
-              const isActive = selectedRecorrido?.id === r.id;
+              const isActive = recorridoActivo?.id === r.id;
               return (
                 <div
                   key={r.id}
@@ -665,7 +593,7 @@ export const HeaderComponent = () => {
                     transition: "background 0.15s",
                   }}
                   onClick={() => {
-                    setSelectedRecorrido(isActive ? null : r);
+                    setRecorridoActivo(isActive ? null : r);
                     closeRutasPanel();
                   }}
                   onMouseEnter={(e) => {
@@ -760,11 +688,11 @@ export const HeaderComponent = () => {
             >
               Ver todos los recorridos →
             </Link>
-            {selectedRecorrido && (
+            {recorridoActivo && (
               <button
                 onClick={() => {
-                  setSelectedRecorrido(null);
-                  window.dispatchEvent(new CustomEvent("header-recorrido-fly"));
+                  setRecorridoActivo(null);
+                  triggerRecorridoFly();
                   closeRutasPanel();
                 }}
                 className="rutas-clear-btn"

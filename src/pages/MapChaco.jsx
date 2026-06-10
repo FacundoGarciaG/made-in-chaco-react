@@ -10,7 +10,7 @@ import { RecorridoPopup } from "../components/map/RecorridoPopup";
 import { LocalidadDetailPanel } from "../components/map/LocalidadDetailPanel";
 import { useMapConexiones } from "../hooks/useMapConexiones";
 import { useMapRecorridos } from "../hooks/useMapRecorridos";
-import { useMapHeaderSync } from "../hooks/useMapHeaderSync";
+import { useMapStore } from "../store/useMapStore";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -20,20 +20,30 @@ export const MapChaco = () => {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const [geoData, setGeoData] = useState(null);
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("made-in-chaco-dark-mode") === "true",
-  );
-  const [filtro, setFiltro] = useState("todos");
-  const [terminoBusqueda, setTerminoBusqueda] = useState("");
+  const darkMode = useMapStore((s) => s.darkMode);
+  const filtro = useMapStore((s) => s.filtro);
+  const setFiltro = useMapStore((s) => s.setFiltro);
+  const terminoBusqueda = useMapStore((s) => s.searchTerm);
+  const setTerminoBusqueda = useMapStore((s) => s.setSearchTerm);
+  const filtroLocalidad = useMapStore((s) => s.filtroLocalidad);
+  const setFiltroLocalidad = useMapStore((s) => s.setFiltroLocalidad);
+  const recorridoActivo = useMapStore((s) => s.recorridoActivo);
+  const setRecorridoActivo = useMapStore((s) => s.setRecorridoActivo);
+  const panelOpen = useMapStore((s) => s.panelOpen);
+  const setHeaderVisible = useMapStore((s) => s.setHeaderVisible);
+  const setGeolocateControl = useMapStore((s) => s.setGeolocateControl);
+  const setMapInstance = useMapStore((s) => s.setMapInstance);
+  const searchSelectToken = useMapStore((s) => s._searchSelectToken);
+  const resetMapToken = useMapStore((s) => s._resetMapToken);
+  const recorridoFlyToken = useMapStore((s) => s._recorridoFlyToken);
+
   const [localidades, setLocalidades] = useState([]);
   const [departamentos, setDepartamentos] = useState(null);
   const [provincia, setProvincia] = useState(null);
   const [showDepartamentos, setShowDepartamentos] = useState(false);
-  const [filtroLocalidad, setFiltroLocalidad] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showStartOverlay, setShowStartOverlay] = useState(true);
-  const [recorridoActivo, setRecorridoActivo] = useState(null);
   const [showEscHint, setShowEscHint] = useState(false);
   const [entityActive, setEntityActive] = useState(false);
   const [recorridoPopup, setRecorridoPopup] = useState(null);
@@ -80,9 +90,11 @@ export const MapChaco = () => {
     });
     map.addControl(geolocateControl, "bottom-left");
     window.__geolocateControl = geolocateControl;
+    setGeolocateControl(geolocateControl);
 
     mapRef.current = map;
     window.__mapInstance = map;
+    setMapInstance(map);
     window.__hideEscHint = () => setShowEscHint(false);
 
     // Si venimos de una entidad, saltar overlay y restaurar filtros
@@ -95,17 +107,7 @@ export const MapChaco = () => {
       setFiltro(parsedState.filtro || "todos");
       setFiltroLocalidad(parsedState.filtroLocalidad || "");
       sessionStorage.removeItem("mapState");
-      window.dispatchEvent(new CustomEvent("header-show"));
-      window.dispatchEvent(
-        new CustomEvent("header-filter-reset", {
-          detail: parsedState.filtro || "todos",
-        }),
-      );
-      window.dispatchEvent(
-        new CustomEvent("header-localidad-reset", {
-          detail: parsedState.filtroLocalidad || "",
-        }),
-      );
+      setHeaderVisible(true);
     } else if (returningToMap) {
       // Volviendo de otra pagina (ej. recorridos): sin intro, directo a la provincia
       sessionStorage.removeItem("return-to-map");
@@ -114,7 +116,7 @@ export const MapChaco = () => {
       setIsLoading(false);
       setShowStartOverlay(false);
       setShowControls(true);
-      window.dispatchEvent(new CustomEvent("header-show"));
+      setHeaderVisible(true);
     } else {
       // Primera visita: mapa en blanco y negro desde el inicio
       const applyGrayscale = () => {
@@ -153,7 +155,9 @@ export const MapChaco = () => {
         popupRef.current = null;
       }
       map.remove();
-      delete window.__mapInstance;
+      window.__mapInstance = null;
+      setMapInstance(null);
+      setGeolocateControl(null);
       delete window.__geolocateControl;
       delete window.__hideEscHint;
       // Limpiar referencia de audio
@@ -165,12 +169,11 @@ export const MapChaco = () => {
     };
   }, []);
 
-  // Sincronizar window.__filtrosActuales cada vez que cambian los filtros
+  // Mantener refs actualizadas para usar en event handlers del mapa
   useEffect(() => {
     filtroRef.current = filtro;
     filtroLocalidadRef.current = filtroLocalidad;
-    window.__filtrosActuales = { filtro, filtroLocalidad, terminoBusqueda };
-  }, [filtro, filtroLocalidad, terminoBusqueda]);
+  }, [filtro, filtroLocalidad]);
 
   useEffect(() => {
     showDepartamentosRef.current = showDepartamentos;
@@ -259,7 +262,7 @@ export const MapChaco = () => {
       setIsLoading(false);
       setTimeout(() => {
         setShowControls(true);
-        window.dispatchEvent(new CustomEvent("header-show"));
+        setHeaderVisible(true);
       }, 100);
     });
   }, []);
@@ -563,9 +566,6 @@ export const MapChaco = () => {
             clickResetFilterRef.current = true;
             setFiltro("todos");
             setFiltroLocalidad("");
-            window.dispatchEvent(
-              new CustomEvent("header-localidad-reset", { detail: "" }),
-            );
           }
           const coordinates = e.features[0].geometry.coordinates.slice();
           const {
@@ -1012,10 +1012,7 @@ export const MapChaco = () => {
     showControls,
   ]); // Se encarga de todo cuando algo cambia
 
-  const [panelOpen, setPanelOpen] = useState(false);
-
-  const handleSearchSelect = useCallback(async (e) => {
-    const nombre = e.detail;
+  const handleSearchSelect = useCallback(async (nombre) => {
     if (!nombre || !geoData || !mapRef.current) return;
     const map = mapRef.current;
     const coincidencia = geoData.features.find(
@@ -1164,10 +1161,8 @@ export const MapChaco = () => {
       ]);
     }
 
-    window.dispatchEvent(
-      new CustomEvent("header-search-set", { detail: nombre }),
-    );
-  }, [geoData, limpiarConexiones, dibujarConexiones]);
+    setTerminoBusqueda(nombre);
+  }, [geoData, limpiarConexiones, dibujarConexiones, setTerminoBusqueda]);
 
   // Dibujar ruta del recorrido en el mapa
   useEffect(() => {
@@ -1391,12 +1386,7 @@ export const MapChaco = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorridoActivo, geoData]);
 
-  // Sincronizar Header cuando Footer cambia filtro
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent("header-filter-reset", { detail: filtro }),
-    );
-  }, [filtro]);
+
 
   // Escape key: resetear mapa a vista completa de Chaco
   useEffect(() => {
@@ -1422,10 +1412,6 @@ export const MapChaco = () => {
         setTerminoBusqueda("");
         setRecorridoActivo(null);
         limpiarRutaRecorrido(map);
-        // Sincronizar header: deseleccionar recorrido
-        window.dispatchEvent(
-          new CustomEvent("header-recorrido", { detail: null }),
-        );
         // Volar a la vista general de Chaco
         map.flyTo({
           center: [-60.44, -26.05],
@@ -1433,13 +1419,6 @@ export const MapChaco = () => {
           speed: 0.8,
           essential: true,
         });
-        // Sincronizar header
-        window.dispatchEvent(
-          new CustomEvent("header-filter-reset", { detail: "todos" }),
-        );
-        window.dispatchEvent(
-          new CustomEvent("header-localidad-reset", { detail: "" }),
-        );
       }
     };
 
@@ -1463,21 +1442,12 @@ export const MapChaco = () => {
     setTerminoBusqueda("");
     setRecorridoActivo(null);
     limpiarRutaRecorrido(map);
-    window.dispatchEvent(
-      new CustomEvent("header-recorrido", { detail: null }),
-    );
     map.flyTo({
       center: [-60.44, -26.05],
       zoom: 7,
       speed: 0.8,
       essential: true,
     });
-    window.dispatchEvent(
-      new CustomEvent("header-filter-reset", { detail: "todos" }),
-    );
-    window.dispatchEvent(
-      new CustomEvent("header-localidad-reset", { detail: "" }),
-    );
   }, []);
 
   const handleRecorridoFly = useCallback(() => {
@@ -1492,16 +1462,21 @@ export const MapChaco = () => {
     }
   }, []);
 
-  useMapHeaderSync({
-    setTerminoBusqueda,
-    setFiltro,
-    setFiltroLocalidad,
-    setRecorridoActivo,
-    setPanelOpen,
-    onSearchSelect: handleSearchSelect,
-    onRecorridoFly: handleRecorridoFly,
-    onResetMap: handleResetMap,
-  });
+  // Watchers para acciones del Header via store
+  useEffect(() => {
+    if (searchSelectToken === 0) return;
+    handleSearchSelect(useMapStore.getState().searchTerm);
+  }, [searchSelectToken, handleSearchSelect]);
+
+  useEffect(() => {
+    if (resetMapToken === 0) return;
+    handleResetMap();
+  }, [resetMapToken, handleResetMap]);
+
+  useEffect(() => {
+    if (recorridoFlyToken === 0) return;
+    handleRecorridoFly();
+  }, [recorridoFlyToken, handleRecorridoFly]);
 
   // 4b. Toggle dark mode on map canvas, persist, and broadcast
   useEffect(() => {
@@ -1516,9 +1491,6 @@ export const MapChaco = () => {
       canvas.style.transition = "filter 0.5s ease";
       canvas.classList.remove("grayscale-canvas");
     } catch (_) {}
-    window.dispatchEvent(
-      new CustomEvent("darkmode-toggle", { detail: darkMode }),
-    );
   }, [darkMode]);
 
   useEffect(() => {
@@ -1755,13 +1727,7 @@ export const MapChaco = () => {
         }}
       >
         <FooterComponent
-          darkMode={darkMode}
-          onToggleDarkMode={() => setDarkMode((prev) => !prev)}
-          onFilterChange={setFiltro}
-          activeFilter={filtro}
           localidades={localidades}
-          filtroLocalidad={filtroLocalidad}
-          onLocalidadChange={setFiltroLocalidad}
           showDepartamentos={showDepartamentos}
           onToggleDepartamentos={(val) => {
             setShowDepartamentos(val);

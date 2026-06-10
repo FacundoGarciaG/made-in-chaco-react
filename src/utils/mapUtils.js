@@ -1,3 +1,5 @@
+import { useMapStore } from "../store/useMapStore";
+
 export const generarCurva = (from, to) => {
   const [lng1, lat1] = from;
   const [lng2, lat2] = to;
@@ -28,10 +30,10 @@ export const generarCurva = (from, to) => {
 };
 
 export const guardarEstadoMapa = function (linkEl) {
-  const map = window.__mapInstance;
+  const state = useMapStore.getState();
+  const map = state._mapInstance;
   if (map) {
     const center = map.getCenter();
-    const filtros = window.__filtrosActuales || {};
     sessionStorage.setItem(
       "mapState",
       JSON.stringify({
@@ -39,8 +41,8 @@ export const guardarEstadoMapa = function (linkEl) {
         zoom: map.getZoom(),
         bearing: map.getBearing(),
         pitch: map.getPitch(),
-        filtro: filtros.filtro || "todos",
-        filtroLocalidad: filtros.filtroLocalidad || "",
+        filtro: state.filtro || "todos",
+        filtroLocalidad: state.filtroLocalidad || "",
       }),
     );
   }

@@ -14,6 +14,8 @@ import localidadRoutes from "./routes/localidades.js";
 import departamentoRoutes from "./routes/departamentos.js";
 import uploadRoutes from "./routes/upload.js";
 import contactoRoutes from "./routes/contacto.js";
+import analyticsRoutes from "./routes/analytics.js";
+import palabrasRoutes from "./routes/palabras.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,6 +33,8 @@ app.use("/api", localidadRoutes);
 app.use("/api", departamentoRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", contactoRoutes);
+app.use("/api", analyticsRoutes);
+app.use("/api", palabrasRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

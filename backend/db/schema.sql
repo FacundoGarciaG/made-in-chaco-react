@@ -219,3 +219,10 @@ CREATE TABLE IF NOT EXISTS contacto_mensajes (
   mensaje TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS palabras_chaco (
+  id SERIAL PRIMARY KEY,
+  palabra VARCHAR(255) NOT NULL,
+  significado TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);

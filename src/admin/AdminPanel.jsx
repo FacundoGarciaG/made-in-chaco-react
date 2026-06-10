@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/AdminPanel.css";
@@ -1884,12 +1884,14 @@ export const AdminPanel = () => {
           </div>
           <div style={styles.sidebarNav}>
             {[
+              { id: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
               { id: "entidades", label: "Entidades", icon: "/icons/book.png" },
               { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png" },
               { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
               { id: "nuevo-recorrido", label: "Recorridos", icon: "/icons/route.png" },
               { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
               { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
+              { id: "palabras", label: "Palabras", icon: "/icons/edit.png" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -3537,6 +3539,14 @@ export const AdminPanel = () => {
               </div>
             )}
 
+            {/* PALABRAS */}
+            {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
+
+            {/* DASHBOARD */}
+            {view === "dashboard" && (
+              <DashboardView authFetch={authFetch} />
+            )}
+
             {/* LOCALIDADES */}
             {view === "localidades" && (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -3678,6 +3688,379 @@ export const AdminPanel = () => {
     </div>
   );
 };
+
+/* ─── Dashboard View ─── */
+function DashboardView({ authFetch }) {
+  const [resumen, setResumen] = useState(null);
+  const [diario, setDiario] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [hoverIdx, setHoverIdx] = useState(null);
+
+  const cargarDatos = useCallback(async () => {
+    setCargando(true);
+    try {
+      const [r, d] = await Promise.all([
+        authFetch("/api/analytics/resumen", { headers: authHeaders() }),
+        authFetch("/api/analytics/diario?dias=30", { headers: authHeaders() }),
+      ]);
+      if (r.ok) setResumen(await r.json());
+      if (d.ok) setDiario(await d.json());
+    } catch { /* ignore */ }
+    setCargando(false);
+  }, [authFetch]);
+
+  useEffect(() => {
+    cargarDatos();
+    const timeout = setTimeout(() => {
+      setResumen((prev) => prev ?? { totales: 0, hoy: 0, semana: 0, mes: 0, porTipo: [], top10: [] });
+      setDiario((prev) => prev ?? []);
+    }, 8000);
+    return () => clearTimeout(timeout);
+  }, [cargarDatos]);
+
+  if (!resumen) {
+    return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando dashboard…</div>;
+  }
+
+  const maxVisitas = Math.max(...(resumen.top10?.map((e) => e.visitas) || [1]));
+  const maxDiario = Math.max(...(diario?.map((d) => d.total) || [1]));
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+          <img src="/icons/todos.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
+          Dashboard
+        </h2>
+        <button onClick={cargarDatos} disabled={cargando} className="admin-btn" style={{
+          background: "#d4a017", color: "white", border: "none", padding: "8px 16px",
+          borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: "6px", opacity: cargando ? 0.5 : 1,
+        }}>
+          <img src="/icons/refresh.png" style={{ width: 14, height: 14 }} alt="" />
+          {cargando ? "ACTUALIZANDO…" : "ACTUALIZAR"}
+        </button>
+      </div>
+
+      {/* Stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
+        {[
+          { label: "Visitas totales", value: resumen.totales },
+          { label: "Hoy", value: resumen.hoy },
+          { label: "Última semana", value: resumen.semana },
+          { label: "Último mes", value: resumen.mes },
+        ].map((s) => (
+          <div key={s.label} style={{
+            background: "white", borderRadius: 12, border: "1px solid #eee",
+            padding: "20px 24px",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#863819", marginBottom: 8, letterSpacing: "0.5px" }}>
+              {s.label}
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#1c1c18" }}>
+              {s.value.toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
+        {/* Top 10 entidades */}
+        <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
+            Top 10 entidades más visitadas
+          </h3>
+          {resumen.top10?.length === 0 ? (
+            <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {resumen.top10?.map((e) => (
+                <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6, fontSize: 10, fontWeight: 700,
+                    color: "white", display: "flex", alignItems: "center", justifyContent: "center",
+                    background: colorMapAdmin[e.tipo] || "#888",
+                  }}>
+                    {e.visitas}
+                  </div>
+                  <div style={{ flex: 1, fontSize: 13, color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.nombre}
+                  </div>
+                  <div style={{ width: "60%", background: "#f0ede8", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 6,
+                      background: colorMapAdmin[e.tipo] || "#888",
+                      width: `${(e.visitas / maxVisitas) * 100}%`,
+                      transition: "width 0.5s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Eventos por tipo */}
+        <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
+            Eventos por tipo
+          </h3>
+          {resumen.porTipo?.length === 0 ? (
+            <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {resumen.porTipo?.map((t, i) => {
+                const colors = ["#863819", "#d4a017", "#4caf50", "#2196f3", "#9c27b0", "#e91e63", "#ff5722", "#795548"];
+                const max = Math.max(...resumen.porTipo.map((x) => x.cantidad));
+                return (
+                  <div key={t.tipo} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: "50%", background: colors[i % colors.length], flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 13, color: "#333" }}>{t.tipo.replace(/_/g, " ")}</div>
+                    <div style={{ width: "50%", background: "#f0ede8", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: 6,
+                        background: colors[i % colors.length],
+                        width: `${(t.cantidad / max) * 100}%`,
+                        transition: "width 0.5s ease",
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#555", minWidth: 32, textAlign: "right" }}>
+                      {t.cantidad}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Daily chart */}
+      <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20, marginBottom: 32 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
+          Visitas diarias (últimos 30 días)
+        </h3>
+        {!diario || diario.length === 0 ? (
+          <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 140, paddingTop: 8 }}>
+            {diario.map((d, i) => (
+              <div
+                key={d.fecha}
+                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}
+                onMouseEnter={() => setHoverIdx(i)}
+                onMouseLeave={() => setHoverIdx(null)}
+              >
+                {hoverIdx === i && d.total > 0 && (
+                  <div style={{
+                    position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
+                    background: "#1c1c18", color: "white", fontSize: 11, fontWeight: 700,
+                    padding: "2px 8px", borderRadius: 6, whiteSpace: "nowrap", zIndex: 10,
+                    pointerEvents: "none", marginBottom: 4,
+                  }}>
+                    {d.total} visita{d.total !== 1 ? "s" : ""}
+                  </div>
+                )}
+                <div style={{
+                  width: "100%", borderRadius: "4px 4px 0 0",
+                  background: "#863819",
+                  height: `${(d.total / maxDiario) * 100}%`,
+                  minHeight: d.total > 0 ? 4 : 0,
+                  transition: "height 0.3s ease",
+                  opacity: hoverIdx === i ? 1 : 0.8,
+                }} />
+                <div style={{ fontSize: 9, color: "#888", transform: "rotate(-45deg)", whiteSpace: "nowrap", marginTop: 4 }}>
+                  {new Date(d.fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit" })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Palabras View ─── */
+function PalabrasView({ authFetch, showConfirm, showPopup }) {
+  const [palabras, setPalabras] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [nuevaPalabra, setNuevaPalabra] = useState("");
+  const [nuevoSignificado, setNuevoSignificado] = useState("");
+  const [editandoId, setEditandoId] = useState(null);
+  const [editandoPalabra, setEditandoPalabra] = useState("");
+  const [editandoSignificado, setEditandoSignificado] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const cargarPalabras = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/palabras");
+      if (res.ok) setPalabras(await res.json());
+    } catch {} finally {
+      setLoading(false);
+    }
+  }, [authFetch]);
+
+  useEffect(() => { cargarPalabras(); }, [cargarPalabras]);
+
+  const agregarPalabra = async () => {
+    if (!nuevaPalabra.trim()) return;
+    setAdding(true);
+    try {
+      const res = await authFetch("/api/palabras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palabra: nuevaPalabra.trim(),
+          significado: nuevoSignificado.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setNuevaPalabra("");
+        setNuevoSignificado("");
+        cargarPalabras();
+      }
+    } catch {} finally {
+      setAdding(false);
+    }
+  };
+
+  const actualizarPalabra = async (id) => {
+    if (!editandoPalabra.trim()) return;
+    try {
+      const res = await authFetch(`/api/palabras/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palabra: editandoPalabra.trim(),
+          significado: editandoSignificado.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setEditandoId(null);
+        setEditandoPalabra("");
+        setEditandoSignificado("");
+        cargarPalabras();
+      }
+    } catch {}
+  };
+
+  const eliminarPalabra = async (id, palabra) => {
+    const ok = await showConfirm(`¿Eliminar "${palabra}"?`, "ELIMINAR");
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/palabras/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) cargarPalabras();
+    } catch {}
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+          <img src="/icons/edit.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
+          Palabras regionales
+        </h2>
+        <button onClick={cargarPalabras} disabled={loading} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", opacity: loading ? 0.5 : 1 }}>
+          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+          {loading ? "CARGANDO…" : "ACTUALIZAR"}
+        </button>
+      </div>
+
+      <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input
+            style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+            placeholder="Palabra o frase chaqueña..."
+            value={nuevaPalabra}
+            onChange={(e) => setNuevaPalabra(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && agregarPalabra()}
+          />
+          <button
+            onClick={agregarPalabra}
+            disabled={adding || !nuevaPalabra.trim()}
+            className="admin-btn"
+            style={{
+              background: "#2e7d32", color: "white", border: "none",
+              padding: "10px 20px", borderRadius: 12, fontWeight: 700,
+              fontSize: 14, cursor: "pointer", whiteSpace: "nowrap",
+              opacity: adding || !nuevaPalabra.trim() ? 0.5 : 1,
+            }}
+          >
+            {adding ? "AGREGANDO…" : "+ AGREGAR"}
+          </button>
+        </div>
+        <textarea
+          style={{ ...styles.input, marginBottom: 0, width: "100%", boxSizing: "border-box", minHeight: 60, resize: "vertical" }}
+          placeholder="Significado (opcional)"
+          value={nuevoSignificado}
+          onChange={(e) => setNuevoSignificado(e.target.value)}
+        />
+      </div>
+
+      {palabras.length === 0 && !loading && (
+        <div style={{ color: "#888", fontSize: 14, padding: 40, textAlign: "center" }}>
+          No hay palabras todavía. Agregá la primera arriba.
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {palabras.map((p) => (
+          <div key={p.id} style={styles.entityCard}>
+            {editandoId === p.id ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #863819", borderRadius: 8, fontSize: 14, color: "#1c1c18", outline: "none" }}
+                    value={editandoPalabra}
+                    onChange={(e) => setEditandoPalabra(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) actualizarPalabra(p.id);
+                      if (e.key === "Escape") { setEditandoId(null); setEditandoPalabra(""); setEditandoSignificado(""); }
+                    }}
+                    autoFocus
+                  />
+                  <button onClick={() => actualizarPalabra(p.id)} className="admin-btn" style={{ background: "#2e7d32", color: "white", border: "none", padding: "8px 14px", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                    GUARDAR
+                  </button>
+                  <button onClick={() => { setEditandoId(null); setEditandoPalabra(""); setEditandoSignificado(""); }} className="admin-btn-ghost" style={{ padding: "8px 14px", background: "white", border: "1px solid #ccc", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", color: "#555" }}>
+                    CANCELAR
+                  </button>
+                </div>
+                <textarea
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, color: "#1c1c18", outline: "none", minHeight: 50, resize: "vertical" }}
+                  placeholder="Significado (opcional)"
+                  value={editandoSignificado}
+                  onChange={(e) => setEditandoSignificado(e.target.value)}
+                />
+              </div>
+            ) : (
+              <>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: "#1c1c18" }}>{p.palabra}</div>
+                  {p.significado && (
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 4, lineHeight: 1.4 }}>{p.significado}</div>
+                  )}
+                </div>
+                <button onClick={() => { setEditandoId(p.id); setEditandoPalabra(p.palabra); setEditandoSignificado(p.significado || ""); }} className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
+                  <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: 4 }} alt="" />
+                  EDITAR
+                </button>
+                <button onClick={() => eliminarPalabra(p.id, p.palabra)} className="admin-btn-danger" style={styles.smallBtn("#c0392b")}>
+                  <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: 4 }} alt="" />
+                  ELIMINAR
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const styles = {
   mainLayout: {

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, useScroll, useTransform, useSpring } from "motion/react";
 import { MiniMap } from "../components/MiniMap";
+import { track } from "../utils/tracking";
 import "../styles/EntidadDetallePage.css";
 
 const colorMap = {
@@ -208,15 +209,21 @@ export const EntidadDetallePage = () => {
     setHeroReady(false);
   }, [slug]);
 
+  const trackedRef = useRef(null);
+
   useEffect(() => {
     const obtenerDetalle = async () => {
       try {
-        const response = await fetch(
+        const response =         await fetch(
           `/api/entidad/${slug}`,
         );
         if (!response.ok) throw new Error("No se encontró la información");
         const data = await response.json();
         setEntidad(data);
+        if (trackedRef.current !== slug) {
+          trackedRef.current = slug;
+          track("visita_entidad", data.id, data.slug);
+        }
 
         if (data?.id) {
           const resConex = await fetch(

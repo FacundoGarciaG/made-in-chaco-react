@@ -16,6 +16,7 @@ import { RecorridosPage } from "./pages/RecorridosPage";
 import { RecorridoDetallePage } from "./pages/RecorridoDetallePage";
 import { SolicitarSelloPage } from "./pages/SolicitarSelloPage";
 import { QuienesSomosPage } from "./pages/QuienesSomosPage";
+import { PalabraDetallePage } from "./pages/PalabraDetallePage";
 
 function MadeInChacoApp() {
   const location = useLocation();
@@ -58,6 +59,7 @@ function MadeInChacoApp() {
         <Route path="/recorrido/:slug" element={<RecorridoDetallePage />} />
         <Route path="/solicitar-sello" element={<SolicitarSelloPage />} />
         <Route path="/quienes-somos" element={<QuienesSomosPage />} />
+        <Route path="/palabra/:id" element={<PalabraDetallePage />} />
         <Route path="/*" element={<Navigate to="/" />}></Route>
       </Routes>
     </>

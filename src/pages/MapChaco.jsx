@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
+import { track } from "../utils/tracking";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/MapPage.css";
@@ -7,6 +8,7 @@ import { guardarEstadoMapa } from "../utils/mapUtils";
 import { WelcomeOverlay } from "../components/map/WelcomeOverlay";
 import { EscHint } from "../components/map/EscHint";
 import { RecorridoPopup } from "../components/map/RecorridoPopup";
+import { SpeechBubble } from "../components/map/SpeechBubble";
 import { LocalidadDetailPanel } from "../components/map/LocalidadDetailPanel";
 import { useMapConexiones } from "../hooks/useMapConexiones";
 import { useMapRecorridos } from "../hooks/useMapRecorridos";
@@ -580,6 +582,7 @@ export const MapChaco = () => {
             dias_abierto,
             fecha_evento,
           } = e.features[0].properties;
+          track("click_mapa", id, slug);
           const colorMap = {
             artesano: "#ff5722",
             gastronomia: "#4caf50",
@@ -1021,6 +1024,9 @@ export const MapChaco = () => {
     if (!coincidencia) return;
     const coords = coincidencia.geometry.coordinates;
     const coincId = coincidencia.properties.id;
+    const coincSlug = coincidencia.properties.slug;
+
+    track("busqueda", coincId, coincSlug);
 
     if (popupRef.current) popupRef.current.remove();
 
@@ -1678,6 +1684,100 @@ export const MapChaco = () => {
           filter: grayscale(1);
         }
 
+        @keyframes wobble {
+          0% { opacity: 0; transform: scale(0.4) rotate(var(--bubble-rotate, 0deg)); }
+          12% { opacity: 1; transform: scale(1.08) rotate(var(--bubble-rotate, 0deg)); }
+          20% { transform: scale(1) rotate(var(--bubble-rotate, 0deg)); }
+          25% { transform: rotate(var(--bubble-rotate, 0deg)) translateX(-1.5px); }
+          75% { transform: rotate(var(--bubble-rotate, 0deg)) translateX(1.5px); }
+          85% { opacity: 1; transform: rotate(var(--bubble-rotate, 0deg)) translateX(0); }
+          100% { opacity: 0; transform: scale(0.4) rotate(var(--bubble-rotate, 0deg)); }
+        }
+
+        @keyframes tipFade {
+          0% { opacity: 0; }
+          12% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        .speech-bubble-popup .mapboxgl-popup-content {
+          background: white !important;
+          border: 3px solid #2D1A12 !important;
+          border-radius: 30px 18px 30px 18px / 20px 30px 18px 30px !important;
+          padding: 0 !important;
+          box-shadow:
+            4px 4px 0px #2D1A12,
+            0 6px 20px rgba(0,0,0,0.12) !important;
+          animation: wobble 3s ease-in-out forwards;
+        }
+
+        .speech-bubble-popup .mapboxgl-popup-tip {
+          border-top-color: #2D1A12 !important;
+          border-width: 12px 10px 0 10px !important;
+          animation: tipFade 3s ease-in-out forwards;
+        }
+
+        .speech-bubble-popup .mapboxgl-popup-content::before {
+          content: '';
+          position: absolute;
+          top: 4px;
+          left: 6px;
+          right: 6px;
+          height: 6px;
+          background: rgba(255,255,255,0.35);
+          border-radius: 50%;
+        }
+
+        .speech-bubble-popup-content {
+          display: block;
+          padding: 14px 28px;
+          font-family: 'Patrick Hand', 'Caveat', 'Comic Sans MS', cursive, sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #2D1A12;
+          text-align: center;
+          white-space: nowrap;
+          background: linear-gradient(145deg, #fffdf5 0%, #fff5e6 100%);
+          border-radius: 28px 16px 28px 16px / 18px 28px 16px 28px;
+          position: relative;
+          text-shadow: 1px 1px 0 rgba(0,0,0,0.05);
+          letter-spacing: 0.02em;
+          text-decoration: none;
+          cursor: pointer;
+          transition: transform 0.1s;
+        }
+
+        .speech-bubble-popup-content:hover {
+          transform: scale(1.04);
+        }
+
+        .speech-bubble-popup-content:active {
+          transform: scale(0.96);
+        }
+
+        .dark-mode .speech-bubble-popup .mapboxgl-popup-content {
+          background: linear-gradient(145deg, #2a2a35 0%, #1e1e28 100%) !important;
+          border-color: #c0a880 !important;
+          box-shadow:
+            4px 4px 0px #c0a880,
+            0 6px 20px rgba(0,0,0,0.3) !important;
+        }
+
+        .dark-mode .speech-bubble-popup .mapboxgl-popup-tip {
+          border-top-color: #c0a880 !important;
+        }
+
+        .dark-mode .speech-bubble-popup-content {
+          background: transparent;
+          color: #f0e8d0;
+          text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+
+        .dark-mode .speech-bubble-popup .mapboxgl-popup-content::before {
+          background: rgba(255,255,255,0.08);
+        }
+
         .mapboxgl-popup-content,
         .recorrido-popup-overlay,
         .localidad-detail-panel,
@@ -1744,6 +1844,8 @@ export const MapChaco = () => {
       </div>
 
       <div ref={mapContainer} className="map-container" style={{ width: "100%", height: "100vh" }} />
+
+      {showControls && provincia && <SpeechBubble mapRef={mapRef} provincia={provincia} />}
     </div>
   );
 };

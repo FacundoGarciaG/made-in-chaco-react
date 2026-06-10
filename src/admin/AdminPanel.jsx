@@ -3910,7 +3910,7 @@ function PalabrasView({ authFetch, showConfirm, showPopup }) {
     try {
       const res = await authFetch("/api/palabras", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           palabra: nuevaPalabra.trim(),
           significado: nuevoSignificado.trim() || undefined,
@@ -3931,7 +3931,7 @@ function PalabrasView({ authFetch, showConfirm, showPopup }) {
     try {
       const res = await authFetch(`/api/palabras/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           palabra: editandoPalabra.trim(),
           significado: editandoSignificado.trim() || undefined,
@@ -3952,6 +3952,7 @@ function PalabrasView({ authFetch, showConfirm, showPopup }) {
     try {
       const res = await authFetch(`/api/palabras/${id}`, {
         method: "DELETE",
+        headers: authHeaders(),
       });
       if (res.ok) cargarPalabras();
     } catch {}

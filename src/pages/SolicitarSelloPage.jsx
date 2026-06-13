@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthPublico } from "../context/AuthPublicoContext";
 import TagSelector from "../components/TagSelector";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -170,11 +171,18 @@ const sectionDividerStyle = {
 
 export const SolicitarSelloPage = () => {
   const navigate = useNavigate();
+  const { perfil, getToken, isAuthenticated } = useAuthPublico();
   const [tipo, setTipo] = useState("");
   const [nombre, setNombre] = useState("");
   const [resumen, setResumen] = useState("");
   const [email, setEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
+
+  useEffect(() => {
+    if (perfil) {
+      if (!email) { setEmail(perfil.email || ""); setConfirmEmail(perfil.email || ""); }
+    }
+  }, [perfil]);
   const [localidadId, setLocalidadId] = useState("");
   const [direccion, setDireccion] = useState("");
   const [localidades, setLocalidades] = useState([]);
@@ -371,9 +379,13 @@ export const SolicitarSelloPage = () => {
       }
       delete payload.categoria_hospedaje_custom;
 
+      const headers = { "Content-Type": "application/json" };
+      const token = getToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch("/api/solicitar-sello", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
       });
       const data = await res.json();

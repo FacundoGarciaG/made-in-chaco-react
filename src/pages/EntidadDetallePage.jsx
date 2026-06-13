@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, useScroll, useTransform, useSpring } from "motion/react";
 import { MiniMap } from "../components/MiniMap";
+import { FavoritoButton } from "../components/FavoritoButton";
 import { track } from "../utils/tracking";
 import "../styles/EntidadDetallePage.css";
 
@@ -561,13 +562,24 @@ export const EntidadDetallePage = () => {
           <i className="ri-share-line" />
         </motion.button>
 
+        {entidad && (
+          <motion.div
+            className="entidad-fav-btn"
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.625, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <FavoritoButton entidadId={entidad.id} />
+          </motion.div>
+        )}
+
         {/* Dark mode toggle */}
         <motion.button
           className="entidad-theme-btn"
           onClick={() => setDarkMode((prev) => { const next = !prev; localStorage.setItem('made-in-chaco-dark-mode', next); return next; })}
           initial={{ opacity: 0, scale: 0 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.4, delay: 0.675, ease: [0.16, 1, 0.3, 1] }}
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
         >

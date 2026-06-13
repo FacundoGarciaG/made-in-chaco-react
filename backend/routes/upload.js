@@ -101,7 +101,7 @@ router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) =
       stream.end(req.file.buffer);
     });
 
-    res.status(201).json({ url: result.secure_url });
+    res.status(201).json({ url: result.secure_url, public_id: result.public_id });
   } catch (err) {
     console.error("Public upload error:", err);
     res.status(500).json({ error: "Error al subir archivo" });

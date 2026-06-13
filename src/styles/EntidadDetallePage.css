@@ -191,7 +191,7 @@
 /* === SHARE BUTTON === */
 .entidad-share-btn {
   position: fixed;
-  bottom: 76px;
+  bottom: 128px;
   right: 24px;
   z-index: 6;
   width: 44px;
@@ -221,7 +221,7 @@
 /* === THEME TOGGLE === */
 .entidad-theme-btn {
   position: fixed;
-  bottom: 128px;
+  bottom: 76px;
   right: 24px;
   z-index: 6;
   width: 44px;
@@ -246,6 +246,14 @@
   border-color: var(--primary);
   box-shadow: 0 8px 30px rgba(134, 56, 25, 0.35);
   transform: translateY(-2px);
+}
+
+/* === FAVORITE BUTTON (wrapper) === */
+.entidad-fav-btn {
+  position: fixed;
+  bottom: 180px;
+  right: 24px;
+  z-index: 6;
 }
 
 /* === TOAST === */

@@ -124,6 +124,14 @@
   transform: translateY(-2px);
 }
 
+/* === FAVORITE BUTTON (wrapper) === */
+.rd-fav-btn {
+  position: fixed;
+  bottom: 180px;
+  right: 24px;
+  z-index: 6;
+}
+
 .rd-hero {
   position: relative;
   height: 60vh;

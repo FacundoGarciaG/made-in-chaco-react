@@ -16,6 +16,8 @@ import uploadRoutes from "./routes/upload.js";
 import contactoRoutes from "./routes/contacto.js";
 import analyticsRoutes from "./routes/analytics.js";
 import palabrasRoutes from "./routes/palabras.js";
+import authPublicoRoutes from "./routes/auth_publico.js";
+import notificacionesRoutes from "./routes/notificaciones.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +37,8 @@ app.use("/api", uploadRoutes);
 app.use("/api", contactoRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", palabrasRoutes);
+app.use("/api", authPublicoRoutes);
+app.use("/api", notificacionesRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

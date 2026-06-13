@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, useScroll, useSpring } from "motion/react";
+import { FavoritoButton } from "../components/FavoritoButton";
 import "../styles/RecorridoDetallePage.css";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
@@ -195,6 +196,17 @@ export const RecorridoDetallePage = () => {
       >
         <i className="ri-share-line" />
       </motion.button>
+
+      {recorrido && (
+        <motion.div
+          className="rd-fav-btn"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.475, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <FavoritoButton recorridoId={recorrido.id} />
+        </motion.div>
+      )}
 
       <motion.button
         className="rd-theme-btn"

@@ -1,0 +1,1965 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuthPublico } from "../context/AuthPublicoContext";
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+
+const sSection = {
+  padding: "100px 40px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+};
+
+const sContainer = {
+  maxWidth: 720,
+  width: "100%",
+};
+
+const sLabel = {
+  fontSize: 13,
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#863819",
+  marginBottom: 8,
+};
+
+const sField = {
+  position: "relative",
+  marginBottom: 48,
+  paddingTop: 28,
+};
+
+const sInput = {
+  width: "100%",
+  padding: "6px 0",
+  fontSize: 24,
+  fontWeight: 400,
+  letterSpacing: "-0.02em",
+  border: "none",
+  borderBottom: "1px solid #e8e8e8",
+  background: "transparent",
+  color: "#1a1a1a",
+  fontFamily: "inherit",
+  outline: "none",
+  borderRadius: 0,
+  transition: "border-color 0.25s ease",
+  boxSizing: "border-box",
+};
+
+const sTextarea = {
+  ...sInput,
+  resize: "vertical",
+  minHeight: 60,
+};
+
+const sDateInput = {
+  ...sInput,
+  fontSize: 20,
+  letterSpacing: "0.02em",
+  color: "#1a1a1a",
+  textTransform: "uppercase",
+};
+
+const sFloatingLabel = (focused, filled) => ({
+  position: "absolute",
+  left: 0,
+  top: focused || filled ? 0 : 34,
+  fontSize: focused || filled ? 13 : 24,
+  fontWeight: focused || filled ? 500 : 400,
+  letterSpacing: focused || filled ? "0.06em" : "-0.02em",
+  textTransform: focused || filled ? "uppercase" : "none",
+  color: focused ? "#863819" : "#aaa",
+  pointerEvents: "none",
+  transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+});
+
+const sDivider = {
+  width: 40,
+  height: 3,
+  background: "#863819",
+  borderRadius: 2,
+  marginBottom: 48,
+};
+
+const FloatingInput = ({ label, value, onChange, type = "text", autoFocus = false, inputStyle }) => {
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef(null);
+
+  return (
+    <div style={sField}>
+      <input
+        ref={inputRef}
+        type={type}
+        style={{ ...sInput, ...inputStyle }}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoFocus={autoFocus}
+      />
+      <label style={sFloatingLabel(focused, !!value)}>{label}</label>
+    </div>
+  );
+};
+
+const FloatingTextarea = ({ label, value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  const ref = useRef(null);
+
+  return (
+    <div style={sField}>
+      <textarea
+        ref={ref}
+        style={sTextarea}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      <label style={sFloatingLabel(focused, !!value)}>{label}</label>
+    </div>
+  );
+};
+
+const FloatingDate = ({ label, value, onChange }) => {
+  return (
+    <div style={sField}>
+      <input
+        type="date"
+        style={sDateInput}
+        value={value || ""}
+        onChange={onChange}
+      />
+      <label style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        fontSize: 13,
+        fontWeight: 500,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "#aaa",
+        pointerEvents: "none",
+      }}>{label}</label>
+    </div>
+  );
+};
+
+const LocationAutocomplete = ({ label, value, onChange, onLocationSelect }) => {
+  const [focused, setFocused] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 3 || !open) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=place,locality&access_token=${MAPBOX_TOKEN}&language=es`,
+        );
+        const data = await res.json();
+        setResults(data.features || []);
+      } catch {
+        setResults([]);
+      }
+    }, 350);
+  }, [query, open]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleSelect = useCallback((feature) => {
+    const placeName = feature.place_name;
+    setQuery(placeName);
+    onChange(placeName);
+    setOpen(false);
+
+    const context = feature.context || [];
+    let country = "";
+    let region = "";
+    for (const ctx of context) {
+      if (ctx.id.startsWith("country")) country = ctx.short_code?.toUpperCase() || ctx.text;
+      if (ctx.id.startsWith("region")) region = ctx.text;
+    }
+    if (onLocationSelect) onLocationSelect({ country, region });
+  }, [onChange, onLocationSelect]);
+
+  return (
+    <div style={{ ...sField, position: "relative" }} ref={wrapperRef}>
+      <input
+        type="text"
+        style={sInput}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+      />
+      <label style={sFloatingLabel(focused || !!query, !!query)}>{label}</label>
+
+      {open && results.length > 0 && (
+        <div style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          background: "#fff",
+          border: "1px solid #eee",
+          borderRadius: 8,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          zIndex: 100,
+          maxHeight: 200,
+          overflowY: "auto",
+          marginTop: 4,
+        }}>
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => handleSelect(r)}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "10px 14px",
+                textAlign: "left",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: 14,
+                color: "#1a1a1a",
+                fontFamily: "inherit",
+                borderBottom: "1px solid #f5f5f5",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f5f0"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              {r.place_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CountryAutocomplete = ({ label, value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 2 || !open) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=country&access_token=${MAPBOX_TOKEN}&language=es`,
+        );
+        const data = await res.json();
+        setResults(data.features || []);
+      } catch { setResults([]); }
+    }, 350);
+  }, [query, open]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleSelect = useCallback((feature) => {
+    setQuery(feature.text);
+    onChange(feature.text);
+    setOpen(false);
+  }, [onChange]);
+
+  return (
+    <div style={{ ...sField, position: "relative" }} ref={wrapperRef}>
+      <input
+        type="text"
+        style={sInput}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { setFocused(true); setOpen(true); }}
+        onBlur={() => setFocused(false)}
+        autoComplete="off"
+      />
+      <label style={sFloatingLabel(focused || !!query, !!query)}>{label}</label>
+      {open && results.length > 0 && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0,
+          background: "#fff", border: "1px solid #eee", borderRadius: 8,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 100,
+          maxHeight: 200, overflowY: "auto", marginTop: 4,
+        }}>
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => handleSelect(r)}
+              style={{
+                display: "block", width: "100%", padding: "10px 14px",
+                textAlign: "left", border: "none", background: "transparent",
+                cursor: "pointer", fontSize: 14, color: "#1a1a1a",
+                fontFamily: "inherit", borderBottom: "1px solid #f5f5f5",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f5f0"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              {r.place_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RegionAutocomplete = ({ label, value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 2 || !open) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=region&access_token=${MAPBOX_TOKEN}&language=es`,
+        );
+        const data = await res.json();
+        setResults(data.features || []);
+      } catch { setResults([]); }
+    }, 350);
+  }, [query, open]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleSelect = useCallback((feature) => {
+    setQuery(feature.text);
+    onChange(feature.text);
+    setOpen(false);
+  }, [onChange]);
+
+  return (
+    <div style={{ ...sField, position: "relative" }} ref={wrapperRef}>
+      <input
+        type="text"
+        style={sInput}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { setFocused(true); setOpen(true); }}
+        onBlur={() => setFocused(false)}
+        autoComplete="off"
+      />
+      <label style={sFloatingLabel(focused || !!query, !!query)}>{label}</label>
+      {open && results.length > 0 && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0,
+          background: "#fff", border: "1px solid #eee", borderRadius: 8,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 100,
+          maxHeight: 200, overflowY: "auto", marginTop: 4,
+        }}>
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => handleSelect(r)}
+              style={{
+                display: "block", width: "100%", padding: "10px 14px",
+                textAlign: "left", border: "none", background: "transparent",
+                cursor: "pointer", fontSize: 14, color: "#1a1a1a",
+                fontFamily: "inherit", borderBottom: "1px solid #f5f5f5",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f5f0"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              {r.place_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SEXOS = [
+  "Masculino", "Femenino", "No binario",
+  "Prefiero no decirlo", "Otro",
+];
+
+const SexoCombobox = ({ value, onChange, label = "Sexo" }) => {
+  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [filtered, setFiltered] = useState(SEXOS);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    setFiltered(SEXOS.filter((s) => s.toLowerCase().includes(value.toLowerCase())));
+  }, [value]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div style={{ ...sField, position: "relative" }} ref={wrapperRef}>
+      <input
+        type="text"
+        style={sInput}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => { setFocused(true); setOpen(true); }}
+        onBlur={() => setFocused(false)}
+        autoComplete="off"
+      />
+      <label style={sFloatingLabel(focused || !!value, !!value)}>{label}</label>
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0,
+          background: "#fff", border: "1px solid #eee", borderRadius: 8,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 100,
+          maxHeight: 200, overflowY: "auto", marginTop: 4,
+        }}>
+          {filtered.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => { onChange(s); setOpen(false); }}
+              style={{
+                display: "block", width: "100%", padding: "10px 14px",
+                textAlign: "left", border: "none", background: "transparent",
+                cursor: "pointer", fontSize: 14, color: "#1a1a1a",
+                fontFamily: "inherit", borderBottom: "1px solid #f5f5f5",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f5f0"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AvatarWithOverlay = ({ avatarUrl, nombre, uploadingAvatar, onChangeClick, onRemoveClick }) => {
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div
+      style={{ position: "relative", flexShrink: 0, width: 120, height: 120, cursor: "pointer" }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt="Avatar"
+          style={{
+            width: 120, height: 120, borderRadius: "50%", objectFit: "cover",
+            border: "2px solid #e8e8e8", display: "block",
+          }}
+        />
+      ) : (
+        <div style={{
+          width: 120, height: 120, borderRadius: "50%",
+          background: "#e8e0d4", display: "flex", alignItems: "center",
+          justifyContent: "center", fontSize: 40, fontWeight: 600,
+          color: "#a09080", fontFamily: "Cinzel, serif",
+          border: "2px solid #e8e8e8",
+        }}>
+          {(nombre || "?").charAt(0).toUpperCase()}
+        </div>
+      )}
+
+      <div style={{
+        position: "absolute", inset: 0, borderRadius: "50%",
+        background: "rgba(0,0,0,0.55)",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 6,
+        opacity: hover ? 1 : 0,
+        transition: "opacity 0.25s ease",
+      }}>
+        <button
+          type="button"
+          onClick={onChangeClick}
+          style={{
+            fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+            letterSpacing: "0.04em", cursor: "pointer",
+            border: "none", background: "none", padding: "2px 0",
+            color: "#fff",
+            transition: "opacity 0.2s ease",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = "0.6"}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+        >
+          {uploadingAvatar ? "SUBIR..." : "CAMBIAR"}
+        </button>
+        {avatarUrl && (
+          <button
+            type="button"
+            onClick={onRemoveClick}
+            style={{
+              fontFamily: "inherit", fontSize: 11, fontWeight: 500,
+              letterSpacing: "0.04em", cursor: "pointer",
+              border: "none", background: "none", padding: "2px 0",
+              color: "#e57373",
+              transition: "opacity 0.2s ease",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "0.6"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+          >
+            ELIMINAR
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const PerfilPage = () => {
+  const { perfil, logout, getToken, isAuthenticated } = useAuthPublico();
+  const navigate = useNavigate();
+  const [nombre, setNombre] = useState("");
+  const [profesion, setProfesion] = useState("");
+  const [bio, setBio] = useState("");
+  const [nacionalidad, setNacionalidad] = useState("");
+  const [pais, setPais] = useState("");
+  const [provincia, setProvincia] = useState("");
+  const [localidad, setLocalidad] = useState("");
+  const [fechaNac, setFechaNac] = useState("");
+  const [sexo, setSexo] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPublicId, setAvatarPublicId] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const [msg, setMsg] = useState("");
+  const [savedUnverified, setSavedUnverified] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [section, setSection] = useState("profile");
+  const [entidades, setEntidades] = useState([]);
+  const [loadingEntidades, setLoadingEntidades] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [cancellingLoading, setCancellingLoading] = useState(false);
+  const [favoritos, setFavoritos] = useState([]);
+  const [loadingFavoritos, setLoadingFavoritos] = useState(false);
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [loadingNotificaciones, setLoadingNotificaciones] = useState(false);
+  const [tourStep, setTourStep] = useState(null);
+  const sidebarRef = useRef(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteEmail, setDeleteEmail] = useState("");
+  const [deleteEntityConfirm, setDeleteEntityConfirm] = useState(null);
+  const [deletingEntity, setDeletingEntity] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/iniciar-sesion", { replace: true });
+      return;
+    }
+    if (perfil && !loaded) {
+      setNombre(perfil.nombre || "");
+      setProfesion(perfil.profesion || "");
+      setBio(perfil.bio || "");
+      setNacionalidad(perfil.nacionalidad || "");
+      setPais(perfil.pais || "");
+      setProvincia(perfil.provincia || "");
+      setLocalidad(perfil.localidad || "");
+      setFechaNac(perfil.fecha_nacimiento ? perfil.fecha_nacimiento.split("T")[0] : "");
+      setSexo(perfil.sexo || "");
+      setAvatarUrl(perfil.avatar_url || "");
+      setAvatarPublicId(perfil.avatar_public_id || "");
+      setLoaded(true);
+    }
+  }, [isAuthenticated, perfil, navigate, loaded]);
+
+  const savingRef = useRef(false);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (savingRef.current) return;
+
+    const missing = [];
+    if (!nombre.trim()) missing.push("Nombre completo");
+    if (!profesion.trim()) missing.push("Profesión / oficio");
+    if (!bio.trim()) missing.push("Biografía");
+    if (!nacionalidad.trim()) missing.push("Nacionalidad");
+    if (!pais.trim()) missing.push("País");
+    if (!provincia.trim()) missing.push("Provincia / Estado");
+    if (!localidad.trim()) missing.push("Localidad");
+    if (!sexo.trim()) missing.push("Sexo");
+    if (!fechaNac.trim()) missing.push("Fecha de nacimiento");
+
+    if (missing.length > 0) {
+      setMsg("Completá todos los campos: " + missing.join(", "));
+      return;
+    }
+
+    savingRef.current = true;
+    setSaving(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/auth/perfil", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          nombre,
+          profesion,
+          bio,
+          localidad,
+          pais,
+          provincia,
+          nacionalidad,
+          fecha_nacimiento: fechaNac || null,
+          sexo,
+          avatar_url: avatarUrl,
+          avatar_public_id: avatarPublicId,
+        }),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      const data = await res.json();
+      localStorage.setItem("made_in_chaco_perfil", JSON.stringify(data));
+      if (!data.verified) {
+        setSavedUnverified(true);
+      } else {
+        setMsg("Perfil actualizado");
+      }
+    } catch {
+      setMsg("Error al guardar");
+    } finally {
+      setSaving(false);
+      savingRef.current = false;
+    }
+  };
+
+  const handleLocationSelect = useCallback(({ country, region }) => {
+    if (country) setPais(country);
+    if (region) setProvincia(region);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("archivo", file);
+      const res = await fetch("/api/upload-public", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Error al subir imagen");
+      const data = await res.json();
+      setAvatarUrl(data.url);
+      setAvatarPublicId(data.public_id || "");
+      const stored = JSON.parse(localStorage.getItem("made_in_chaco_perfil") || "{}");
+      localStorage.setItem("made_in_chaco_perfil", JSON.stringify({ ...stored, avatar_url: data.url, avatar_public_id: data.public_id || "" }));
+      await fetch("/api/auth/perfil", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ avatar_url: data.url, avatar_public_id: data.public_id || "" }),
+      });
+    } catch {
+      setMsg("Error al subir foto");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    const prevId = avatarPublicId;
+    setAvatarUrl("");
+    setAvatarPublicId("");
+    const stored = JSON.parse(localStorage.getItem("made_in_chaco_perfil") || "{}");
+    localStorage.setItem("made_in_chaco_perfil", JSON.stringify({ ...stored, avatar_url: "", avatar_public_id: "" }));
+    try {
+      await fetch("/api/auth/avatar", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+    } catch {
+      // if delete fails, still clean local state
+    }
+  };
+
+  const fetchEntidades = useCallback(async () => {
+    setLoadingEntidades(true);
+    try {
+      const res = await fetch("/api/mis-entidades", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setEntidades(await res.json());
+    } catch {} finally {
+      setLoadingEntidades(false);
+    }
+  }, [getToken]);
+
+  const fetchFavoritos = useCallback(async () => {
+    setLoadingFavoritos(true);
+    try {
+      const res = await fetch("/api/mis-favoritos", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setFavoritos(await res.json());
+    } catch {} finally {
+      setLoadingFavoritos(false);
+    }
+  }, [getToken]);
+
+  const fetchNotificaciones = useCallback(async () => {
+    setLoadingNotificaciones(true);
+    try {
+      const res = await fetch("/api/notificaciones/verificar-suscripciones", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setNotificaciones(await res.json());
+    } catch {} finally {
+      setLoadingNotificaciones(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (section === "solicitudes" || section === "entidades") {
+      fetchEntidades();
+    }
+    if (section === "favoritos") {
+      fetchFavoritos();
+    }
+    if (section === "notificaciones") {
+      fetchNotificaciones();
+    }
+  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones]);
+
+  const handleCancelConfirm = async () => {
+    if (!cancellingId) return;
+    setCancellingLoading(true);
+    try {
+      const res = await fetch(`/api/mis-entidades/${cancellingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) fetchEntidades();
+    } catch {}
+    setCancellingLoading(false);
+    setCancellingId(null);
+  };
+
+  const ESTADOS_SELLO = {
+    pendiente: { label: "Pendiente", color: "#f9a825", bg: "#fff8e1" },
+    aprobado: { label: "Aprobado", color: "#2e7d32", bg: "#e8f5e9" },
+    rechazado: { label: "Rechazado", color: "#c62828", bg: "#ffebee" },
+  };
+
+  const TIPO_COLOR = {
+    artesano: "#ff5722",
+    gastronomia: "#4caf50",
+    comercio: "#2196f3",
+    evento: "#9c27b0",
+    patrimonio: "#795548",
+    personalidad: "#e91e63",
+    comunidad_indigena: "#8B4513",
+    lugar_natural: "#2E7D32",
+    hospedaje: "#FF6F00",
+    productor: "#00695C",
+    experiencia: "#6A1B9A",
+    relato: "#D84315",
+    espacio_cultural: "#37474F",
+  };
+
+  const TIPOS_LABEL = {
+    comercio: "Comercio",
+    hospedaje: "Hospedaje",
+    productor: "Productor",
+    evento: "Evento",
+  };
+
+  const suscripcionStatus = (e) => {
+    if (!e.fecha_fin_suscripcion) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const inicio = new Date(e.fecha_inicio_suscripcion?.split("T")[0]);
+    const fin = new Date(e.fecha_fin_suscripcion.split("T")[0]);
+    if (today < inicio) {
+      const days = Math.ceil((inicio - today) / 86400000);
+      return { label: `Comienza en ${days}d`, color: "#f39c12", bg: "#fff8e1" };
+    }
+    if (today > fin) {
+      return { label: "Vencida", color: "#c62828", bg: "#ffebee" };
+    }
+    const daysLeft = Math.ceil((fin - today) / 86400000);
+    if (daysLeft <= 30) {
+      return { label: `Por vencer (${daysLeft}d)`, color: "#e65100", bg: "#fff3e0" };
+    }
+    return { label: "Activa", color: "#2e7d32", bg: "#e8f5e9" };
+  };
+
+  const enMapa = (e) => {
+    if (e.estado_sello !== "aprobado" || !e.visible) return false;
+    if (!e.latitud || !e.longitud) return false;
+
+    const suscValida = () => {
+      if (!e.fecha_fin_suscripcion) return true;
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      const inicio = e.fecha_inicio_suscripcion ? new Date(e.fecha_inicio_suscripcion.split("T")[0]) : null;
+      const fin = new Date(e.fecha_fin_suscripcion.split("T")[0]);
+      if (inicio && hoy < inicio) return false;
+      if (hoy > fin) return false;
+      return true;
+    };
+
+    if (e.tipo === "comercio" || e.tipo === "hospedaje" || e.tipo === "productor") {
+      return e.estado_pago === "al_dia" && suscValida();
+    }
+
+    if (e.tipo === "evento") {
+      if (e.fecha_evento) {
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        const ev = new Date(e.fecha_evento.split("T")[0]);
+        if (ev < hoy) return false;
+      }
+      if (e.estado_pago && e.estado_pago !== "al_dia") return false;
+      if (e.estado_pago === "al_dia") return suscValida();
+      return true;
+    }
+
+    return true;
+  };
+
+  if (!isAuthenticated || !perfil) return null;
+
+  if (savedUnverified) {
+    return (
+      <div style={{ background: "#f5f2e8", minHeight: "100vh", fontFamily: "Epilogue, sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ maxWidth: 480, margin: "0 auto" }}>
+            <p style={sLabel}>Cuenta creada</p>
+            <div style={{ marginTop: 48 }}>
+              <h2 style={{
+                fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em",
+              }}>
+                Revisá tu email
+              </h2>
+              <p style={{ color: "#666", lineHeight: 1.7, fontSize: 15, maxWidth: 400, margin: "0 auto" }}>
+                Guardamos tus datos correctamente. Te enviamos un enlace de confirmación a
+              </p>
+              <p style={{
+                color: "#1c1c18", fontSize: 15, fontWeight: 600, marginTop: 8,
+                letterSpacing: "-0.01em",
+              }}>
+                {perfil.email}
+              </p>
+              <p style={{ color: "#999", fontSize: 13, marginTop: 20 }}>
+                ¿No lo encontrás? Revisá la carpeta de spam.
+              </p>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate("/", { replace: true });
+                }}
+                style={{
+                  marginTop: 40, padding: "14px 48px", background: "#863819",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "inherit", letterSpacing: "0.06em",
+                }}
+              >
+                CERRAR SESIÓN
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const SIDEBAR_SECTIONS = [
+    { key: "profile", label: "Mi Perfil", icon: "→" },
+    { key: "notificaciones", label: "Notificaciones", icon: "→" },
+    { key: "solicitudes", label: "Mis Solicitudes", icon: "→" },
+    { key: "entidades", label: "Mis Entidades", icon: "→" },
+    { key: "favoritos", label: "Mis Favoritos", icon: "→" },
+  ];
+
+  const sSidebarItem = (isActive) => ({
+    fontFamily: "inherit",
+    fontSize: 15,
+    fontWeight: isActive ? 600 : 400,
+    letterSpacing: "-0.01em",
+    cursor: "pointer",
+    border: "none",
+    borderBottom: "1px solid #eee",
+    background: isActive ? "#e8e4da" : "transparent",
+    padding: "14px 16px",
+    borderRadius: "6px 0 0 6px",
+    color: isActive ? "#111" : "#555",
+    textAlign: "left",
+    width: "100%",
+    transition: "all 0.2s ease",
+  });
+
+  const sEstadoBadge = (estado) => {
+    const cfg = ESTADOS_SELLO[estado] || { label: estado, color: "#888", bg: "#f5f5f5" };
+    return {
+      display: "inline-block",
+      padding: "4px 12px",
+      fontSize: 12,
+      fontWeight: 600,
+      letterSpacing: "0.04em",
+      color: cfg.color,
+      background: cfg.bg,
+      borderRadius: 4,
+    };
+  };
+
+  return (
+    <div style={{ background: "#f5f2e8", height: "100vh", overflow: "hidden", fontFamily: "Epilogue, sans-serif", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        .perfil-content::-webkit-scrollbar {
+          width: 6px;
+        }
+        .perfil-content::-webkit-scrollbar-track {
+          background: #f5f2e8;
+        }
+        .perfil-content::-webkit-scrollbar-thumb {
+          background: #d4cfc3;
+          border-radius: 3px;
+        }
+        .perfil-content::-webkit-scrollbar-thumb:hover {
+          background: #bbb5a8;
+        }
+      `}</style>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarChange}
+        style={{ display: "none" }}
+      />
+
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", gap: 0, padding: "140px 40px 40px" }}>
+        {/* Sidebar */}
+        <div ref={sidebarRef} style={{ width: 240, flexShrink: 0, borderRight: "2px solid #e8e4da", paddingRight: 40, overflow: "hidden", wordBreak: "break-word" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 40 }}>
+            <AvatarWithOverlay
+              avatarUrl={avatarUrl}
+              nombre={nombre}
+              uploadingAvatar={uploadingAvatar}
+              onChangeClick={() => fileInputRef.current?.click()}
+              onRemoveClick={handleRemoveAvatar}
+            />
+            <div style={{ textAlign: "center", width: "100%" }}>
+              <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600, color: "#1c1c18", margin: 0, letterSpacing: "-0.02em" }}>
+                {nombre || "Mi Perfil"}
+              </h3>
+              <p style={{ color: "#888", fontSize: 13, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{perfil.email}</p>
+            </div>
+          </div>
+
+          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {SIDEBAR_SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setSection(s.key)}
+                style={sSidebarItem(section === s.key)}
+                onMouseEnter={(e) => { if (section !== s.key) e.currentTarget.style.color = "#999"; }}
+                onMouseLeave={(e) => { if (section !== s.key) e.currentTarget.style.color = "#555"; }}
+              >
+                {s.label}
+                {s.key === "notificaciones" && notificaciones.some((n) => !n.leida) && (
+                  <span style={{
+                    display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                    background: "#863819", marginLeft: 8, verticalAlign: "middle",
+                  }} />
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: "0.04em",
+              cursor: "pointer",
+              border: "none",
+              background: "none",
+              padding: "14px 0",
+              color: "#555",
+              borderBottom: "1px solid #e57373",
+              marginTop: 32,
+              transition: "opacity 0.2s ease",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#999"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#555"; }}
+          >
+            CERRAR SESIÓN
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="perfil-content" style={{ flex: 1, minWidth: 0, paddingLeft: 60, paddingRight: 40, overflowY: "auto" }}>
+            {perfil && !perfil.verified && (
+            <div style={{
+              background: "#fff8e1", border: "1px solid #f0dca0", borderRadius: 10,
+              padding: "16px 20px", marginBottom: 24,
+              fontSize: 13, color: "#1c1c18", lineHeight: 1.5,
+            }}>
+              <strong style={{ color: "#1c1c18" }}>Completá tus datos para activar tu cuenta</strong>
+              <p style={{ margin: "4px 0 0", color: "#1c1c18" }}>
+                Completá la información de tu perfil y presioná <strong style={{ color: "#1c1c18" }}>Guardar</strong>. Te enviaremos un enlace de confirmación a <strong style={{ color: "#1c1c18" }}>{perfil.email}</strong> para verificar tu cuenta.
+              </p>
+            </div>
+          )}
+          {section === "profile" && (
+              <>
+                <div style={sDivider} />
+                <form onSubmit={handleSave} style={{ width: "100%" }}>
+                  <FloatingInput label="Nombre completo *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                  <FloatingInput label="Profesión / oficio *" value={profesion} onChange={(e) => setProfesion(e.target.value)} />
+                  <FloatingTextarea label="Biografía *" value={bio} onChange={(e) => setBio(e.target.value)} />
+
+                  <div style={{ height: 24 }} />
+
+                  <CountryAutocomplete label="Nacionalidad *" value={nacionalidad} onChange={setNacionalidad} />
+                  <CountryAutocomplete label="País de residencia *" value={pais} onChange={setPais} />
+                  <RegionAutocomplete label="Provincia / Estado *" value={provincia} onChange={setProvincia} />
+
+                  <LocationAutocomplete
+                    label="Localidad *"
+                    value={localidad}
+                    onChange={setLocalidad}
+                    onLocationSelect={handleLocationSelect}
+                  />
+
+                  <SexoCombobox label="Sexo *" value={sexo} onChange={setSexo} />
+
+                  <FloatingDate label="Fecha de nacimiento *" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} />
+
+                  <div style={{ display: "flex", gap: 32, marginTop: 56, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      style={{
+                        fontFamily: "inherit",
+                        fontSize: 15,
+                        fontWeight: 500,
+                        letterSpacing: "0.02em",
+                        cursor: "pointer",
+                        border: "none",
+                        background: "none",
+                        padding: "14px 0",
+                        color: "#888",
+                        borderBottom: "1px solid #90a88a",
+                        transition: "opacity 0.25s ease",
+                      }}
+                      onMouseEnter={(e) => { if (!saving) e.currentTarget.style.opacity = "0.5"; }}
+                      onMouseLeave={(e) => { if (!saving) e.currentTarget.style.opacity = "1"; }}
+                    >
+                      {saving ? "GUARDANDO..." : "GUARDAR"}
+                    </button>
+                  </div>
+
+                  {msg && (
+                    <p style={{
+                      marginTop: 24,
+                      fontSize: 13,
+                      letterSpacing: "0.02em",
+                      color: msg.includes("Perfil") ? "#506441" : "#d32f2f",
+                    }}>
+                      {msg.includes("Perfil") ? "✓ " : "✗ "}{msg}
+                    </p>
+                  )}
+
+                  <div style={{ borderTop: "1px solid #e0dcd0", marginTop: 48, paddingTop: 32 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setDeleteConfirm(true); setDeleteEmail(""); }}
+                      style={{
+                        fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                        cursor: "pointer", border: "2px solid #c62828",
+                        background: "transparent", color: "#c62828",
+                        padding: "12px 32px", borderRadius: 8,
+                        letterSpacing: "0.04em", transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "#c62828"; e.currentTarget.style.color = "#fff"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#c62828"; }}
+                    >
+                      ELIMINAR CUENTA
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+
+            {section === "solicitudes" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Mis Solicitudes
+                </h2>
+                {loadingEntidades ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : entidades.length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    Todavía no solicitaste ningún sello.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {entidades.map((e) => {
+                      const estado = ESTADOS_SELLO[e.estado_sello] || { label: e.estado_sello || "Sin estado", color: "#888", bg: "#f5f5f5" };
+                      return (
+                        <div key={e.id} style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "16px 20px", border: "1px solid #e0dcd0", borderRadius: 10,
+                          background: "#fcf9f4", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                        }}>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
+                                {TIPOS_LABEL[e.tipo] || e.tipo}
+                              </span>
+                              <span style={sEstadoBadge(e.estado_sello)}>{estado.label}</span>
+                            </div>
+                            <p style={{ fontSize: 16, fontWeight: 500, color: "#1c1c18", margin: 0 }}>{e.nombre}</p>
+                            <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
+                              {new Date(e.created_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric" })}
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => window.open(`/entidad/${e.slug}`, "_blank")}
+                              style={{
+                                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                                padding: "8px 16px", borderRadius: 6, color: "#555",
+                                whiteSpace: "nowrap", transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f2e8"; e.currentTarget.style.borderColor = "#bbb"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#ddd"; }}
+                            >
+                              Ver
+                            </button>
+                            {e.estado_sello === "pendiente" && (
+                              <button
+                                type="button"
+                                onClick={() => setCancellingId(e.id)}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                  cursor: "pointer", border: "1px solid #e57373", background: "transparent",
+                                  padding: "8px 16px", borderRadius: 6, color: "#e57373",
+                                  whiteSpace: "nowrap", transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "#ffebee"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {section === "entidades" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Mis Entidades
+                </h2>
+                {loadingEntidades ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : entidades.filter((e) => e.estado_sello === "aprobado" && e.visible).length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    No tenés entidades aprobadas todavía.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {entidades
+                      .filter((e) => e.estado_sello === "aprobado" && e.visible)
+                      .map((e) => (
+                         <div key={e.id} style={{
+                           display: "flex", alignItems: "center", justifyContent: "space-between",
+                           padding: "16px 20px", border: "1px solid #e0dcd0", borderRadius: 10,
+                          background: "#fcf9f4", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                         }}>
+                           <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
+                                {TIPOS_LABEL[e.tipo] || e.tipo}
+                              </span>
+                              {(() => {
+                                const st = suscripcionStatus(e);
+                                return st ? (
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 600, padding: "2px 8px",
+                                    borderRadius: 4, color: st.color, background: st.bg,
+                                    letterSpacing: "0.02em",
+                                  }}>
+                                    {st.label}
+                                  </span>
+                                ) : null;
+                              })()}
+                              {e.tiene_solicitud_pendiente && (
+                                <span style={{
+                                  fontSize: 11, fontWeight: 600, padding: "2px 8px",
+                                  borderRadius: 4, color: "#7b1fa2", background: "#f3e5f5",
+                                  letterSpacing: "0.02em",
+                                }}>
+                                  En revisión
+                                </span>
+                              )}
+                              <span style={{
+                                fontSize: 11, fontWeight: 600, padding: "2px 8px",
+                                borderRadius: 4,
+                                color: enMapa(e) ? "#1565c0" : "#999",
+                                background: enMapa(e) ? "#e3f2fd" : "#f5f5f5",
+                                letterSpacing: "0.02em",
+                              }}>
+                                {enMapa(e) ? "En mapa" : "No visible"}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: 16, fontWeight: 500, color: "#1c1c18", margin: 0 }}>{e.nombre}</p>
+                            {e.resumen && (
+                              <p style={{ fontSize: 13, color: "#888", marginTop: 4, maxWidth: 400, lineHeight: 1.4 }}>
+                                {e.resumen}
+                              </p>
+                            )}
+                            {e.updated_at && (
+                              <p style={{ fontSize: 11, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>
+                                Última actualización: {new Date(e.updated_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric" })}
+                              </p>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => window.open(`/entidad/${e.slug}`, "_blank")}
+                              style={{
+                                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                                padding: "8px 16px", borderRadius: 6, color: "#555",
+                                whiteSpace: "nowrap", transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f2e8"; e.currentTarget.style.borderColor = "#bbb"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#ddd"; }}
+                            >
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/entidad/${e.id}/editar`)}
+                              style={{
+                                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                                padding: "8px 16px", borderRadius: 6, color: "#555",
+                                whiteSpace: "nowrap", transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f2e8"; e.currentTarget.style.borderColor = "#bbb"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#ddd"; }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteEntityConfirm(e)}
+                              style={{
+                                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                cursor: "pointer", border: "1px solid #e57373", background: "transparent",
+                                padding: "8px 16px", borderRadius: 6, color: "#c62828",
+                                whiteSpace: "nowrap", transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#ffebee"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {section === "notificaciones" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Notificaciones
+                </h2>
+                {loadingNotificaciones ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : notificaciones.length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    No tenés notificaciones.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {notificaciones.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch("/api/notificaciones/leer-todas", {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${getToken()}` },
+                          });
+                          setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+                        }}
+                        style={{
+                          alignSelf: "flex-end",
+                          fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                          cursor: "pointer", border: "none", background: "transparent",
+                          padding: "4px 0", color: "#863819", textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Marcar todas como leídas
+                      </button>
+                    )}
+                    {(() => {
+                      const ICON_MAP = {
+                        bienvenida: "👋",
+                        sello_aprobado: "✓",
+                        sello_rechazado: "✕",
+                        edicion_aprobada: "✓",
+                        edicion_rechazada: "✕",
+                        suscripcion_por_vencer: "!",
+                        suscripcion_vencida: "!",
+                        mapa_no_visible: "◌",
+                      };
+                      const COLOR_MAP = {
+                        bienvenida: "#863819",
+                        sello_aprobado: "#2e7d32",
+                        edicion_aprobada: "#2e7d32",
+                        sello_rechazado: "#c62828",
+                        edicion_rechazada: "#c62828",
+                        suscripcion_por_vencer: "#f9a825",
+                        suscripcion_vencida: "#c62828",
+                        mapa_no_visible: "#888",
+                      };
+                      return notificaciones.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={async () => {
+                            if (n.tipo === "bienvenida") {
+                              setTourStep(0);
+                              setSection("notificaciones");
+                              if (!n.leida) {
+                                await fetch(`/api/notificaciones/${n.id}/leer`, {
+                                  method: "POST",
+                                  headers: { Authorization: `Bearer ${getToken()}` },
+                                });
+                                setNotificaciones((prev) => prev.map((x) => x.id === n.id ? { ...x, leida: true } : x));
+                              }
+                              return;
+                            }
+                            if (!n.leida) {
+                              await fetch(`/api/notificaciones/${n.id}/leer`, {
+                                method: "POST",
+                                headers: { Authorization: `Bearer ${getToken()}` },
+                              });
+                              setNotificaciones((prev) => prev.map((x) => x.id === n.id ? { ...x, leida: true } : x));
+                            }
+                          }}
+                          style={{
+                            display: "flex", alignItems: "flex-start", gap: 12,
+                            padding: "14px 18px", border: "1px solid #eee",
+                            borderRadius: 8, cursor: "pointer",
+                            background: n.leida ? "#fff" : "#fdfaf5",
+                            transition: "background 0.2s ease",
+                            opacity: n.leida ? 0.7 : 1,
+                          }}
+                        >
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: (COLOR_MAP[n.tipo] || "#863819") + "18",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 14, fontWeight: 700, flexShrink: 0,
+                            color: COLOR_MAP[n.tipo] || "#863819",
+                          }}>
+                            {ICON_MAP[n.tipo] || "•"}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", margin: 0 }}>
+                                {n.titulo}
+                              </p>
+                              <span style={{ fontSize: 11, color: "#aaa", whiteSpace: "nowrap", marginLeft: 8 }}>
+                                {new Date(n.created_at).toLocaleDateString("es-AR")}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: 13, color: "#555", margin: "4px 0 0", lineHeight: 1.4 }}>
+                              {n.mensaje}
+                            </p>
+                            {n.entidad_slug && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`/entidad/${n.entidad_slug}`, "_blank");
+                                }}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 12, fontWeight: 500,
+                                  cursor: "pointer", border: "none", background: "transparent",
+                                  padding: "4px 0", marginTop: 6, color: "#863819",
+                                }}
+                              >
+                                Ver entidad →
+                              </button>
+                            )}
+                          </div>
+                          {!n.leida && (
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#863819", flexShrink: 0, marginTop: 6 }} />
+                          )}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </>
+            )}
+
+            {section === "favoritos" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Mis Favoritos
+                </h2>
+                {loadingFavoritos ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : favoritos.length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    No tenés favoritos guardados todavía.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {favoritos.map((f) => (
+                      <div key={f.id} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "16px 20px", border: "1px solid #e0dcd0", borderRadius: 10,
+                        background: "#fcf9f4", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, color: "#999", fontWeight: 500, letterSpacing: "0.04em" }}>
+                              <span style={{ color: TIPO_COLOR[f.entidad_tipo] || "#999" }}>{f.entidad_id ? (f.entidad_tipo || "Entidad") : "Recorrido"}</span>
+                            </span>
+                          </div>
+                          <p style={{ fontSize: 16, fontWeight: 500, color: "#1c1c18", margin: 0 }}>
+                            {f.entidad_nombre || f.recorrido_nombre}
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => window.open(f.entidad_id ? `/entidad/${f.entidad_slug}` : `/recorrido/${f.recorrido_slug}`, "_blank")}
+                            style={{
+                              fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                              cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                              padding: "8px 16px", borderRadius: 6, color: "#555",
+                              whiteSpace: "nowrap", transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f2e8"; e.currentTarget.style.borderColor = "#bbb"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#ddd"; }}
+                          >
+                            Ver
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/favoritos/${f.id}`, {
+                                  method: "DELETE",
+                                  headers: { Authorization: `Bearer ${getToken()}` },
+                                });
+                                if (res.ok) fetchFavoritos();
+                              } catch {}
+                            }}
+                            style={{
+                              fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                              cursor: "pointer", border: "1px solid #e57373", background: "transparent",
+                              padding: "8px 16px", borderRadius: 6, color: "#e57373",
+                              whiteSpace: "nowrap", transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#ffebee"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {cancellingId && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => !cancellingLoading && setCancellingId(null)}>
+            <div style={{
+              background: "#fff", padding: "40px", maxWidth: 420, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              textAlign: "center",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", background: "#ffebee",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 24, margin: "0 auto 16px",
+              }}>⚠️</div>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 600,
+                color: "#c62828", margin: "0 0 12px", letterSpacing: "-0.02em",
+              }}>
+                Cancelar solicitud
+              </h3>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 24px" }}>
+                ¿Estás seguro de que querés cancelar esta solicitud? Esta acción es <strong style={{ color: "#c62828" }}>permanente e irreversible</strong>.
+              </p>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => setCancellingId(null)}
+                  disabled={cancellingLoading}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelConfirm}
+                  disabled={cancellingLoading}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+                    cursor: cancellingLoading ? "not-allowed" : "pointer",
+                    border: "none", background: cancellingLoading ? "#e0dcd0" : "#c62828",
+                    padding: "10px 24px", borderRadius: 8, color: cancellingLoading ? "#aaa" : "#fff",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {cancellingLoading ? "CANCELANDO..." : "CANCELAR SOLICITUD"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tourStep !== null && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+            zIndex: 999, display: "flex", alignItems: "flex-start", justifyContent: "center",
+            paddingTop: "15vh", fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => setTourStep(null)}>
+            <div style={{
+              background: "#fff", padding: "36px 40px 28px", maxWidth: 480, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              textAlign: "center", position: "relative",
+            }} onClick={(e) => e.stopPropagation()}>
+              {tourStep === 0 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#86381918", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    👋
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    ¡Bienvenido a tu panel!
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Este es tu centro de gestión. Te mostraremos las secciones para que puedas aprovecharlas al máximo.
+                  </p>
+                </>
+              )}
+              {tourStep === 1 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#ff980018", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    🔔
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    Notificaciones
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Acá recibirás alertas sobre aprobaciones, rechazos, ediciones, y el estado de tus suscripciones. Todo lo que pasa con tus entidades, en un solo lugar.
+                  </p>
+                </>
+              )}
+              {tourStep === 2 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#2196f318", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    📋
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    Mis Solicitudes
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Seguí el estado de tus solicitudes para obtener el sello Made in Chaco. Podés ver si están pendientes, aprobadas o rechazadas.
+                  </p>
+                </>
+              )}
+              {tourStep === 3 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#4caf5018", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    🏪
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    Mis Entidades
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Administrá todas tus entidades, editá sus datos, controlá el estado de tu suscripción y la visibilidad en el mapa.
+                  </p>
+                </>
+              )}
+              {tourStep === 4 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#e91e6318", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    ❤️
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    Mis Favoritos
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Guardá tus entidades y recorridos favoritos para acceder a ellos rápidamente desde cualquier lugar.
+                  </p>
+                </>
+              )}
+              {tourStep === 5 && (
+                <>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#86381918", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 16px" }}>
+                    ✨
+                  </div>
+                  <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+                    ¡Todo listo!
+                  </h3>
+                  <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, margin: "0 0 28px" }}>
+                    Ya conocés todas las secciones. Explorá cada una y sacale el máximo provecho a tu panel de perfil.
+                  </p>
+                </>
+              )}
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#bbb" }}>
+                  {tourStep + 1} / 6
+                </span>
+                <div style={{ flex: 1 }} />
+                {tourStep < 5 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setTourStep(null)}
+                      style={{
+                        fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                        cursor: "pointer", border: "none", background: "transparent",
+                        padding: "8px 16px", color: "#888",
+                      }}
+                    >
+                      Saltar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = tourStep + 1;
+                        if (next === 1) setSection("notificaciones");
+                        else if (next === 2) setSection("solicitudes");
+                        else if (next === 3) setSection("entidades");
+                        else if (next === 4) setSection("favoritos");
+                        setTourStep(next);
+                      }}
+                      style={{
+                        fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                        cursor: "pointer", border: "none", background: "#863819",
+                        padding: "10px 28px", borderRadius: 8, color: "#fff",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      Siguiente
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTourStep(null);
+                      setSection("notificaciones");
+                    }}
+                    style={{
+                      fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                      cursor: "pointer", border: "none", background: "#863819",
+                      padding: "10px 28px", borderRadius: 8, color: "#fff",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    Finalizar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deleteConfirm && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => !deletingAccount && setDeleteConfirm(false)}>
+            <div style={{
+              background: "#fff", padding: "40px", maxWidth: 420, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              textAlign: "center",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", background: "#ffebee",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 24, margin: "0 auto 16px",
+              }}>⚠️</div>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 600,
+                color: "#c62828", margin: "0 0 12px", letterSpacing: "-0.02em",
+              }}>
+                ¿Eliminar cuenta?
+              </h3>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 8px" }}>
+                Esta acción es <strong style={{ color: "#c62828" }}>permanente e irreversible</strong>.
+              </p>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 24px" }}>
+                Se eliminarán todos tus datos, entidades y contenido asociado.
+              </p>
+              <p style={{ color: "#555", fontSize: 13, margin: "0 0 8px", textAlign: "left" }}>
+                Escribí <strong>{perfil.email}</strong> para confirmar:
+              </p>
+              <input
+                type="text"
+                value={deleteEmail}
+                onChange={(e) => setDeleteEmail(e.target.value)}
+                placeholder={perfil.email}
+                style={{
+                  width: "100%", padding: "10px 14px", fontSize: 14,
+                  border: "2px solid #e0dcd0", borderRadius: 8,
+                  fontFamily: "inherit", outline: "none", color: "#1c1c18",
+                  background: "#fcf9f4", boxSizing: "border-box",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#c62828"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#e0dcd0"; }}
+              />
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 28 }}>
+                <button
+                  type="button"
+                  onClick={() => { setDeleteConfirm(false); setDeleteEmail(""); }}
+                  disabled={deletingAccount}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setDeletingAccount(true);
+                    try {
+                      const res = await fetch("/api/auth/perfil", {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${getToken()}` },
+                      });
+                      if (res.ok) {
+                        logout();
+                        navigate("/", { replace: true });
+                      } else {
+                        alert("Error al eliminar la cuenta");
+                      }
+                    } catch {
+                      alert("Error de conexión");
+                    } finally {
+                      setDeletingAccount(false);
+                    }
+                  }}
+                  disabled={deleteEmail !== perfil.email || deletingAccount}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+                    cursor: deleteEmail !== perfil.email || deletingAccount ? "not-allowed" : "pointer",
+                    border: "none", background: deleteEmail !== perfil.email || deletingAccount ? "#e0dcd0" : "#c62828",
+                    padding: "10px 24px", borderRadius: 8, color: deleteEmail !== perfil.email || deletingAccount ? "#aaa" : "#fff",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {deletingAccount ? "ELIMINANDO..." : "ELIMINAR"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {deleteEntityConfirm && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => !deletingEntity && setDeleteEntityConfirm(null)}>
+            <div style={{
+              background: "#fff", padding: "40px", maxWidth: 420, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              textAlign: "center",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", background: "#ffebee",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 24, margin: "0 auto 16px",
+              }}>⚠️</div>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 600,
+                color: "#c62828", margin: "0 0 12px", letterSpacing: "-0.02em",
+              }}>
+                ¿Eliminar entidad?
+              </h3>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 8px" }}>
+                Vas a eliminar <strong style={{ color: "#c62828" }}>{deleteEntityConfirm.nombre}</strong>.
+              </p>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 24px" }}>
+                Esta acción es <strong style={{ color: "#c62828" }}>permanente e irreversible</strong>.
+                Se eliminarán todos los datos, imágenes y contenido asociado.
+              </p>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => setDeleteEntityConfirm(null)}
+                  disabled={deletingEntity}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setDeletingEntity(true);
+                    try {
+                      const res = await fetch(`/api/entidades/${deleteEntityConfirm.id}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${getToken()}` },
+                      });
+                      if (res.ok) {
+                        const respuesta = await fetch("/api/mis-entidades", { headers: { Authorization: `Bearer ${getToken()}` } });
+                        if (respuesta.ok) setEntidades(await respuesta.json());
+                        setDeleteEntityConfirm(null);
+                      } else {
+                        alert("Error al eliminar la entidad");
+                      }
+                    } catch {
+                      alert("Error de conexión");
+                    } finally {
+                      setDeletingEntity(false);
+                    }
+                  }}
+                  disabled={deletingEntity}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+                    cursor: deletingEntity ? "not-allowed" : "pointer",
+                    border: "none", background: deletingEntity ? "#e0dcd0" : "#c62828",
+                    padding: "10px 24px", borderRadius: 8, color: deletingEntity ? "#aaa" : "#fff",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {deletingEntity ? "ELIMINANDO..." : "ELIMINAR"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+  );
+};

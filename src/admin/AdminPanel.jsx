@@ -513,6 +513,8 @@ export const AdminPanel = () => {
   const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
   const [approveFechas, setApproveFechas] = useState({ inicio: "", fin: "", estado_pago: "al_dia" });
   const [solicitudDetalle, setSolicitudDetalle] = useState(null);
+  const [pendingSolicitudes, setPendingSolicitudes] = useState(0);
+  const [pendingEdiciones, setPendingEdiciones] = useState(0);
   const [step, setStep] = useState(1);
   const [editingEntityId, setEditingEntityId] = useState(null);
 
@@ -615,7 +617,7 @@ export const AdminPanel = () => {
     setSolicitudesLoading(true);
     try {
       const res = await authFetch("/api/solicitudes", { headers: authHeaders() });
-      if (res.ok) setSolicitudes(await res.json());
+      if (res.ok) { const data = await res.json(); setSolicitudes(data); setPendingSolicitudes(data.length); }
     } catch {} finally {
       setSolicitudesLoading(false);
     }
@@ -625,6 +627,16 @@ export const AdminPanel = () => {
     cargarLocalidades();
     cargarEntidades();
     cargarRecorridos();
+    (async () => {
+      try {
+        const [solRes, edRes] = await Promise.all([
+          authFetch("/api/solicitudes", { headers: authHeaders() }),
+          authFetch("/api/solicitudes-edicion", { headers: authHeaders() }),
+        ]);
+        if (solRes.ok) { const data = await solRes.json(); setPendingSolicitudes(data.length); }
+        if (edRes.ok) { const data = await edRes.json(); setPendingEdiciones(data.length); }
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -1887,6 +1899,7 @@ export const AdminPanel = () => {
               { id: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
               { id: "entidades", label: "Entidades", icon: "/icons/book.png" },
               { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png" },
+              { id: "ediciones", label: "Ediciones", icon: "/icons/edit.png" },
               { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
               { id: "nuevo-recorrido", label: "Recorridos", icon: "/icons/route.png" },
               { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
@@ -1928,6 +1941,12 @@ export const AdminPanel = () => {
               >
                 <img src={item.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                 {item.label}
+                {item.id === "solicitudes" && pendingSolicitudes > 0 && (
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d4a017", marginLeft: 8, verticalAlign: "middle" }} />
+                )}
+                {item.id === "ediciones" && pendingEdiciones > 0 && (
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d4a017", marginLeft: 8, verticalAlign: "middle" }} />
+                )}
               </button>
             ))}
           </div>
@@ -2954,13 +2973,17 @@ export const AdminPanel = () => {
             )}
 
             {/* SOLICITUDES */}
+            {/* EDICIONES */}
+            {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} />}
+
             {view === "solicitudes" && (
-              <div>
-                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h2 style={styles.sectionTitle}>
-                    <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                    Solicitudes de Sello
-                  </h2>
+              <>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                    <h2 style={styles.sectionTitle}>
+                      <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                      Solicitudes
+                    </h2>
                   <button onClick={cargarSolicitudes} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
                     <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
                     ACTUALIZAR
@@ -2972,96 +2995,112 @@ export const AdminPanel = () => {
                 ) : solicitudes.length === 0 ? (
                   <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>No hay solicitudes pendientes</div>
                 ) : (
-                  solicitudes.map((sol) => {
-                    const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(sol.tipo);
-                    return (
-                      <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
-                        <img src={`/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0 }} alt="" />
-                        <div style={{ flex: 1, color: "#000" }}>
-                          <div style={{ fontWeight: 700, fontSize: "15px", color: "#000" }}>{sol.nombre}</div>
-                          <div style={{ fontSize: "11px", color: "#666", textTransform: "capitalize", marginTop: "2px" }}>{sol.tipo}</div>
-                          <div style={{ fontSize: "12px", marginTop: "4px", lineHeight: 1.5, color: "#000" }}>
-                            <div style={{ color: "#000" }}>{sol.email || "—"}</div>
-                            <div style={{ color: "#000" }}>{sol.razon_social || "—"}</div>
-                            <div style={{ color: "#000" }}>{sol.cuit ? "CUIT: " + sol.cuit : "—"}</div>
-                            <div style={{ color: "#000" }}>{sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR") : "—"}</div>
-                          </div>
+                  (() => {
+                    const grouped = solicitudes.reduce((acc, sol) => {
+                      const key = sol.perfil_email || sol.email || "Sin email";
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(sol);
+                      return acc;
+                    }, {});
+                    return Object.entries(grouped).map(([email, sols]) => (
+                      <div key={email} style={{ marginBottom: 24 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#555", marginBottom: 8, padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 6 }}>
+                          <img src="/icons/user.png" style={{ width: 16, height: 16 }} alt="" />
+                          {sols[0].perfil_nombre || email}
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <button
-                            onClick={() => setSolicitudDetalle(sol)}
-                            className="admin-btn-ghost"
-                            style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
-                          >
-                            👁 VER DETALLE
-                          </button>
-                          {sol.email && (
-                            <a
-                              href={buildMailtoUrl(sol)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="admin-btn-ghost"
-                              style={{ ...styles.smallBtn("#2980b9"), textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
-                            >
-                              <img src="/icons/mail.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                              MAIL
-                            </a>
-                          )}
-                          <button
-                            onClick={() => {
-                              setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
-                              setApproveFechas({ inicio: "", fin: "", estado_pago: "al_dia" });
-                            }}
-                            className="admin-btn"
-                            style={{ background: "#2e7d32", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
-                          >
-                            ✓ APROBAR
-                          </button>
-                          <button
-                            onClick={async () => {
-                              const ok = await showConfirm(`¿Rechazar "${sol.nombre}"?`, "RECHAZAR");
-                              if (!ok) return;
-                              try {
-                                const res = await authFetch(`/api/solicitudes/${sol.id}/rechazar`, {
-                                  method: "POST",
-                                  headers: authHeaders({ "Content-Type": "application/json" }),
-                                });
-                                if (res.ok) {
-                                  showPopup("Solicitud rechazada", "success");
-                                  cargarSolicitudes();
-                                  if (sol.email) {
-                                    const lines = [
-                                      `Hola ${sol.nombre},`,
-                                      "",
-                                      "Lamentamos informarte que tu solicitud para el Sello Made in Chaco no ha sido aprobada en esta instancia.",
-                                      "",
-                                      "Cualquier consulta podés responder a este correo.",
-                                      "",
-                                      "Saludos,",
-                                      "Equipo Made in Chaco",
-                                    ];
-                                    const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello");
-                                    const body = encodeURIComponent(lines.join("\n"));
-                                    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sol.email)}&su=${subject}&body=${body}`;
-                                    window.open(url, "_blank", "noopener,noreferrer");
-                                  }
-                                } else {
-                                  const data = await res.json();
-                                  showPopup(data.error || "Error al rechazar", "warning");
-                                }
-                              } catch {
-                                showPopup("Error de conexión", "warning");
-                              }
-                            }}
-                            className="admin-btn"
-                            style={{ background: "#c62828", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
-                          >
-                            ✕ RECHAZAR
-                          </button>
-                        </div>
+                        {sols.map((sol) => {
+                          const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(sol.tipo);
+                          return (
+                            <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
+                              <img src={`/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0 }} alt="" />
+                              <div style={{ flex: 1, color: "#000" }}>
+                                <div style={{ fontWeight: 700, fontSize: "15px", color: "#000" }}>{sol.nombre}</div>
+                                <div style={{ fontSize: "11px", color: "#666", textTransform: "capitalize", marginTop: "2px" }}>{sol.tipo}</div>
+                                <div style={{ fontSize: "12px", marginTop: "4px", lineHeight: 1.5, color: "#000" }}>
+                                  <div style={{ color: "#000" }}>{sol.email || "—"}</div>
+                                  <div style={{ color: "#000" }}>{sol.razon_social || "—"}</div>
+                                  <div style={{ color: "#000" }}>{sol.cuit ? "CUIT: " + sol.cuit : "—"}</div>
+                                  <div style={{ color: "#000" }}>{sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR") : "—"}</div>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                <button
+                                  onClick={() => setSolicitudDetalle(sol)}
+                                  className="admin-btn-ghost"
+                                  style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
+                                >
+                                  👁 VER DETALLE
+                                </button>
+                                {sol.email && (
+                                  <a
+                                    href={buildMailtoUrl(sol)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="admin-btn-ghost"
+                                    style={{ ...styles.smallBtn("#2980b9"), textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
+                                  >
+                                    <img src="/icons/mail.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                                    MAIL
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
+                                    setApproveFechas({ inicio: "", fin: "", estado_pago: "al_dia" });
+                                  }}
+                                  className="admin-btn"
+                                  style={{ background: "#2e7d32", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                                >
+                                  ✓ APROBAR
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    const ok = await showConfirm(`¿Rechazar "${sol.nombre}"?`, "RECHAZAR");
+                                    if (!ok) return;
+                                    try {
+                                      const res = await authFetch(`/api/solicitudes/${sol.id}/rechazar`, {
+                                        method: "POST",
+                                        headers: authHeaders({ "Content-Type": "application/json" }),
+                                      });
+                                      if (res.ok) {
+                                        showPopup("Solicitud rechazada", "success");
+                                        cargarSolicitudes();
+                                        if (sol.email) {
+                                          const lines = [
+                                            `Hola ${sol.nombre},`,
+                                            "",
+                                            "Lamentamos informarte que tu solicitud para el Sello Made in Chaco no ha sido aprobada en esta instancia.",
+                                            "",
+                                            "Cualquier consulta podés responder a este correo.",
+                                            "",
+                                            "Saludos,",
+                                            "Equipo Made in Chaco",
+                                          ];
+                                          const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello");
+                                          const body = encodeURIComponent(lines.join("\n"));
+                                          const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sol.email)}&su=${subject}&body=${body}`;
+                                          window.open(url, "_blank", "noopener,noreferrer");
+                                        }
+                                      } else {
+                                        const data = await res.json();
+                                        showPopup(data.error || "Error al rechazar", "warning");
+                                      }
+                                    } catch {
+                                      showPopup("Error de conexión", "warning");
+                                    }
+                                  }}
+                                  className="admin-btn"
+                                  style={{ background: "#c62828", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                                >
+                                  ✕ RECHAZAR
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })
+                    ));
+                  })()
                 )}
 
                 {/* Modal aprobar */}
@@ -3256,6 +3295,7 @@ export const AdminPanel = () => {
                   );
                 })()}
               </div>
+              </>
             )}
 
             {/* RECORRIDOS */}
@@ -4257,3 +4297,244 @@ const LocalidadRow = ({ loc, values, onChange }) => (
     </div>
   </div>
 );
+
+const FIELD_LABELS = {
+  nombre: "Nombre", resumen: "Descripción", email: "Email",
+  direccion_escrita: "Dirección", latitud: "Latitud", longitud: "Longitud",
+  localidad_id: "Localidad", imagen: "Foto de portada",
+  biografia_larga: "Descripción", redes_sociales: "Redes sociales",
+  sitio_web: "Sitio web", razon_social: "Razón social", cuit: "CUIT",
+  rubro_especifico: "Rubro específico", horario_apertura: "Horario apertura",
+  horario_cierre: "Horario cierre", dias_abierto: "Días abierto",
+  acepta_tarjetas: "Acepta tarjetas", fecha_evento: "Fecha del evento",
+  duracion_dias: "Duración (días)", actividades_principales: "Actividades principales",
+  link_entradas: "Link de entradas", es_itinerante: "Es itinerante",
+  fecha_inicio_suscripcion: "Inicio suscripción",
+  fecha_fin_suscripcion: "Fin suscripción",
+  tecnica_principal: "Técnica principal", materiales_usados: "Materiales usados",
+  anios_experiencia: "Años de experiencia", taller_abierto: "Taller abierto",
+  comunidad_etnica: "Comunidad étnica", contacto_comercial: "Contacto comercial",
+  historia_plato: "Historia del plato", ingredientes_clave: "Ingredientes clave",
+  receta_destacada: "Receta destacada",
+  establecimientos_donde_probar: "Establecimientos",
+  año_referencia: "Año de referencia", estilo_arquitectonico: "Estilo arquitectónico",
+  declaratoria_oficial: "Declaratoria oficial",
+  estado_conservacion: "Estado de conservación",
+  nombre_completo: "Nombre completo", apodo: "Apodo",
+  biografia_resumida: "Biografía", profesion: "Profesión",
+  fecha_nacimiento: "Fecha de nacimiento",
+  es_referente_comunidad: "Referente comunitario", contacto: "Contacto",
+  etnia: "Etnia", lenguas: "Lenguas", territorio_tradicional: "Territorio tradicional",
+  cosmovision: "Cosmovisión", categoria_natural: "Categoría natural",
+  actividades: "Actividades", acceso: "Acceso",
+  flora_fauna_destacada: "Flora y fauna destacada", mejor_epoca: "Mejor época",
+  categoria_hospedaje: "Categoría", servicios: "Servicios",
+  capacidad: "Capacidad", tipo_producto: "Tipo de producto",
+  metodos_produccion: "Métodos de producción", certificaciones: "Certificaciones",
+  tipo_experiencia: "Tipo de experiencia", duracion_experiencia: "Duración",
+  que_incluye: "Qué incluye", precio_referencia: "Precio de referencia",
+  contacto_reserva: "Contacto / Reserva", operador: "Operador",
+  autor: "Autor", fecha_relato: "Fecha del relato",
+  tipo_relato: "Tipo de relato", contenido_completo: "Contenido completo",
+  tipo_espacio: "Tipo de espacio", horarios: "Horarios",
+};
+
+function RevisarModal({ sol, onClose }) {
+  const actual = sol.entidad_actual || {};
+  const datos = sol.datos || {};
+  const changes = Object.keys(datos).filter((k) => {
+    if (k === "multimedia" || k.endsWith("_custom")) return false;
+    const current = actual[k] ?? "";
+    const proposed = datos[k] ?? "";
+    return String(current) !== String(proposed);
+  });
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 16, padding: 32, fontFamily: "Epilogue, sans-serif" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[sol.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 4px" }}>{sol.tipo}</p>
+            <h2 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 700, color: "#1c1c18", margin: 0 }}>{sol.entidad_nombre}</h2>
+            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              Solicitado por {sol.perfil_nombre || sol.perfil_email || "\u2014"} · {new Date(sol.created_at).toLocaleDateString("es-AR")}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#999", padding: 4, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {changes.length === 0 ? (
+          <p style={{ color: "#999", fontSize: 14 }}>No se detectaron cambios en los campos principales.</p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #eee" }}>
+                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "30%" }}>Campo</th>
+                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "35%" }}>Valor actual</th>
+                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "35%" }}>Valor propuesto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes.map((k) => {
+                const current = actual[k];
+                const proposed = datos[k];
+                const label = FIELD_LABELS[k] || k;
+                const displayVal = (v) => {
+                  if (v === null || v === undefined || v === "") return <span style={{ color: "#ccc", fontStyle: "italic" }}>vacío</span>;
+                  if (k === "redes_sociales") {
+                    try {
+                      const parsed = typeof v === "string" ? JSON.parse(v) : v;
+                      if (Array.isArray(parsed)) return parsed.map((c) => `${c.type}: ${c.value}`).join(" · ");
+                    } catch {}
+                    return String(v);
+                  }
+                  if (k === "localidad_id") return `ID: ${v}`;
+                  if (k === "multimedia") return `${Array.isArray(v) ? v.length : 0} archivo(s)`;
+                  return String(v);
+                };
+                const isNew = current === null || current === undefined || current === "";
+                return (
+                  <tr key={k} style={{ borderBottom: "1px solid #f5f2eb" }}>
+                    <td style={{ padding: "10px 12px", fontWeight: 600, color: "#1c1c18" }}>{label}</td>
+                    <td style={{ padding: "10px 12px", color: isNew ? "#ccc" : "#666", fontStyle: isNew ? "italic" : "normal" }}>
+                      {displayVal(current)}
+                    </td>
+                    <td style={{ padding: "10px 12px", color: "#2e7d32", background: "#f1f8e9" }}>
+                      {displayVal(proposed)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+
+        {datos.multimedia && Array.isArray(datos.multimedia) && datos.multimedia.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px" }}>Multimedia nueva</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {datos.multimedia.filter((m) => m.url_recurso).map((m, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#fafaf8", borderRadius: 8, border: "1px solid #eee" }}>
+                  {m.tipo_recurso === "foto" ? (
+                    <img src={m.url_recurso} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4 }} />
+                  ) : m.tipo_recurso === "video" ? (
+                    <video src={m.url_recurso} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4 }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, background: "#f5f2eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎵</div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", margin: 0 }}>{m.titulo_alternativo || `Multimedia ${i + 1}`}</p>
+                    <p style={{ fontSize: 11, color: "#999", margin: 0 }}>{m.tipo_recurso} · {m.descripcion_recurso || ""}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 32 }}>
+          <button onClick={onClose} style={{
+            fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            border: "1px solid #ddd", background: "transparent", padding: "8px 16px",
+            borderRadius: 8, color: "#555",
+          }}>CERRAR</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdiciones }) {
+  const [ediciones, setEdiciones] = useState(null);
+  const [revisando, setRevisando] = useState(null);
+  const setEdicionesCount = useCallback((data) => {
+    setEdiciones(data);
+    if (setPendingEdiciones) setPendingEdiciones(data ? data.length : 0);
+  }, [setPendingEdiciones]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
+        if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
+      } catch {}
+    })();
+  }, [authFetch, authHeaders, setEdicionesCount]);
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <h2 style={styles.sectionTitle}>
+          <img src="/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+          Ediciones
+        </h2>
+        <button onClick={async () => {
+          const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
+          if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
+        }} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+          ACTUALIZAR
+        </button>
+      </div>
+      {ediciones === null ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+      ) : ediciones.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay ediciones pendientes.</p>
+      ) : (
+        <>
+        {(() => {
+          const grouped = ediciones.reduce((acc, sol) => {
+            const key = sol.owner_email || "desconocido";
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(sol);
+            return acc;
+          }, {});
+          return Object.entries(grouped).map(([email, sols]) => (
+            <div key={email} style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#555", marginBottom: 8, padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 6 }}>
+                <img src="/icons/user.png" style={{ width: 16, height: 16 }} alt="" />
+                {sols[0].owner_nombre || email}
+              </div>
+              {sols.map((sol) => (
+                <div key={sol.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", border: "1px solid #eee", borderRadius: 12, background: "#fff", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[sol.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>{sol.tipo}</span>
+                      <span style={{ fontSize: 11, color: "#f39c12", background: "#fff8e1", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>PENDIENTE</span>
+                    </div>
+                    <p style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18", margin: 0 }}>{sol.entidad_nombre}</p>
+                    <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                      {new Date(sol.created_at).toLocaleDateString("es-AR")}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setRevisando(sol)} style={{
+                      padding: "8px 16px", background: "transparent", color: "#555",
+                      border: "1px solid #ddd", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}>REVISAR</button>
+                    <button onClick={async () => {
+                      if (!confirm("¿Aprobar esta edición? Los datos se aplicarán a la entidad.")) return;
+                      await authFetch(`/api/solicitudes-edicion/${sol.id}/aprobar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
+                      const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
+                      if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
+                    }} style={{ padding: "8px 16px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      APROBAR
+                    </button>
+                    <button onClick={async () => {
+                      if (!confirm("¿Rechazar esta edición?")) return;
+                      await authFetch(`/api/solicitudes-edicion/${sol.id}/rechazar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
+                      const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
+                      if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
+                    }} style={{ padding: "8px 16px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      RECHAZAR
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ));
+        })()}
+        </>
+      )}
+      {revisando && <RevisarModal sol={revisando} onClose={() => setRevisando(null)} />}
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { AuthPublicoProvider } from "./context/AuthPublicoContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HeaderComponent } from "./components/HeaderComponent";
 import { FullscreenToggle } from "./components/FullscreenToggle";
@@ -15,8 +16,13 @@ import { EntidadDetallePage } from "./pages/EntidadDetallePage";
 import { RecorridosPage } from "./pages/RecorridosPage";
 import { RecorridoDetallePage } from "./pages/RecorridoDetallePage";
 import { SolicitarSelloPage } from "./pages/SolicitarSelloPage";
+import { SolicitarEdicionPage } from "./pages/SolicitarEdicionPage";
 import { QuienesSomosPage } from "./pages/QuienesSomosPage";
 import { PalabraDetallePage } from "./pages/PalabraDetallePage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { UserLoginPage } from "./pages/UserLoginPage";
+import { PerfilPage } from "./pages/PerfilPage";
+import { VerificarCuentaPage } from "./pages/VerificarCuentaPage";
 
 function MadeInChacoApp() {
   const location = useLocation();
@@ -55,10 +61,15 @@ function MadeInChacoApp() {
           }
         />
         <Route path="/entidad/:slug" element={<EntidadDetallePage />} />
+        <Route path="/entidad/:id/editar" element={<SolicitarEdicionPage />} />
         <Route path="/recorridos" element={<RecorridosPage />} />
         <Route path="/recorrido/:slug" element={<RecorridoDetallePage />} />
         <Route path="/solicitar-sello" element={<SolicitarSelloPage />} />
         <Route path="/quienes-somos" element={<QuienesSomosPage />} />
+        <Route path="/registrarse" element={<RegisterPage />} />
+        <Route path="/iniciar-sesion" element={<UserLoginPage />} />
+        <Route path="/perfil" element={<PerfilPage />} />
+        <Route path="/verificar/:token" element={<VerificarCuentaPage />} />
         <Route path="/palabra/:id" element={<PalabraDetallePage />} />
         <Route path="/*" element={<Navigate to="/" />}></Route>
       </Routes>
@@ -67,7 +78,9 @@ function MadeInChacoApp() {
 
   return (
     <AuthProvider>
-      {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
+      <AuthPublicoProvider>
+        {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
+      </AuthPublicoProvider>
     </AuthProvider>
   );
 }

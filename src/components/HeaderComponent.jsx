@@ -5,6 +5,7 @@ import logoClaro from "../assets/imagenes/madeinchacoclaro.png";
 import logoSymbol from "../assets/imagenes/logo-sintitulo.png";
 import { SelloModal } from "./SelloModal";
 import { useMapStore } from "../store/useMapStore";
+import { useAuthPublico } from "../context/AuthPublicoContext";
 export const HeaderComponent = () => {
   const location = useLocation();
   const isMapPage = location.pathname === "/descubre";
@@ -37,6 +38,7 @@ export const HeaderComponent = () => {
   const [rutasPanelClosing, setRutasPanelClosing] = useState(false);
   const navigate = useNavigate();
   const logoRef = useRef(null);
+  const { perfil: perfilPublico, logout: logoutPublico, isAuthenticated: isAuthPublico } = useAuthPublico();
   const searchInputRef = useRef(null);
 
   // Efecto 3D tilt en el logo del header
@@ -188,9 +190,22 @@ export const HeaderComponent = () => {
       >
         <div className="header-left">
           {/* LOGO  */}
-          <NavLink ref={logoRef} className="logo" to="/" aria-current="page">
+          <span
+            ref={logoRef}
+            className="logo"
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              if (isAuthPublico && !perfilPublico?.verified) {
+                localStorage.removeItem("made_in_chaco_token_publico");
+                localStorage.removeItem("made_in_chaco_perfil");
+                location.replace("/");
+              } else {
+                navigate("/");
+              }
+            }}
+          >
             <img src={logoClaro} alt="Made in Chaco" className="logo-img" />
-          </NavLink>
+          </span>
 
           {/* HAMBURGER GLASS BUTTON - filter panel toggle */}
           {isMapPage && (
@@ -236,6 +251,8 @@ export const HeaderComponent = () => {
           )}
         </div>
 
+        {isAuthPublico && !perfilPublico?.verified ? null : (
+        <>
         {/* Search bar on map page */}
         {isMapPage && (
           <div className="header-search-wrapper">
@@ -351,16 +368,25 @@ export const HeaderComponent = () => {
                 Contacto
               </NavLink>
             </li>
+            {isAuthPublico && (
+              <li>
+                <NavLink
+                  to="/solicitar-sello"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowSelloModal(true);
+                  }}
+                >
+                  Solicitar sello
+                </NavLink>
+              </li>
+            )}
             <li>
-              <NavLink
-                to="/solicitar-sello"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowSelloModal(true);
-                }}
-              >
-                Solicitar sello
-              </NavLink>
+              {isAuthPublico ? (
+                <NavLink to="/perfil">Perfil</NavLink>
+              ) : (
+                <NavLink to="/iniciar-sesion">Ingresar</NavLink>
+              )}
             </li>
           </ul>
         )}
@@ -741,16 +767,25 @@ export const HeaderComponent = () => {
               >
                 Contacto
               </NavLink>
+              {isAuthPublico && (
+                <NavLink
+                  to="/solicitar-sello"
+                  className="train-item"
+                  style={{ transitionDelay: "0.24s" }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowSelloModal(true);
+                  }}
+                >
+                  Solicitar sello
+                </NavLink>
+              )}
               <NavLink
-                to="/solicitar-sello"
+                to={isAuthPublico ? "/perfil" : "/iniciar-sesion"}
                 className="train-item"
-                style={{ transitionDelay: "0.24s" }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowSelloModal(true);
-                }}
+                style={{ transitionDelay: "0.32s" }}
               >
-                Solicitar sello
+                {isAuthPublico ? "Perfil" : "Ingresar"}
               </NavLink>
             </nav>
           </div>
@@ -765,6 +800,7 @@ export const HeaderComponent = () => {
             </label>
           </>
         )}
+      </>)}
       </header>
 
       <SelloModal

@@ -60,6 +60,7 @@ export const MapChaco = () => {
   const filtroRef = useRef(filtro);
   const filtroLocalidadRef = useRef(filtroLocalidad);
   const showDepartamentosRef = useRef(showDepartamentos);
+  const imagenesCargadasRef = useRef(new Set());
 
   const { limpiarConexiones, dibujarConexiones } = useMapConexiones(entidadCoordsRef, entidadDataRef, popupRef);
   const { limpiarRutaRecorrido, recorridoRouteDataRef, savedPuntosFilterRef, prevRecorridoRef, recorridoLayerRef, recorridoGlowLayerRef, recorridoSourceRef, routeAnimRef } = useMapRecorridos();
@@ -316,17 +317,20 @@ export const MapChaco = () => {
         if (cancelled) return;
         const geojson = {
           type: "FeatureCollection",
-          features: data.map((punto) => ({
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [
-                parseFloat(punto.longitud),
-                parseFloat(punto.latitud),
-              ],
-            },
-            properties: { ...punto },
-          })),
+          features: data.map((punto) => {
+            const { icono: iconoVal, ...resto } = punto;
+            return {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [
+                  parseFloat(punto.longitud),
+                  parseFloat(punto.latitud),
+                ],
+              },
+              properties: iconoVal ? { ...resto, icono: iconoVal } : resto,
+            };
+          }),
         };
         setGeoData(geojson);
         window.__geoData = geojson;
@@ -411,20 +415,56 @@ export const MapChaco = () => {
       await Promise.all(
         iconos.map((nombre) => {
           return new Promise((resolve) => {
-            if (map.hasImage(nombre)) return resolve();
+            if (imagenesCargadasRef.current.has(nombre) || map.hasImage(nombre)) return resolve();
             map.loadImage(`/icons/${nombre}.png`, (error, image) => {
               if (!error && image) {
-                try {
+                if (!map.hasImage(nombre)) {
                   map.addImage(nombre, image);
-                } catch {
-                  // ya existe, ignorar
                 }
+                imagenesCargadasRef.current.add(nombre);
               }
               resolve();
             });
           });
         }),
       );
+
+      // Cargar iconos personalizados de entidades
+      const customIcons = geoData.features.filter((f) => f.properties.icono);
+      const failedIconIds = new Set();
+      await Promise.all(
+        customIcons.map((f) => {
+          const imageName = String(f.properties.id);
+          if (imagenesCargadasRef.current.has(imageName) || map.hasImage(imageName)) return Promise.resolve();
+          return new Promise((resolve) => {
+            map.loadImage(f.properties.icono, (error, image) => {
+              if (!error && image) {
+                if (!map.hasImage(imageName)) {
+                  map.addImage(imageName, image, { sdf: false, pixelRatio: 1 });
+                }
+                imagenesCargadasRef.current.add(imageName);
+              } else {
+                failedIconIds.add(f.properties.id);
+              }
+              resolve();
+            });
+          });
+        }),
+      );
+
+      // Si algún icono no se pudo cargar, remover icono de esas features
+      // para que la expresión del layer caiga al fallback por tipo
+      let geoDataClean = geoData;
+      if (failedIconIds.size > 0) {
+        geoDataClean = {
+          ...geoData,
+          features: geoData.features.map((f) =>
+            failedIconIds.has(f.properties.id)
+              ? { ...f, properties: { ...f.properties, icono: undefined } }
+              : f,
+          ),
+        };
+      }
 
       // A. Capa de polígonos de departamentos
       if (departamentos && !map.getSource("departamentos")) {
@@ -459,7 +499,7 @@ export const MapChaco = () => {
 
       // C. Configurar Source y Layer de puntos
       if (!map.getSource("puntos-chaco")) {
-        map.addSource("puntos-chaco", { type: "geojson", data: geoData });
+        map.addSource("puntos-chaco", { type: "geojson", data: geoDataClean });
 
         // Si venimos de detalle de entidad, la capa se crea visible directamente
         const visibleInicial = returningRef.current ? "visible" : "none";
@@ -470,7 +510,7 @@ export const MapChaco = () => {
           type: "symbol",
           source: "puntos-chaco",
           layout: {
-            "icon-image": ["get", "tipo"],
+            "icon-image": ["case", ["has", "icono"], ["to-string", ["get", "id"]], ["get", "tipo"]],
             "icon-size": 1,
             "icon-allow-overlap": true,
             visibility: visibleInicial,
@@ -952,7 +992,7 @@ export const MapChaco = () => {
           setEntityActive(false);
         });
       } else if (showControls) {
-        map.getSource("puntos-chaco").setData(geoData);
+        map.getSource("puntos-chaco").setData(geoDataClean);
         map.setLayoutProperty("capa-puntos", "visibility", "visible");
         map.setPaintProperty("capa-puntos", "icon-opacity", 1);
       }

@@ -594,11 +594,19 @@ export const EntidadDetallePage = () => {
                 background: catColor,
                 color: "#fff",
                 boxShadow: `0 2px 12px ${catColor}60`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
               }}
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             >
+              <img
+                src={entidad.icono || `/icons/${entidad.tipo}.png`}
+                alt=""
+                style={{ width: 16, height: 16, borderRadius: 2, objectFit: "contain" }}
+              />
               {catName}
             </motion.span>
             {(() => {

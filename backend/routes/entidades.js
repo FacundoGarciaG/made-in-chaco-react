@@ -177,16 +177,34 @@ router.post("/solicitar-sello", async (req, res) => {
 // PUT /api/entidades/:id
 router.put("/entidades/:id", authMiddleware, async (req, res) => {
   try {
-    const { tipo, nombre, slug, resumen, localidad_id, latitud, longitud, visible, imagen, biografia_larga } = req.body;
+    const { tipo, nombre, slug, resumen, localidad_id, latitud, longitud, visible, imagen, biografia_larga, icono } = req.body;
+
+    // Delete old icono from Cloudinary if it changed
+    if (icono) {
+      const { rows: old } = await pool.query("SELECT icono FROM entidades WHERE id = $1", [req.params.id]);
+      if (old[0]?.icono && old[0].icono !== icono) {
+        try {
+          const u = new URL(old[0].icono);
+          const segments = u.pathname.split("/");
+          let vi = -1;
+          for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
+          if (vi !== -1) {
+            const pid = segments.slice(vi + 1).join("/");
+            await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
+          }
+        } catch {}
+      }
+    }
+
     await pool.query(
       `UPDATE entidades SET tipo = $1, nombre = $2, slug = $3, resumen = $4,
         localidad_id = $5, latitud = $6, longitud = $7, visible = $8,
-        imagen = $9, biografia_larga = $10
-       WHERE id = $11`,
+        imagen = $9, biografia_larga = $10, icono = $11
+       WHERE id = $12`,
       [
         tipo, nombre, slug, resumen || "", localidad_id || null,
         latitud || null, longitud || null, visible !== false,
-        imagen || "", biografia_larga || "", req.params.id,
+        imagen || "", biografia_larga || "", icono || "", req.params.id,
       ],
     );
     res.json({ ok: true });
@@ -242,7 +260,7 @@ router.post("/entidades/:id/detalles", authMiddleware, async (req, res) => {
 router.delete("/entidades/:id", authMiddleware, async (req, res) => {
   try {
     const { rows: ent } = await pool.query(
-      "SELECT perfil_id, imagen FROM entidades WHERE id = $1",
+      "SELECT perfil_id, imagen, icono FROM entidades WHERE id = $1",
       [req.params.id],
     );
     if (ent.length === 0) {
@@ -271,6 +289,20 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
     if (ent[0]?.imagen) {
       try {
         const u = new URL(ent[0].imagen);
+        const segments = u.pathname.split("/");
+        let vi = -1;
+        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
+        if (vi !== -1) {
+          const pid = segments.slice(vi + 1).join("/");
+          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
+        }
+      } catch {}
+    }
+
+    // Delete icono from Cloudinary
+    if (rows[0].icono) {
+      try {
+        const u = new URL(rows[0].icono);
         const segments = u.pathname.split("/");
         let vi = -1;
         for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
@@ -366,8 +398,8 @@ router.get("/entidades/:id/recorridos", async (req, res) => {
 router.get("/mapa-puntos", async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, nombre, slug, tipo, latitud, longitud, imagen, resumen,
-              horario_apertura, horario_cierre, dias_abierto,
+      `SELECT id, nombre, slug, tipo, latitud, longitud, imagen, resumen, icono,
+               horario_apertura, horario_cierre, dias_abierto,
               fecha_evento, localidad_id
        FROM entidades
        WHERE visible = true AND latitud IS NOT NULL AND longitud IS NOT NULL
@@ -477,7 +509,7 @@ router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
 router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows: entPre } = await pool.query("SELECT imagen FROM entidades WHERE id = $1", [id]);
+    const { rows: entPre } = await pool.query("SELECT imagen, icono FROM entidades WHERE id = $1", [id]);
 
     await pool.query(
       "UPDATE entidades SET estado_sello = 'rechazado' WHERE id = $1",
@@ -507,6 +539,20 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
       } catch {}
     }
 
+    // Delete icono from Cloudinary
+    if (entPre[0]?.icono) {
+      try {
+        const u = new URL(entPre[0].icono);
+        const segments = u.pathname.split("/");
+        let vi = -1;
+        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
+        if (vi !== -1) {
+          const pid = segments.slice(vi + 1).join("/");
+          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
+        }
+      } catch {}
+    }
+
     const { rows: entProp } = await pool.query("SELECT perfil_id, nombre FROM entidades WHERE id = $1", [id]);
     if (entProp[0]?.perfil_id) {
       await crearNotificacion(entProp[0].perfil_id, "sello_rechazado", "Sello rechazado", `Tu solicitud de sello para "${entProp[0].nombre}" no ha sido aprobada en esta instancia.`, parseInt(id));
@@ -523,7 +569,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
 router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT perfil_id, estado_sello, imagen FROM entidades WHERE id = $1",
+      "SELECT perfil_id, estado_sello, imagen, icono FROM entidades WHERE id = $1",
       [req.params.id],
     );
     if (rows.length === 0) {
@@ -648,7 +694,7 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
     const datos = solicitud.datos;
 
     // Apply base fields
-    const baseFields = ["nombre", "resumen", "email", "direccion_escrita", "latitud", "longitud", "localidad_id", "imagen", "biografia_larga", "redes_sociales", "fecha_inicio_suscripcion", "fecha_fin_suscripcion"];
+    const baseFields = ["nombre", "resumen", "email", "direccion_escrita", "latitud", "longitud", "localidad_id", "imagen", "biografia_larga", "redes_sociales", "fecha_inicio_suscripcion", "fecha_fin_suscripcion", "icono"];
     const baseUpdates = [];
     const baseValues = [];
     let idx = 1;
@@ -777,7 +823,7 @@ router.get("/mis-entidades", authMiddleware, async (req, res) => {
       `SELECT e.id, e.tipo, e.nombre, e.slug, e.resumen, e.localidad_id, e.email,
                e.estado_sello, e.visible, e.created_at, e.imagen, e.direccion_escrita,
                e.fecha_inicio_suscripcion, e.fecha_fin_suscripcion,
-               e.latitud, e.longitud, e.estado_pago, e.updated_at,
+               e.latitud, e.longitud, e.estado_pago, e.updated_at, e.icono,
                CASE WHEN se.id IS NOT NULL THEN true ELSE false END AS tiene_solicitud_pendiente
         FROM entidades e
         LEFT JOIN solicitudes_edicion se ON se.entidad_id = e.id AND se.estado = 'pendiente'

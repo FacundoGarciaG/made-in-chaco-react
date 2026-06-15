@@ -2,8 +2,6 @@ import "../styles/ProjectPage.css";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
-import { BackgroundParallax } from "../components/BackgroundParallax";
-import { useParallax } from "../hooks/useParallax";
 import { AutoPageScroll } from "../components/AutoPageScroll";
 
 export const ProjectPage = () => {
@@ -13,7 +11,6 @@ export const ProjectPage = () => {
   const [showResumeHint, setShowResumeHint] = useState(false);
   const hintTimerRef = useRef(null);
   const { scrollYProgress } = useScroll();
-  const offset = useParallax(0.4);
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
@@ -46,6 +43,18 @@ export const ProjectPage = () => {
     setAutoScroll(true);
   }, []);
 
+  // Fondo negro en body/html mientras esté en esta página
+  useEffect(() => {
+    const prevBodyBg = document.body.style.backgroundColor;
+    const prevHtmlBg = document.documentElement.style.backgroundColor;
+    document.body.style.backgroundColor = "#0a0a0a";
+    document.documentElement.style.backgroundColor = "#0a0a0a";
+    return () => {
+      document.body.style.backgroundColor = prevBodyBg;
+      document.documentElement.style.backgroundColor = prevHtmlBg;
+    };
+  }, []);
+
   // Mostrar hint a los 5s de pausado
   useEffect(() => {
     if (!hasStarted || autoScroll) {
@@ -72,25 +81,12 @@ export const ProjectPage = () => {
         blockScroll={scrollLocked}
       />
 
-      <BackgroundParallax />
-
       {/* Overlay click para empezar */}
       {!hasStarted && (
         <div className="project-start-overlay">
           <div className="project-start-cta" onClick={handleStartAutoScroll}>
             <img src="/icons/touch.png" className="project-start-icon" />
             <p className="project-start-text">Hacé click o tocá la pantalla</p>
-            <motion.div
-              className="project-start-arrow"
-              animate={{ y: [0, 15, 0] }}
-              transition={{
-                repeat: Infinity,
-                duration: 1.5,
-                ease: "easeInOut",
-              }}
-            >
-              <i className="ri-arrow-down-wide-line"></i>
-            </motion.div>
           </div>
         </div>
       )}
@@ -103,22 +99,24 @@ export const ProjectPage = () => {
           de la provincia del Chaco.
         </p>
 
-        <p
+        <motion.p
           className="project-intro"
-          style={{
-            transform: `translateY(${1200 - offset}px)`,
-          }}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
         >
           El proyecto propone el desarrollo de una enciclopedia web interactiva,
           de acceso libre y gratuito, que recoja saberes, oficios, lenguas,
           gastronomía, expresiones artísticas y patrimonio intangible de las
           comunidades chaqueñas.
-        </p>
-        <div
+        </motion.p>
+        <motion.div
           className="item-project"
-          style={{
-            transform: `translateX(${offset / 2 - 600}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
         >
           <h2>Objetivos</h2>
           <h3>Objetivo general</h3>
@@ -148,12 +146,13 @@ export const ProjectPage = () => {
             Fomentar el acceso al conocimiento de estudiantes, investigadores,
             docentes y ciudadanos en general.
           </p>
-        </div>
-        <div
+        </motion.div>
+        <motion.div
           className="item-project justification"
-          style={{
-            transform: `translateY(${1700 - offset}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
         >
           <h2>Justificación</h2>
           <p>
@@ -179,13 +178,14 @@ export const ProjectPage = () => {
             territorial en un valor de mercado que beneficia directamente a los
             productores, comerciantes y prestadores de servicios locales.
           </p>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
           className="item-project"
-          style={{
-            transform: `translateX(${offset / 2 - 1000}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
         >
           <h2>Descripción del proyecto</h2>
           <p>
@@ -209,12 +209,13 @@ export const ProjectPage = () => {
             geográficamente en un mapa interactivo que funcionará como eje
             visual de navegación.
           </p>
-        </div>
-        <div
+        </motion.div>
+        <motion.div
           className="item-project"
-          style={{
-            transform: `translateX(${1300 - offset / 2}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
         >
           <h2>Público destinatario</h2>
           <ul className="project-list">
@@ -224,12 +225,13 @@ export const ProjectPage = () => {
             <li>Organismos públicos, museos, bibliotecas</li>
             <li>Medios de comunicación y productores culturales</li>
           </ul>
-        </div>
-        <div
+        </motion.div>
+        <motion.div
           className="item-project"
-          style={{
-            transform: `translateY(${3000 - offset}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
         >
           <h2>Alcance y etapas</h2>
           <p>El proyecto prevé una ejecución en etapas:</p>
@@ -242,12 +244,13 @@ export const ProjectPage = () => {
               Alianzas con escuelas, universidades, instituciones culturales
             </li>
           </ul>
-        </div>
-        <div
+        </motion.div>
+        <motion.div
           className="item-project"
-          style={{
-            transform: `translateX(${offset / 2 - 1500}px)`,
-          }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
         >
           <h2>Impacto esperado</h2>
           <ul className="project-list">
@@ -262,8 +265,14 @@ export const ProjectPage = () => {
             </li>
             <li>Generación de identidad y orgullo provincial.</li>
           </ul>
-        </div>
-        <div className="item-project">
+        </motion.div>
+        <motion.div
+          className="item-project"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+        >
           <h3>Solicitamos apoyo institucional para:</h3>
           <ul className="project-list">
             <li>
@@ -285,7 +294,7 @@ export const ProjectPage = () => {
               descentralizadas.
             </li>
           </ul>
-        </div>
+        </motion.div>
 
         <motion.div className="progress" style={{ scaleX, originX: 0 }} />
       </section>

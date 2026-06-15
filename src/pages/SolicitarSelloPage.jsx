@@ -187,7 +187,9 @@ export const SolicitarSelloPage = () => {
   const [direccion, setDireccion] = useState("");
   const [localidades, setLocalidades] = useState([]);
   const [imagen, setImagen] = useState("");
+  const [icono, setIcono] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [subiendoIcono, setSubiendoIcono] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -303,6 +305,46 @@ export const SolicitarSelloPage = () => {
     img.src = url;
   };
 
+  const handleIconUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    if (file.type !== "image/png") {
+      setError("El icono debe ser una imagen PNG.");
+      e.target.value = "";
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      if (img.width !== 24 || img.height !== 24) {
+        setError(`El icono debe ser de 24×24 px. La imagen subida es de ${img.width}×${img.height} px.`);
+        e.target.value = "";
+        return;
+      }
+      setSubiendoIcono(true);
+      try {
+        const formData = new FormData();
+        formData.append("archivo", file);
+        const res = await fetch("/api/upload-public", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error al subir");
+        setIcono(data.url);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setSubiendoIcono(false);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setError("No se pudo leer la imagen.");
+      e.target.value = "";
+    };
+    img.src = url;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -361,6 +403,7 @@ export const SolicitarSelloPage = () => {
         longitud: longitud || null,
         direccion_escrita: direccion,
         imagen,
+        icono: icono || null,
         email: email.trim(),
         ...Object.fromEntries(
           Object.entries(extra).map(([k, v]) => [
@@ -849,6 +892,38 @@ export const SolicitarSelloPage = () => {
               <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
             </div>
 
+            {/* Icono */}
+            <div style={sectionStyle}>
+              <h3 style={sectionHeaderStyle}>Icono personalizado (opcional)</h3>
+              <div style={sectionDividerStyle} />
+              <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                Subí un icono PNG de 24×24 px para tu entidad. Si no subís ninguno, se usará el icono predeterminado según el tipo.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, border: "1px dashed #ddd", padding: "20px 24px", background: "#fafaf8" }}>
+                <label style={{
+                  fontFamily: "inherit",
+                  fontSize: 15,
+                  letterSpacing: "-0.01em",
+                  cursor: "pointer",
+                  border: "none",
+                  borderBottom: "1px solid #bbb",
+                  background: "none",
+                  padding: "4px 0",
+                  color: "#555",
+                }}>
+                  {subiendoIcono ? "Subiendo..." : "Seleccionar archivo"}
+                  <input type="file" accept="image/png" hidden onChange={handleIconUpload} disabled={subiendoIcono} />
+                </label>
+                {icono && (
+                  <img src={icono} alt="" style={{ width: 24, height: 24, imageRendering: "pixelated", border: "1px solid #eee" }} />
+                )}
+                {!icono && tipo && (
+                  <img src={`/icons/${tipo}.png`} alt="" style={{ width: 24, height: 24, opacity: 0.4, border: "1px solid #eee" }} />
+                )}
+              </div>
+              <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Solo PNG • 24×24 px</div>
+            </div>
+
             {/* Error */}
             {error && (
               <div style={{
@@ -865,7 +940,7 @@ export const SolicitarSelloPage = () => {
             {/* Submit */}
             <button
               type="submit"
-              disabled={submitting || uploading}
+              disabled={submitting || uploading || subiendoIcono}
               onMouseEnter={() => setSubmitHover(true)}
               onMouseLeave={() => setSubmitHover(false)}
               style={{
@@ -873,20 +948,20 @@ export const SolicitarSelloPage = () => {
                 fontSize: 18,
                 fontWeight: 500,
                 letterSpacing: "-0.01em",
-                cursor: submitting || uploading ? "default" : "pointer",
+                cursor: submitting || uploading || subiendoIcono ? "default" : "pointer",
                 border: "2px solid #1a1a1a",
-                background: submitHover && !submitting && !uploading ? "#1a1a1a" : "transparent",
+                background: submitHover && !submitting && !uploading && !subiendoIcono ? "#1a1a1a" : "transparent",
                 padding: "12px 32px",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 10,
-                color: submitHover && !submitting && !uploading ? "white" : "#1a1a1a",
+                color: submitHover && !submitting && !uploading && !subiendoIcono ? "white" : "#1a1a1a",
                 marginTop: 56,
                 transition: "all 0.25s ease",
               }}
             >
-              {submitting ? "Enviando solicitud..." : uploading ? "Subiendo imagen..." : "Enviar solicitud"}
-              {!submitting && !uploading && <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a", transform: submitHover ? "translateX(6px)" : "none", transition: "transform 0.2s ease" }}>→</span>}
+              {submitting ? "Enviando solicitud..." : uploading ? "Subiendo imagen..." : subiendoIcono ? "Subiendo icono..." : "Enviar solicitud"}
+              {!submitting && !uploading && !subiendoIcono && <span style={{ fontSize: "1.2em", display: "inline-block", color: "#1a1a1a", transform: submitHover ? "translateX(6px)" : "none", transition: "transform 0.2s ease" }}>→</span>}
             </button>
           </>
         )}

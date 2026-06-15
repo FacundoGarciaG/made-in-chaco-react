@@ -1185,6 +1185,9 @@ export const PerfilPage = () => {
                         }}>
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              {e.icono && (
+                                <img src={e.icono} alt="" style={{ width: 16, height: 16, borderRadius: 2, objectFit: "contain" }} />
+                              )}
                               <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
                                 {TIPOS_LABEL[e.tipo] || e.tipo}
                               </span>
@@ -1261,7 +1264,10 @@ export const PerfilPage = () => {
                           background: "#fcf9f4", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                          }}>
                            <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                              {e.icono && (
+                                <img src={e.icono} alt="" style={{ width: 16, height: 16, borderRadius: 2, objectFit: "contain" }} />
+                              )}
                               <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
                                 {TIPOS_LABEL[e.tipo] || e.tipo}
                               </span>

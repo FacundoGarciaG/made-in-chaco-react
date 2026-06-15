@@ -264,6 +264,8 @@ export const SolicitarEdicionPage = () => {
   const [imagen, setImagen] = useState("");
   const [uploadingImagen, setUploadingImagen] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [icono, setIcono] = useState("");
+  const [subiendoIcono, setSubiendoIcono] = useState(false);
   const [multimediaItems, setMultimediaItems] = useState([]);
   const [uploadingMultimediaIndex, setUploadingMultimediaIndex] = useState(null);
 
@@ -315,6 +317,7 @@ export const SolicitarEdicionPage = () => {
           if (c) setContactos(typeof c === "string" ? JSON.parse(c) : Array.isArray(c) ? c : []);
         } catch { setContactos([]); }
         setImagen(data.imagen || "");
+        setIcono(data.icono || "");
         try {
           const mmRes = await fetch(`/api/entidades/${id}/multimedia`);
           if (mmRes.ok) setMultimediaItems(await mmRes.json());
@@ -406,6 +409,36 @@ export const SolicitarEdicionPage = () => {
     img.src = url;
   };
 
+  const handleUploadIcono = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      if (img.width !== 24 || img.height !== 24) {
+        alert("El icono debe ser exactamente 24×24 px");
+        e.target.value = "";
+        return;
+      }
+      setSubiendoIcono(true);
+      try {
+        const formData = new FormData();
+        formData.append("archivo", file);
+        const res = await fetch("/api/upload-public", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error al subir");
+        setIcono(data.url);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setSubiendoIcono(false);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); e.target.value = ""; };
+    img.src = url;
+  };
+
   const agregarMultimedia = () => setMultimediaItems((p) => [...p, { url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", public_id: "", thumbnail_url: "" }]);
 
   const eliminarMultimedia = (i) => setMultimediaItems((p) => p.filter((_, idx) => idx !== i));
@@ -450,6 +483,7 @@ export const SolicitarEdicionPage = () => {
       delete payload.categoria_hospedaje_custom;
       payload.redes_sociales = JSON.stringify(contactos);
       payload.imagen = imagen;
+      if (icono) payload.icono = icono;
       const multimediaNuevas = multimediaItems.filter((m) => m.id === undefined && m.url_recurso);
       if (multimediaNuevas.length > 0) payload.multimedia = multimediaNuevas;
       const res = await fetch(`/api/entidades/${id}/solicitar-edicion`, {
@@ -867,6 +901,36 @@ export const SolicitarEdicionPage = () => {
             )}
           </div>
 
+          {/* Icono personalizado */}
+          <div style={{ marginTop: 56 }}>
+            <h3 style={{
+              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
+              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
+            }}>Icono personalizado</h3>
+            <div style={sectionDividerStyle} />
+            <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              Subí un icono PNG de exactamente 24×24 px para identificar tu entidad en el mapa.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, border: "1px dashed #ddd", padding: "20px 24px", background: "#fafaf8" }}>
+              {icono && (
+                <img src={icono} alt="" style={{ width: 24, height: 24, borderRadius: 3, objectFit: "contain", border: "1px solid #eee" }} />
+              )}
+              <label style={{
+                fontFamily: "inherit", fontSize: 15, letterSpacing: "-0.01em", cursor: "pointer",
+                border: "none", borderBottom: "1px solid #bbb", background: "none", padding: "4px 0", color: "#555",
+              }}>
+                {subiendoIcono ? "Subiendo..." : icono ? "Cambiar icono" : "Seleccionar archivo"}
+                <input type="file" accept="image/png" hidden onChange={handleUploadIcono} disabled={subiendoIcono} />
+              </label>
+              {icono && (
+                <button type="button" onClick={() => setIcono("")}
+                  style={{ background: "none", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: 16 }}
+                >✕</button>
+              )}
+            </div>
+            <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Solo PNG • 24×24 px exacto</div>
+          </div>
+
           {/* Multimedia */}
           <div style={{ marginTop: 56 }}>
             <h3 style={{
@@ -962,13 +1026,13 @@ export const SolicitarEdicionPage = () => {
             >+ Agregar multimedia</button>
           </div>
 
-          <button type="submit" disabled={saving} style={{
+          <button type="submit" disabled={saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null} style={{
             fontFamily: "inherit", fontSize: 14, fontWeight: 600, letterSpacing: "0.06em",
-            padding: "16px 40px", background: saving ? "#ccc" : "#863819", color: "#fff",
-            border: "none", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer",
+            padding: "16px 40px", background: saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "#ccc" : "#863819", color: "#fff",
+            border: "none", borderRadius: 8, cursor: saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "not-allowed" : "pointer",
             width: "100%", marginTop: 32,
           }}>
-            {saving ? "Enviando..." : "Enviar solicitud de edición"}
+            {saving ? "Enviando..." : uploadingImagen ? "Subiendo portada..." : subiendoIcono ? "Subiendo icono..." : uploadingMultimediaIndex !== null ? "Subiendo multimedia..." : "Enviar solicitud de edición"}
           </button>
         </form>
       </div>

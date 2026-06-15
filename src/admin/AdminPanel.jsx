@@ -553,6 +553,7 @@ export const AdminPanel = () => {
   const [conexiones, setConexiones] = useState([]);
 
   const [uploadingIndex, setUploadingIndex] = useState(null);
+  const [subiendoIconoAdm, setSubiendoIconoAdm] = useState(false);
   const [multimediaError, setMultimediaError] = useState("");
   const [detailError, setDetailError] = useState("");
 
@@ -832,6 +833,7 @@ export const AdminPanel = () => {
       latitud: -27.4511,
       longitud: -58.9861,
       visible: true,
+      icono: "",
     });
     setEspecifico({});
     setMultimediaItems([
@@ -1065,6 +1067,7 @@ export const AdminPanel = () => {
         longitud: data.longitud || -58.9861,
         visible: data.visible !== false,
         direccion_escrita: data.direccion_escrita || "",
+        icono: data.icono || "",
       });
       setGeoQuery(data.direccion_escrita || "");
       const fieldsMap = {
@@ -2482,13 +2485,61 @@ export const AdminPanel = () => {
                         />
                         Visible en el mapa
                       </label>
+                      <div style={{ marginTop: 12 }}>
+                        <label style={{ fontSize: "12px", fontWeight: 600, color: "#863819", display: "block", marginBottom: 6 }}>Icono personalizado (24×24 px, PNG)</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          {general.icono && (
+                            <img src={general.icono} alt="" style={{ width: 24, height: 24, borderRadius: 3, objectFit: "contain", border: "1px solid #eee" }} />
+                          )}
+                          <label style={{
+                            cursor: "pointer", fontSize: "12px", color: "#555",
+                            padding: "6px 14px", border: "1px solid #ccc", borderRadius: 6,
+                            background: "white",
+                          }}>
+                            {subiendoIconoAdm ? "Subiendo..." : general.icono ? "Cambiar" : "Subir icono"}
+                            <input type="file" accept="image/png" hidden disabled={subiendoIconoAdm} onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const img = new Image();
+                              const url = URL.createObjectURL(file);
+                              setSubiendoIconoAdm(true);
+                              img.onload = async () => {
+                                URL.revokeObjectURL(url);
+                                if (img.width !== 24 || img.height !== 24) {
+                                  showPopup("El icono debe ser exactamente 24×24 px", "warning");
+                                  setSubiendoIconoAdm(false);
+                                  e.target.value = "";
+                                  return;
+                                }
+                                const fd = new FormData();
+                                fd.append("archivo", file);
+                                try {
+                                  const r = await fetch("/api/upload-public", { method: "POST", body: fd });
+                                  const d = await r.json();
+                                  if (r.ok) setGeneral((g) => ({ ...g, icono: d.url }));
+                                  else showPopup(d.error || "Error al subir", "warning");
+                                } catch { showPopup("Error de conexión", "warning"); }
+                                setSubiendoIconoAdm(false);
+                                e.target.value = "";
+                              };
+                              img.onerror = () => { setSubiendoIconoAdm(false); e.target.value = ""; };
+                              img.src = url;
+                            }} />
+                          </label>
+                          {general.icono && (
+                            <button type="button" onClick={() => setGeneral((g) => ({ ...g, icono: "" }))}
+                              style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 13 }}
+                            >✕</button>
+                          )}
+                        </div>
+                      </div>
                       <button
-                        style={general.nombre && general.tipo ? { ...styles.btnNext, background: "#2e7d32", width: "100%" } : { ...styles.btnNext, background: "#2e7d32", width: "100%", opacity: 0.5, cursor: "not-allowed" }}
+                        style={general.nombre && general.tipo && !subiendoIconoAdm ? { ...styles.btnNext, background: "#2e7d32", width: "100%" } : { ...styles.btnNext, background: "#2e7d32", width: "100%", opacity: 0.5, cursor: "not-allowed" }}
                         className="admin-btn"
-                        disabled={!general.nombre || !general.tipo}
+                        disabled={!general.nombre || !general.tipo || subiendoIconoAdm}
                         onClick={() => setStep(2)}
                       >
-                        SIGUIENTE: DETALLES →
+                        {subiendoIconoAdm ? "SUBIENDO ICONO…" : "SIGUIENTE: DETALLES →"}
                       </button>
                     </div>
                   </div>
@@ -2954,17 +3005,17 @@ export const AdminPanel = () => {
                       </button>
                       <button
                         onClick={guardarEntidad}
-                        disabled={loading || uploadingIndex !== null}
+                        disabled={loading || uploadingIndex !== null || subiendoIconoAdm}
                         className="admin-btn"
                         style={{
                           ...styles.btnPrimary,
-                          opacity: loading || uploadingIndex !== null ? 0.6 : 1,
-                          cursor: loading || uploadingIndex !== null ? "not-allowed" : "pointer",
+                          opacity: loading || uploadingIndex !== null || subiendoIconoAdm ? 0.6 : 1,
+                          cursor: loading || uploadingIndex !== null || subiendoIconoAdm ? "not-allowed" : "pointer",
                           background: "#2e7d32",
                           width: "100%",
                         }}
                       >
-                        {loading ? "GUARDANDO…" : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
+                        {loading ? "GUARDANDO…" : subiendoIconoAdm ? "SUBIENDO ICONO…" : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
                       </button>
                     </div>
                   </div>
@@ -3012,7 +3063,7 @@ export const AdminPanel = () => {
                           const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(sol.tipo);
                           return (
                             <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
-                              <img src={`/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0 }} alt="" />
+                              <img src={sol.icono || `/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: 4, objectFit: "contain" }} alt="" />
                               <div style={{ flex: 1, color: "#000" }}>
                                 <div style={{ fontWeight: 700, fontSize: "15px", color: "#000" }}>{sol.nombre}</div>
                                 <div style={{ fontSize: "11px", color: "#666", textTransform: "capitalize", marginTop: "2px" }}>{sol.tipo}</div>
@@ -3233,8 +3284,13 @@ export const AdminPanel = () => {
                           {sol.imagen && (
                             <img src={sol.imagen} alt="" style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", flexShrink: 0, border: "1px solid #eee" }} />
                           )}
-                          <div>
-                            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1c1c18" }}>{sol.nombre}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              {sol.icono && (
+                                <img src={sol.icono} alt="" style={{ width: 20, height: 20, borderRadius: 3, objectFit: "contain" }} />
+                              )}
+                              <div style={{ fontSize: "18px", fontWeight: 700, color: "#1c1c18" }}>{sol.nombre}</div>
+                            </div>
                             <div style={{ fontSize: "12px", color: "#863819", textTransform: "capitalize", fontWeight: 600, marginTop: "4px" }}>{sol.tipo}</div>
                             <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>#{sol.id} — {sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
                           </div>

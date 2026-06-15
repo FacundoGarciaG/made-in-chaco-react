@@ -30,6 +30,7 @@ body {
   color: var(--on-surface);
   font-family: var(--font-body);
   overflow-x: hidden;
+  overscroll-behavior: none;
 }
 
 [data-theme="dark"] body,

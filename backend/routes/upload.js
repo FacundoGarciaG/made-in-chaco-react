@@ -101,10 +101,31 @@ router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) =
       stream.end(req.file.buffer);
     });
 
+    const oldPublicId = req.body.old_public_id;
+    if (oldPublicId) {
+      try {
+        await cloudinary.v2.uploader.destroy(oldPublicId, { invalidate: true });
+      } catch (err) {
+        console.warn("No se pudo borrar imagen anterior:", err.message);
+      }
+    }
+
     res.status(201).json({ url: result.secure_url, public_id: result.public_id });
   } catch (err) {
     console.error("Public upload error:", err);
     res.status(500).json({ error: "Error al subir archivo" });
+  }
+});
+
+router.post("/delete-public-image", async (req, res) => {
+  try {
+    const { public_id } = req.body;
+    if (!public_id) return res.status(400).json({ error: "public_id requerido" });
+    await cloudinary.v2.uploader.destroy(public_id, { invalidate: true });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete public image error:", err);
+    res.status(500).json({ error: "Error al borrar imagen" });
   }
 });
 

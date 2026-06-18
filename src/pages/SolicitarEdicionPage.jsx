@@ -276,6 +276,11 @@ export const SolicitarEdicionPage = () => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const mapInitialized = useRef(false);
+  const originalFormRef = useRef(null);
+  const originalContactosRef = useRef(null);
+  const originalImagenRef = useRef(null);
+  const originalIconoRef = useRef(null);
+  const originalMultimediaIdsRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -298,30 +303,39 @@ export const SolicitarEdicionPage = () => {
             const d = new Date(val);
             if (!isNaN(d.getTime())) val = d.toISOString().split("T")[0];
           }
-          initial[c.key] = val ?? "";
+          initial[c.key] = val != null ? String(val) : "";
         }
         initial.nombre = data.nombre || "";
         initial.resumen = data.resumen || "";
         initial.email = data.email || "";
         initial.direccion_escrita = data.direccion_escrita || "";
-        initial.latitud = data.latitud ?? "";
-        initial.longitud = data.longitud ?? "";
-        initial.localidad_id = data.localidad_id ?? "";
-        initial.fecha_inicio_suscripcion = data.fecha_inicio_suscripcion ? data.fecha_inicio_suscripcion.split("T")[0] : "";
-        initial.fecha_fin_suscripcion = data.fecha_fin_suscripcion ? data.fecha_fin_suscripcion.split("T")[0] : "";
+        initial.latitud = data.latitud != null ? String(data.latitud) : "";
+        initial.longitud = data.longitud != null ? String(data.longitud) : "";
+        initial.localidad_id = data.localidad_id != null ? String(data.localidad_id) : "";
         setGeoQuery(data.direccion_escrita || "");
         setForm(initial);
         if (locRes.ok) setLocalidades(await locRes.json());
+        let loadedContactos = [];
         try {
           const c = data.redes_sociales;
-          if (c) setContactos(typeof c === "string" ? JSON.parse(c) : Array.isArray(c) ? c : []);
-        } catch { setContactos([]); }
-        setImagen(data.imagen || "");
-        setIcono(data.icono || "");
+          if (c) loadedContactos = typeof c === "string" ? JSON.parse(c) : Array.isArray(c) ? c : [];
+        } catch { loadedContactos = []; }
+        setContactos(loadedContactos);
+        const loadedImagen = data.imagen || "";
+        const loadedIcono = data.icono || "";
+        setImagen(loadedImagen);
+        setIcono(loadedIcono);
+        let loadedMultimedia = [];
         try {
           const mmRes = await fetch(`/api/entidades/${id}/multimedia`);
-          if (mmRes.ok) setMultimediaItems(await mmRes.json());
+          if (mmRes.ok) loadedMultimedia = await mmRes.json();
         } catch {}
+        setMultimediaItems(loadedMultimedia);
+        originalFormRef.current = initial;
+        originalContactosRef.current = loadedContactos;
+        originalImagenRef.current = loadedImagen;
+        originalIconoRef.current = loadedIcono;
+        originalMultimediaIdsRef.current = new Set(loadedMultimedia.filter((m) => m.id).map((m) => m.id));
       } catch {} finally { setLoading(false); }
     })();
   }, [isAuthenticated, id, getToken, navigate]);
@@ -531,6 +545,21 @@ export const SolicitarEdicionPage = () => {
 
   const campos = CAMPOS_POR_TIPO[entity.tipo] || [];
   const catColor = TIPO_COLOR[entity.tipo] || "#555";
+
+  const hasChanges = (() => {
+    if (!originalFormRef.current) return false;
+    const allKeys = new Set([...Object.keys(form), ...Object.keys(originalFormRef.current)]);
+    for (const key of allKeys) {
+      const a = String(form[key] ?? "").trim();
+      const b = String(originalFormRef.current[key] ?? "").trim();
+      if (a !== b) return true;
+    }
+    if (JSON.stringify(contactos) !== JSON.stringify(originalContactosRef.current)) return true;
+    if ((imagen || "") !== (originalImagenRef.current || "")) return true;
+    if ((icono || "") !== (originalIconoRef.current || "")) return true;
+    if (multimediaItems.some((m) => !m.id)) return true;
+    return false;
+  })();
 
   const renderField = (c) => {
     if (c.type === "textarea") {
@@ -784,26 +813,7 @@ export const SolicitarEdicionPage = () => {
           </div>
 
           {/* Suscripción */}
-          <div style={{ marginTop: 56 }}>
-            <h3 style={{
-              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-            }}>Suscripción</h3>
-            <div style={sectionDividerStyle} />
-            <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-              Podés solicitar cambios en las fechas de tu suscripción. El administrador revisará y aprobará la modificación.
-            </p>
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={sLabel}>Inicio de suscripción</label>
-                <input type="date" style={sInput} value={form.fecha_inicio_suscripcion ?? ""} onChange={(e) => set("fecha_inicio_suscripcion", e.target.value)} />
-              </div>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={sLabel}>Fin de suscripción</label>
-                <input type="date" style={sInput} value={form.fecha_fin_suscripcion ?? ""} onChange={(e) => set("fecha_fin_suscripcion", e.target.value)} />
-              </div>
-            </div>
-          </div>
+
 
           {campos.length > 0 && (
             <div style={{ marginTop: 56 }}>
@@ -1026,10 +1036,10 @@ export const SolicitarEdicionPage = () => {
             >+ Agregar multimedia</button>
           </div>
 
-          <button type="submit" disabled={saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null} style={{
+          <button type="submit" disabled={!hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null} style={{
             fontFamily: "inherit", fontSize: 14, fontWeight: 600, letterSpacing: "0.06em",
-            padding: "16px 40px", background: saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "#ccc" : "#863819", color: "#fff",
-            border: "none", borderRadius: 8, cursor: saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "not-allowed" : "pointer",
+            padding: "16px 40px", background: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "#ccc" : "#863819", color: "#fff",
+            border: "none", borderRadius: 8, cursor: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "not-allowed" : "pointer",
             width: "100%", marginTop: 32,
           }}>
             {saving ? "Enviando..." : uploadingImagen ? "Subiendo portada..." : subiendoIcono ? "Subiendo icono..." : uploadingMultimediaIndex !== null ? "Subiendo multimedia..." : "Enviar solicitud de edición"}

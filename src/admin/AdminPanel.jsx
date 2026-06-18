@@ -511,10 +511,10 @@ export const AdminPanel = () => {
   const [solicitudes, setSolicitudes] = useState([]);
   const [solicitudesLoading, setSolicitudesLoading] = useState(false);
   const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
-  const [approveFechas, setApproveFechas] = useState({ inicio: "", fin: "", estado_pago: "al_dia" });
   const [solicitudDetalle, setSolicitudDetalle] = useState(null);
   const [pendingSolicitudes, setPendingSolicitudes] = useState(0);
   const [pendingEdiciones, setPendingEdiciones] = useState(0);
+  const [pendingDevoluciones, setPendingDevoluciones] = useState(0);
   const [step, setStep] = useState(1);
   const [editingEntityId, setEditingEntityId] = useState(null);
 
@@ -630,12 +630,14 @@ export const AdminPanel = () => {
     cargarRecorridos();
     (async () => {
       try {
-        const [solRes, edRes] = await Promise.all([
+        const [solRes, edRes, devRes] = await Promise.all([
           authFetch("/api/solicitudes", { headers: authHeaders() }),
           authFetch("/api/solicitudes-edicion", { headers: authHeaders() }),
+          authFetch("/api/suscripciones/devoluciones", { headers: authHeaders() }),
         ]);
         if (solRes.ok) { const data = await solRes.json(); setPendingSolicitudes(data.length); }
         if (edRes.ok) { const data = await edRes.json(); setPendingEdiciones(data.length); }
+        if (devRes.ok) { const data = await devRes.json(); setPendingDevoluciones(data.length); }
       } catch {}
     })();
   }, []);
@@ -1262,16 +1264,23 @@ export const AdminPanel = () => {
 
   const buildMailtoUrl = (e) => {
     const lines = [
-      `Hola ${e.nombre},`,
+      `Hola ${e.perfil_nombre || e.nombre},`,
       "",
-      "Recibimos correctamente tu solicitud para el Sello Made in Chaco.",
+      `Recibimos correctamente tu solicitud para obtener el Sello Made in Chaco para ${e.nombre}.`,
       "",
-      "Podés continuar con el proceso de suscripción respondiendo a este correo.",
+      "Queremos contarte que tu solicitud ya está siendo revisada por nuestro equipo. En los próximos días vas a recibir una notificación a través de la plataforma informándote si fue aprobada o rechazada.",
+      "",
+      `Si tu solicitud es aprobada, el siguiente paso es adquirir un plan de suscripción desde tu perfil. Recién entonces tu ${e.tipo} aparecerá en el mapa de Made in Chaco y va a estar visible para toda la comunidad.`,
+      "",
+      "También queremos que sepas que, una vez que adquieras un plan y si en algún momento necesitás reclamar una devolución, podés hacerlo desde tu perfil siguiendo los términos y condiciones establecidos en nuestra política de devolución.",
+      "",
+      "Si tenés cualquier duda, respondé a este correo sin problema.",
       "",
       "Saludos,",
       "Equipo Made in Chaco",
+      "https://madeinchaco.com",
     ];
-    const subject = encodeURIComponent("Made in Chaco — Confirmación de Sello");
+    const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello recibida");
     const body = encodeURIComponent(lines.join("\n"));
     return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.email)}&su=${subject}&body=${body}`;
   };
@@ -1908,6 +1917,7 @@ export const AdminPanel = () => {
               { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
               { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
               { id: "palabras", label: "Palabras", icon: "/icons/edit.png" },
+              { id: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1949,6 +1959,9 @@ export const AdminPanel = () => {
                 )}
                 {item.id === "ediciones" && pendingEdiciones > 0 && (
                   <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d4a017", marginLeft: 8, verticalAlign: "middle" }} />
+                )}
+                {item.id === "devoluciones" && pendingDevoluciones > 0 && (
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#e65100", marginLeft: 8, verticalAlign: "middle" }} />
                 )}
               </button>
             ))}
@@ -2045,6 +2058,7 @@ export const AdminPanel = () => {
                                 {e.estado_sello === "rechazado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>RECHAZADO</span>}
                                 {e.estado_sello === "aprobado" && e.visible && (e.latitud == null || e.longitud == null) && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e67e22", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>REVISAR MAPA</span>}
                                 {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
+                                {e.estado_pago === "reembolso_solicitado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e65100", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEVOLUCIÓN</span>}
                                 {e.fecha_fin_suscripcion && (() => {
                                   try {
                                     const d = new Date();
@@ -3025,7 +3039,7 @@ export const AdminPanel = () => {
 
             {/* SOLICITUDES */}
             {/* EDICIONES */}
-            {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} />}
+            {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} showConfirm={showConfirm} showPopup={showPopup} />}
 
             {view === "solicitudes" && (
               <>
@@ -3060,7 +3074,6 @@ export const AdminPanel = () => {
                           {sols[0].perfil_nombre || email}
                         </div>
                         {sols.map((sol) => {
-                          const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(sol.tipo);
                           return (
                             <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
                               <img src={sol.icono || `/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: 4, objectFit: "contain" }} alt="" />
@@ -3097,7 +3110,6 @@ export const AdminPanel = () => {
                                 <button
                                   onClick={() => {
                                     setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
-                                    setApproveFechas({ inicio: "", fin: "", estado_pago: "al_dia" });
                                   }}
                                   className="admin-btn"
                                   style={{ background: "#2e7d32", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
@@ -3156,7 +3168,6 @@ export const AdminPanel = () => {
 
                 {/* Modal aprobar */}
                 {approveModal && (() => {
-                  const esComercial = ["comercio", "hospedaje", "productor", "evento"].includes(approveModal.tipo);
                   return (
                     <div style={{
                       position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
@@ -3176,35 +3187,6 @@ export const AdminPanel = () => {
                         <p style={{ fontSize: "14px", color: "#555", marginBottom: "16px" }}>
                           {approveModal.nombre} ({approveModal.tipo})
                         </p>
-                        {esComercial && (
-                          <>
-                            <p style={{ fontSize: "12px", color: "#666", marginBottom: "12px" }}>
-                              Esta entidad requiere membresía. Establecé las fechas de suscripción:
-                            </p>
-                            <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-                              <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Inicio</label>
-                                <input type="date" style={styles.input} value={approveFechas.inicio} onChange={(e) => setApproveFechas((f) => ({ ...f, inicio: e.target.value }))} />
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fin</label>
-                                <input type="date" style={styles.input} value={approveFechas.fin} onChange={(e) => setApproveFechas((f) => ({ ...f, fin: e.target.value }))} />
-                              </div>
-                            </div>
-                            <div style={{ marginBottom: "12px" }}>
-                              <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Estado de pago</label>
-                              <select style={styles.input} value={approveFechas.estado_pago} onChange={(e) => setApproveFechas((f) => ({ ...f, estado_pago: e.target.value }))}>
-                                <option value="al_dia">Al día</option>
-                                <option value="atrasado">Atrasado</option>
-                              </select>
-                            </div>
-                          </>
-                        )}
-                        {!esComercial && (
-                          <p style={{ fontSize: "12px", color: "#888", marginBottom: "12px" }}>
-                            Este tipo de entidad no requiere membresía.
-                          </p>
-                        )}
                         <div style={{ background: "#fff3e0", border: "1px solid #ffcc80", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
                             <p style={{ fontSize: "12px", color: "#e65100", margin: 0, lineHeight: 1.4 }}>
                               ⚠ Esta entidad no se mostrará en el mapa hasta que la revises en la sección <strong style={{ color: "#e65100" }}>Entidades</strong> y actives manualmente "MAPA". Recordá revisar sus datos y ubicación primero.
@@ -3216,25 +3198,10 @@ export const AdminPanel = () => {
                           </button>
                           <button
                             onClick={async () => {
-                              if (esComercial && (!approveFechas.inicio || !approveFechas.fin)) {
-                                showPopup("Completá las fechas de inicio y fin de suscripción.", "warning");
-                                return;
-                              }
-                              if (esComercial && approveFechas.inicio && approveFechas.fin && new Date(approveFechas.inicio) >= new Date(approveFechas.fin)) {
-                                showPopup("La fecha de inicio debe ser anterior a la fecha de fin.", "warning");
-                                return;
-                              }
                               try {
-                                const body = {};
-                                if (esComercial) {
-                                  body.fecha_inicio_suscripcion = approveFechas.inicio;
-                                  body.fecha_fin_suscripcion = approveFechas.fin;
-                                  body.estado_pago = approveFechas.estado_pago;
-                                }
                                 const res = await authFetch(`/api/solicitudes/${approveModal.id}/aprobar`, {
                                   method: "POST",
                                   headers: authHeaders({ "Content-Type": "application/json" }),
-                                  body: JSON.stringify(body),
                                 });
                                 if (res.ok) {
                                   showPopup(`"${approveModal.nombre}" aprobada — revisá sus datos y activá "MAPA" en Entidades`, "success");
@@ -3638,6 +3605,19 @@ export const AdminPanel = () => {
             {/* PALABRAS */}
             {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
 
+            {/* DEVOLUCIONES */}
+            {view === "devoluciones" && (
+              <DevolucionesView
+                authFetch={authFetch}
+                authHeaders={authHeaders}
+                colorMapAdmin={colorMapAdmin}
+                setPendingDevoluciones={setPendingDevoluciones}
+                cargarEntidades={cargarEntidades}
+                showPopup={showPopup}
+                showConfirm={showConfirm}
+              />
+            )}
+
             {/* DASHBOARD */}
             {view === "dashboard" && (
               <DashboardView authFetch={authFetch} />
@@ -3702,83 +3682,95 @@ export const AdminPanel = () => {
       </div>
 
       {/* Popup */}
-      {popup && (
+      {popup && popup.isConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => { pendingConfirm.current?.(false); setPopup(null); pendingConfirm.current = null; }}>
+          <div
+            style={{
+              background: "white",
+              padding: "32px",
+              borderRadius: "14px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+              minWidth: "360px",
+              maxWidth: "440px",
+              textAlign: "center",
+              fontFamily: "Merriweather, serif",
+              fontSize: "14px",
+              fontWeight: 500,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: "0 0 20px", fontSize: "15px", lineHeight: 1.5, color: "#000" }}>
+              {popup.message}
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button
+                className="admin-btn"
+                onClick={() => {
+                  pendingConfirm.current?.(true);
+                  setPopup(null);
+                  pendingConfirm.current = null;
+                }}
+                style={{
+                  padding: "10px 28px",
+                  background: popup.confirmLabel === "ELIMINAR" ? "#863819" : "#2e7d32",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+              >
+                {popup.confirmLabel || "ELIMINAR"}
+              </button>
+              <button
+                className="admin-btn-ghost"
+                onClick={() => {
+                  pendingConfirm.current?.(false);
+                  setPopup(null);
+                  pendingConfirm.current = null;
+                }}
+                style={{
+                  padding: "10px 28px",
+                  background: "#f0ede8",
+                  color: "#555",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+              >
+                CANCELAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {popup && !popup.isConfirm && (
         <div
           style={{
             position: "fixed",
-            top: popup.isConfirm ? "50%" : "24px",
+            top: "24px",
             left: "50%",
-            transform: popup.isConfirm ? "translate(-50%, -50%)" : "translateX(-50%)",
+            transform: "translateX(-50%)",
             zIndex: 10000,
-            background: popup.isConfirm
-              ? "white"
-              : popup.type === "error"
-                ? "#fdecea"
-                : popup.type === "warning"
-                  ? "#fff3e0"
-                  : "#e8f5e9",
-            color: popup.isConfirm ? "#000" : "#1c1c18",
-            padding: popup.isConfirm ? "32px" : "14px 24px",
+            background: popup.type === "error"
+              ? "#fdecea"
+              : popup.type === "warning"
+                ? "#fff3e0"
+                : "#e8f5e9",
+            color: "#1c1c18",
+            padding: "14px 24px",
             borderRadius: "14px",
             boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-            minWidth: popup.isConfirm ? "360px" : "auto",
             textAlign: "center",
             fontFamily: "Merriweather, serif",
             fontSize: "14px",
             fontWeight: 500,
           }}
         >
-          {popup.isConfirm ? (
-            <>
-              <p style={{ margin: "0 0 20px", fontSize: "15px", lineHeight: 1.5, color: "#000" }}>
-                {popup.message}
-              </p>
-              <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                  <button
-                    className="admin-btn"
-                    onClick={() => {
-                      pendingConfirm.current?.(true);
-                      setPopup(null);
-                      pendingConfirm.current = null;
-                    }}
-                    style={{
-                      padding: "10px 28px",
-                      background: popup.confirmLabel === "ELIMINAR" ? "#863819" : "#2e7d32",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "10px",
-                      fontWeight: 700,
-                      fontSize: "14px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {popup.confirmLabel || "ELIMINAR"}
-                  </button>
-                  <button
-                    className="admin-btn-ghost"
-                    onClick={() => {
-                      pendingConfirm.current?.(false);
-                      setPopup(null);
-                      pendingConfirm.current = null;
-                    }}
-                    style={{
-                      padding: "10px 28px",
-                      background: "#f0ede8",
-                      color: "#555",
-                      border: "none",
-                      borderRadius: "10px",
-                      fontWeight: 600,
-                      fontSize: "14px",
-                      cursor: "pointer",
-                    }}
-                  >
-                  CANCELAR
-                </button>
-              </div>
-            </>
-          ) : (
-            <>{popup.message}</>
-          )}
+          {popup.message}
         </div>
       )}
     </div>
@@ -4159,6 +4151,219 @@ function PalabrasView({ authFetch, showConfirm, showPopup }) {
   );
 }
 
+function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPendingDevoluciones, cargarEntidades, showPopup, showConfirm }) {
+  const [devoluciones, setDevoluciones] = useState(null);
+  const [detalleEntity, setDetalleEntity] = useState(null);
+
+  const cargarDevoluciones = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/suscripciones/devoluciones", { headers: authHeaders() });
+      if (res.ok) { const data = await res.json(); setDevoluciones(data); setPendingDevoluciones(data.length); }
+    } catch {}
+  }, [authFetch, authHeaders, setPendingDevoluciones]);
+
+  useEffect(() => { cargarDevoluciones(); }, [cargarDevoluciones]);
+
+  const verDetalle = async (id) => {
+    try {
+      const res = await authFetch(`/api/entidades/${id}`);
+      if (res.ok) { setDetalleEntity(await res.json()); }
+    } catch {}
+  };
+
+  const aprobar = async (id, nombre) => {
+    const ok = await showConfirm(`¿Aprobar devolución de "${nombre}"? La suscripción se cancelará.`, "APROBAR");
+    if (!ok) return;
+    const res = await authFetch(`/api/suscripciones/aprobar-devolucion/${id}`, {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+    });
+    if (res.ok) {
+      showPopup(`Devolución de "${nombre}" aprobada`);
+      setDetalleEntity(null);
+      cargarDevoluciones();
+      cargarEntidades();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      showPopup(d.error || "Error al aprobar", "error");
+    }
+  };
+
+  const rechazar = async (id, nombre) => {
+    const ok = await showConfirm(`¿Rechazar devolución de "${nombre}"? La suscripción seguirá activa.`, "RECHAZAR");
+    if (!ok) return;
+    const res = await authFetch(`/api/suscripciones/rechazar-devolucion/${id}`, {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+    });
+    if (res.ok) {
+      showPopup(`Devolución de "${nombre}" rechazada`);
+      setDetalleEntity(null);
+      cargarDevoluciones();
+      cargarEntidades();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      showPopup(d.error || "Error al rechazar", "error");
+    }
+  };
+
+  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+
+  const camposEntidad = (e) => {
+    const campos = [
+      { label: "Nombre", val: e.nombre },
+      { label: "Tipo", val: e.tipo },
+      { label: "Plan", val: e.plan_tipo || "—" },
+      { label: "Vigencia", val: e.fecha_inicio_suscripcion && e.fecha_fin_suscripcion
+        ? `Del ${new Date(e.fecha_inicio_suscripcion).toLocaleDateString("es-AR")} al ${new Date(e.fecha_fin_suscripcion).toLocaleDateString("es-AR")}`
+        : "—" },
+      { label: "Email", val: e.email || "—" },
+      { label: "Razón social", val: e.razon_social || "—" },
+      { label: "CUIT", val: e.cuit || "—" },
+      { label: "Resumen", val: e.resumen || "—" },
+      { label: "Dirección", val: e.direccion_escrita || "—" },
+      { label: "Sitio web", val: e.sitio_web || "—" },
+    ];
+    if (e.tipo === "comercio") {
+      campos.push({ label: "Rubro", val: e.rubro_especifico || "—" });
+      campos.push({ label: "Horario", val: `${e.horario_apertura || "?"} – ${e.horario_cierre || "?"}` });
+    }
+    if (e.tipo === "hospedaje") {
+      campos.push({ label: "Categoría", val: e.categoria_hospedaje || "—" });
+      campos.push({ label: "Servicios", val: e.servicios || "—" });
+    }
+    if (e.tipo === "productor") {
+      campos.push({ label: "Producto", val: e.tipo_producto || "—" });
+    }
+    if (e.tipo === "evento") {
+      campos.push({ label: "Fecha evento", val: e.fecha_evento ? new Date(e.fecha_evento).toLocaleDateString("es-AR") : "—" });
+    }
+    return campos;
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <h2 style={styles.sectionTitle}>
+          <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+          Devoluciones solicitadas
+        </h2>
+        <button onClick={cargarDevoluciones} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+          ACTUALIZAR
+        </button>
+      </div>
+      {devoluciones === null ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+      ) : devoluciones.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay solicitudes de devolución pendientes.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {devoluciones.map((e) => (
+            <div key={e.id} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "16px 20px", border: "1px solid #eee", borderRadius: 12,
+              background: "#fff",
+            }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[e.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>{e.tipo}</span>
+                </div>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18", margin: "0 0 4px" }}>{e.nombre}</p>
+                <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+                  {e.perfil_nombre || e.perfil_email} — {e.plan_tipo || "Sin plan"}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => verDetalle(e.id)}
+                  style={{ padding: "8px 16px", background: "transparent", color: "#555", border: "1px solid #ddd", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  VER
+                </button>
+                <button onClick={() => aprobar(e.id, e.nombre)}
+                  style={{ padding: "8px 16px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  APROBAR
+                </button>
+                <button onClick={() => rechazar(e.id, e.nombre)}
+                  style={{ padding: "8px 16px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  RECHAZAR
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal detalle */}
+      {detalleEntity && (() => {
+        const e = detalleEntity;
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+            onClick={() => setDetalleEntity(null)}
+          >
+            <div style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "560px", width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: "20px" }}>
+                  Detalle de entidad
+                </h3>
+                <button onClick={() => setDetalleEntity(null)}
+                  style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", padding: "4px 8px", borderRadius: "6px" }}>
+                  ✕
+                </button>
+              </div>
+
+              {e.imagen && (
+                <img src={e.imagen} alt="" style={{ width: "100%", height: "160px", borderRadius: 12, objectFit: "cover", marginBottom: 16, border: "1px solid #eee" }} />
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                {camposEntidad(e).map((c) => (
+                  <div key={c.label}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{c.label}</div>
+                    <div style={{ fontSize: "13px", color: "#000", wordBreak: "break-word" }}>{c.val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {e.redes_sociales && (() => {
+                const items = parseSocialList(e.redes_sociales);
+                if (items.length === 0) return null;
+                return (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 4 }}>Redes sociales</div>
+                    {items.map((item, i) => {
+                      const platform = SOCIAL_PLATFORMS.find((p) => p.value === item.type) || SOCIAL_PLATFORMS.find((p) => p.value === "otro");
+                      return (
+                        <div key={i} style={{ fontSize: "13px", color: "#000", marginBottom: 2 }}>
+                          <span style={{ fontWeight: 600, color: "#555" }}>{platform ? platform.label : item.type}: </span>
+                          <span style={{ color: "#000" }}>{item.value}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "center" }}>
+                <button onClick={() => {
+                  setDetalleEntity(null);
+                }} style={{ padding: "8px 18px", background: "white", color: "#555", border: "1px solid #ccc", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  CANCELAR
+                </button>
+                <button onClick={() => aprobar(e.id, e.nombre)} style={{ padding: "8px 18px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  APROBAR DEVOLUCIÓN
+                </button>
+                <button onClick={() => rechazar(e.id, e.nombre)} style={{ padding: "8px 18px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  RECHAZAR
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 const styles = {
   mainLayout: {
     width: "100%",
@@ -4499,7 +4704,7 @@ function RevisarModal({ sol, onClose }) {
   );
 }
 
-function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdiciones }) {
+function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdiciones, showConfirm, showPopup }) {
   const [ediciones, setEdiciones] = useState(null);
   const [revisando, setRevisando] = useState(null);
   const setEdicionesCount = useCallback((data) => {
@@ -4567,7 +4772,8 @@ function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdicio
                       cursor: "pointer", fontFamily: "inherit",
                     }}>REVISAR</button>
                     <button onClick={async () => {
-                      if (!confirm("¿Aprobar esta edición? Los datos se aplicarán a la entidad.")) return;
+                      const ok = await showConfirm("¿Aprobar esta edición? Los datos se aplicarán a la entidad.", "APROBAR");
+                      if (!ok) return;
                       await authFetch(`/api/solicitudes-edicion/${sol.id}/aprobar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
                       const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
                       if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
@@ -4575,7 +4781,8 @@ function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdicio
                       APROBAR
                     </button>
                     <button onClick={async () => {
-                      if (!confirm("¿Rechazar esta edición?")) return;
+                      const ok = await showConfirm("¿Rechazar esta edición?", "RECHAZAR");
+                      if (!ok) return;
                       await authFetch(`/api/solicitudes-edicion/${sol.id}/rechazar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
                       const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
                       if (res.ok) { const data = await res.json(); setEdicionesCount(data); }

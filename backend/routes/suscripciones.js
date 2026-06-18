@@ -1,0 +1,277 @@
+import { Router } from "express";
+import pool from "../config/db.js";
+import { authMiddleware } from "../middleware/auth.js";
+import { crearNotificacion } from "./notificaciones.js";
+
+const router = Router();
+
+const tiposConMembresia = ["comercio", "hospedaje", "productor", "evento"];
+
+router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
+  try {
+    const { entidad_id, plan_id, dias_personalizados, precio_personalizado } = req.body;
+
+    if (!entidad_id) {
+      return res.status(400).json({ error: "entidad_id es requerido" });
+    }
+
+    const { rows: entRows } = await pool.query(
+      "SELECT id, tipo, perfil_id, fecha_inicio_suscripcion, fecha_fin_suscripcion FROM entidades WHERE id = $1",
+      [entidad_id],
+    );
+    if (entRows.length === 0) {
+      return res.status(404).json({ error: "Entidad no encontrada" });
+    }
+
+    const entidad = entRows[0];
+    if (entidad.perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    if (!tiposConMembresia.includes(entidad.tipo)) {
+      return res.status(400).json({ error: "Este tipo de entidad no requiere suscripción" });
+    }
+
+    let planNombre, duracionDias, precio;
+
+    if (dias_personalizados) {
+      planNombre = "Personalizado";
+      duracionDias = parseInt(dias_personalizados);
+      precio = parseFloat(precio_personalizado);
+      if (!duracionDias || duracionDias < 1) {
+        return res.status(400).json({ error: "Días inválidos" });
+      }
+      if (!precio || precio < 1) {
+        return res.status(400).json({ error: "Precio inválido" });
+      }
+    } else {
+      if (!plan_id) {
+        return res.status(400).json({ error: "plan_id es requerido" });
+      }
+      const { rows: planRows } = await pool.query(
+        "SELECT * FROM planes WHERE id = $1 AND activo = true",
+        [plan_id],
+      );
+      if (planRows.length === 0) {
+        return res.status(400).json({ error: "Plan no válido o inactivo" });
+      }
+      const plan = planRows[0];
+      planNombre = plan.nombre;
+      duracionDias = plan.duracion_dias;
+      precio = plan.precio;
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const finActual = entidad.fecha_fin_suscripcion
+      ? new Date(entidad.fecha_fin_suscripcion)
+      : null;
+
+    let inicio = null;
+    let fin;
+
+    if (finActual && finActual >= hoy) {
+      fin = new Date(finActual);
+      fin.setDate(fin.getDate() + duracionDias);
+    } else {
+      inicio = hoy;
+      fin = new Date(hoy);
+      fin.setDate(fin.getDate() + duracionDias);
+    }
+
+    const finStr = fin.toISOString().split("T")[0];
+    const setClauses = ["plan_tipo = $1", "estado_pago = 'al_dia'"];
+    const params = [planNombre];
+    let pIdx = 2;
+
+    if (inicio) {
+      setClauses.push(`fecha_inicio_suscripcion = $${pIdx++}`);
+      params.push(inicio.toISOString().split("T")[0]);
+    }
+
+    setClauses.push(`fecha_fin_suscripcion = $${pIdx++}`);
+    params.push(finStr);
+
+    params.push(entidad_id);
+
+    await pool.query(
+      `UPDATE entidades SET ${setClauses.join(", ")} WHERE id = $${pIdx++}`,
+      params,
+    );
+
+    await pool.query(
+      `INSERT INTO pagos (perfil_id, entidad_id, plan_id, monto, metodo_pago, estado, fecha_inicio, fecha_fin)
+       VALUES ($1, $2, $3, $4, 'simulado', 'aprobado', $5, $6)`,
+      [req.user.id, entidad_id, plan_id || null, precio, inicio ? inicio.toISOString().split("T")[0] : entidad.fecha_inicio_suscripcion, finStr],
+    );
+
+    res.json({
+      ok: true,
+      message: `Suscripción activada: ${planNombre}`,
+      fecha_fin: finStr,
+    });
+  } catch (err) {
+    console.error("Error POST /suscripciones/adquirir:", err);
+    res.status(500).json({ error: "Error al adquirir suscripción" });
+  }
+});
+
+router.get("/suscripciones/mis-pagos", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.*, pl.nombre AS plan_nombre, e.nombre AS entidad_nombre, e.slug AS entidad_slug
+       FROM pagos p
+       LEFT JOIN planes pl ON p.plan_id = pl.id
+       LEFT JOIN entidades e ON p.entidad_id = e.id
+       WHERE p.perfil_id = $1
+       ORDER BY p.created_at DESC`,
+      [req.user.id],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /suscripciones/mis-pagos:", err);
+    res.status(500).json({ error: "Error al obtener pagos" });
+  }
+});
+
+router.get("/suscripciones/entidad/:id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, tipo, plan_tipo, fecha_inicio_suscripcion,
+              fecha_fin_suscripcion, estado_pago
+       FROM entidades WHERE id = $1 AND perfil_id = $2`,
+      [req.params.id, req.user.id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Entidad no encontrada" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error GET /suscripciones/entidad/:id:", err);
+    res.status(500).json({ error: "Error al obtener suscripción" });
+  }
+});
+
+router.post("/suscripciones/reclamar-devolucion/:entidad_id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, perfil_id, estado_pago, nombre FROM entidades WHERE id = $1",
+      [req.params.entidad_id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Entidad no encontrada" });
+    }
+    if (rows[0].perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+    if (rows[0].estado_pago !== "al_dia") {
+      return res.status(400).json({ error: "Esta entidad no tiene una suscripción activa" });
+    }
+
+    await pool.query(
+      `UPDATE entidades SET estado_pago = 'reembolso_solicitado' WHERE id = $1`,
+      [req.params.entidad_id],
+    );
+
+    await crearNotificacion(
+      req.user.id,
+      "devolucion_solicitada",
+      "Devolución solicitada",
+      `Solicitaste la devolución del pago de "${rows[0].nombre}". El administrador revisará tu solicitud.`,
+      parseInt(req.params.entidad_id),
+    );
+
+    res.json({ ok: true, message: "Solicitud de devolución enviada. El administrador la revisará." });
+  } catch (err) {
+    console.error("Error POST /suscripciones/reclamar-devolucion:", err);
+    res.status(500).json({ error: "Error al solicitar devolución" });
+  }
+});
+
+router.get("/suscripciones/devoluciones", authMiddleware, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.id, e.nombre, e.tipo, e.plan_tipo, e.estado_pago,
+              e.fecha_inicio_suscripcion, e.fecha_fin_suscripcion,
+              p.nombre AS perfil_nombre, p.email AS perfil_email
+       FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       WHERE e.estado_pago = 'reembolso_solicitado'
+       ORDER BY e.nombre ASC`,
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /suscripciones/devoluciones:", err);
+    res.status(500).json({ error: "Error al obtener solicitudes de devolución" });
+  }
+});
+
+router.post("/suscripciones/aprobar-devolucion/:entidad_id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, perfil_id, estado_pago, nombre FROM entidades WHERE id = $1",
+      [req.params.entidad_id],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Entidad no encontrada" });
+    if (rows[0].estado_pago !== "reembolso_solicitado") {
+      return res.status(400).json({ error: "Esta entidad no tiene una devolución solicitada" });
+    }
+
+    await pool.query(
+      `UPDATE entidades SET
+        estado_pago = 'cancelado',
+        plan_tipo = NULL,
+        fecha_inicio_suscripcion = NULL,
+        fecha_fin_suscripcion = NULL
+       WHERE id = $1`,
+      [req.params.entidad_id],
+    );
+
+    await crearNotificacion(
+      rows[0].perfil_id,
+      "devolucion_aprobada",
+      "Devolución aprobada",
+      `La devolución del pago de "${rows[0].nombre}" fue aprobada. Nos vamos a comunicar con vos para completar el proceso de devolución.`,
+      parseInt(req.params.entidad_id),
+    );
+
+    res.json({ ok: true, message: "Devolución aprobada, suscripción cancelada" });
+  } catch (err) {
+    console.error("Error POST /suscripciones/aprobar-devolucion:", err);
+    res.status(500).json({ error: "Error al aprobar devolución" });
+  }
+});
+
+router.post("/suscripciones/rechazar-devolucion/:entidad_id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, perfil_id, estado_pago, nombre FROM entidades WHERE id = $1",
+      [req.params.entidad_id],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Entidad no encontrada" });
+    if (rows[0].estado_pago !== "reembolso_solicitado") {
+      return res.status(400).json({ error: "Esta entidad no tiene una devolución solicitada" });
+    }
+
+    await pool.query(
+      `UPDATE entidades SET estado_pago = 'al_dia' WHERE id = $1`,
+      [req.params.entidad_id],
+    );
+
+    await crearNotificacion(
+      rows[0].perfil_id,
+      "devolucion_rechazada",
+      "Devolución rechazada",
+      `La solicitud de devolución del pago de "${rows[0].nombre}" fue rechazada. La suscripción continúa activa.`,
+      parseInt(req.params.entidad_id),
+    );
+
+    res.json({ ok: true, message: "Devolución rechazada, suscripción continúa activa" });
+  } catch (err) {
+    console.error("Error POST /suscripciones/rechazar-devolucion:", err);
+    res.status(500).json({ error: "Error al rechazar devolución" });
+  }
+});
+
+export default router;

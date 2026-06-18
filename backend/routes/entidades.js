@@ -403,11 +403,11 @@ router.get("/mapa-puntos", async (_req, res) => {
               fecha_evento, localidad_id
        FROM entidades
        WHERE visible = true AND latitud IS NOT NULL AND longitud IS NOT NULL
-         AND (tipo != 'comercio' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
-         AND (tipo != 'hospedaje' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
-         AND (tipo != 'productor' OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'comercio' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'hospedaje' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
+         AND (tipo != 'productor' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
          AND (tipo != 'evento' OR (fecha_evento IS NULL OR fecha_evento >= CURRENT_DATE))
-         AND (tipo != 'evento' OR estado_pago IS NULL OR (estado_pago = 'al_dia' AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))`,
+          AND (tipo != 'evento' OR perfil_id IS NULL OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))`,
     );
     res.json(rows);
   } catch (err) {
@@ -444,58 +444,28 @@ router.get("/solicitudes", authMiddleware, async (_req, res) => {
   }
 });
 
-// POST /api/solicitudes/:id/aprobar — aprobar solicitud y activar membresía
+// POST /api/solicitudes/:id/aprobar — aprobar solicitud (sin suscripción)
 router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
   try {
-    const { fecha_inicio_suscripcion, fecha_fin_suscripcion, estado_pago } = req.body;
     const { id } = req.params;
 
-    const updates = [];
-    const values = [];
-    let idx = 1;
-
-    updates.push(`visible = $${idx++}`);
-    values.push(false);
-    updates.push(`estado_sello = $${idx++}`);
-    values.push("aprobado");
-
-    const tiposConMembresia = ["comercio", "hospedaje", "productor", "evento"];
-
-    // Primero obtenemos el tipo de la entidad
     const { rows: entRows } = await pool.query(
-      "SELECT tipo FROM entidades WHERE id = $1",
+      "SELECT tipo, perfil_id, nombre FROM entidades WHERE id = $1",
       [id],
     );
     if (entRows.length === 0) {
       return res.status(404).json({ error: "Entidad no encontrada" });
     }
 
-    const tipo = entRows[0].tipo;
+    const ent = entRows[0];
 
-    if (tiposConMembresia.includes(tipo)) {
-      if (fecha_inicio_suscripcion) {
-        updates.push(`fecha_inicio_suscripcion = $${idx++}`);
-        values.push(fecha_inicio_suscripcion);
-      }
-      if (fecha_fin_suscripcion) {
-        updates.push(`fecha_fin_suscripcion = $${idx++}`);
-        values.push(fecha_fin_suscripcion);
-      }
-      if (estado_pago) {
-        updates.push(`estado_pago = $${idx++}`);
-        values.push(estado_pago);
-      }
-    }
-
-    values.push(id);
     await pool.query(
-      `UPDATE entidades SET ${updates.join(", ")} WHERE id = $${idx}`,
-      values,
+      "UPDATE entidades SET visible = false, estado_sello = 'aprobado' WHERE id = $1",
+      [id],
     );
 
-    const { rows: entProp } = await pool.query("SELECT perfil_id, nombre FROM entidades WHERE id = $1", [id]);
-    if (entProp[0]?.perfil_id) {
-      await crearNotificacion(entProp[0].perfil_id, "sello_aprobado", "Sello aprobado", `¡Felicidades! Tu solicitud de sello para "${entProp[0].nombre}" ha sido aprobada.`, parseInt(id));
+    if (ent.perfil_id) {
+      await crearNotificacion(ent.perfil_id, "sello_aprobado", "Sello aprobado", `¡Felicidades! Tu solicitud de sello para "${ent.nombre}" ha sido aprobada. No olvides adquirir un plan de suscripción desde tu perfil para que ${ent.nombre} aparezca en el mapa de Made in Chaco.`, parseInt(id));
     }
 
     res.json({ ok: true });
@@ -694,14 +664,15 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
     const datos = solicitud.datos;
 
     // Apply base fields
-    const baseFields = ["nombre", "resumen", "email", "direccion_escrita", "latitud", "longitud", "localidad_id", "imagen", "biografia_larga", "redes_sociales", "fecha_inicio_suscripcion", "fecha_fin_suscripcion", "icono"];
+    const baseFields = ["nombre", "resumen", "email", "direccion_escrita", "latitud", "longitud", "localidad_id", "imagen", "biografia_larga", "redes_sociales", "icono"];
+    const dateFields = ["fecha_evento"];
     const baseUpdates = [];
     const baseValues = [];
     let idx = 1;
     for (const field of baseFields) {
       if (datos[field] !== undefined) {
         baseUpdates.push(`${field} = $${idx++}`);
-        baseValues.push(datos[field]);
+        baseValues.push(dateFields.includes(field) && datos[field] === "" ? null : datos[field]);
       }
     }
     if (baseUpdates.length > 0) {
@@ -717,6 +688,9 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
     for (const f of baseFields) delete campos[f];
     delete campos.imagen_anterior;
     delete campos.multimedia;
+    for (const f of dateFields) {
+      if (campos[f] === "") campos[f] = null;
+    }
     const built = buildSetClause(campos, 1);
     if (built) {
       await pool.query(

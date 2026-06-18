@@ -18,6 +18,8 @@ import analyticsRoutes from "./routes/analytics.js";
 import palabrasRoutes from "./routes/palabras.js";
 import authPublicoRoutes from "./routes/auth_publico.js";
 import notificacionesRoutes from "./routes/notificaciones.js";
+import planesRoutes from "./routes/planes.js";
+import suscripcionesRoutes from "./routes/suscripciones.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +41,8 @@ app.use("/api", analyticsRoutes);
 app.use("/api", palabrasRoutes);
 app.use("/api", authPublicoRoutes);
 app.use("/api", notificacionesRoutes);
+app.use("/api", planesRoutes);
+app.use("/api", suscripcionesRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

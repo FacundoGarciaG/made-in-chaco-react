@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthPublico } from "../context/AuthPublicoContext";
+import { SelloModal } from "../components/SelloModal";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -590,17 +591,29 @@ export const PerfilPage = () => {
   const [loadingEntidades, setLoadingEntidades] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancellingLoading, setCancellingLoading] = useState(false);
+  const [cancelSubId, setCancelSubId] = useState(null);
+  const [cancellingSub, setCancellingSub] = useState(false);
+  const [aceptoPolitica, setAceptoPolitica] = useState(false);
   const [favoritos, setFavoritos] = useState([]);
   const [loadingFavoritos, setLoadingFavoritos] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
   const [loadingNotificaciones, setLoadingNotificaciones] = useState(false);
+  const [deletingNotif, setDeletingNotif] = useState(new Set());
   const [tourStep, setTourStep] = useState(null);
   const sidebarRef = useRef(null);
+  const [showSelloModal, setShowSelloModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState("");
   const [deleteEntityConfirm, setDeleteEntityConfirm] = useState(null);
   const [deletingEntity, setDeletingEntity] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [planes, setPlanes] = useState([]);
+  const [loadingPlanes, setLoadingPlanes] = useState(false);
+  const [pagos, setPagos] = useState([]);
+  const [loadingPagos, setLoadingPagos] = useState(false);
+  const [planModal, setPlanModal] = useState(null);
+  const [adquiriendo, setAdquiriendo] = useState(false);
+  const [customDias, setCustomDias] = useState(1);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -780,8 +793,30 @@ export const PerfilPage = () => {
     }
   }, [getToken]);
 
+  const fetchPlanes = useCallback(async () => {
+    setLoadingPlanes(true);
+    try {
+      const res = await fetch("/api/planes");
+      if (res.ok) setPlanes(await res.json());
+    } catch {} finally {
+      setLoadingPlanes(false);
+    }
+  }, []);
+
+  const fetchPagos = useCallback(async () => {
+    setLoadingPagos(true);
+    try {
+      const res = await fetch("/api/suscripciones/mis-pagos", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setPagos(await res.json());
+    } catch {} finally {
+      setLoadingPagos(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
-    if (section === "solicitudes" || section === "entidades") {
+    if (section === "solicitudes" || section === "entidades" || section === "suscripciones") {
       fetchEntidades();
     }
     if (section === "favoritos") {
@@ -790,7 +825,17 @@ export const PerfilPage = () => {
     if (section === "notificaciones") {
       fetchNotificaciones();
     }
-  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones]);
+    if (section === "suscripciones") {
+      fetchPlanes();
+      fetchPagos();
+    }
+  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos]);
+
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(() => setMsg(""), 5000);
+    return () => clearTimeout(t);
+  }, [msg]);
 
   const handleCancelConfirm = async () => {
     if (!cancellingId) return;
@@ -835,24 +880,35 @@ export const PerfilPage = () => {
     evento: "Evento",
   };
 
+  const tiposConMembresia = Object.keys(TIPOS_LABEL);
+
   const suscripcionStatus = (e) => {
+    if (e.estado_pago === "reembolso_solicitado") {
+      return { label: "En revisión", color: "#e65100", bg: "#fff3e0" };
+    }
     if (!e.fecha_fin_suscripcion) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const inicio = new Date(e.fecha_inicio_suscripcion?.split("T")[0]);
-    const fin = new Date(e.fecha_fin_suscripcion.split("T")[0]);
-    if (today < inicio) {
-      const days = Math.ceil((inicio - today) / 86400000);
+    const d = new Date();
+    const hoyStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const inicioStr = e.fecha_inicio_suscripcion?.split("T")[0];
+    const finStr = e.fecha_fin_suscripcion.split("T")[0];
+    if (inicioStr && hoyStr < inicioStr) {
+      const days = Math.ceil((new Date(inicioStr + 'T00:00:00') - new Date(hoyStr + 'T00:00:00')) / 86400000);
       return { label: `Comienza en ${days}d`, color: "#f39c12", bg: "#fff8e1" };
     }
-    if (today > fin) {
+    if (hoyStr > finStr) {
       return { label: "Vencida", color: "#c62828", bg: "#ffebee" };
     }
-    const daysLeft = Math.ceil((fin - today) / 86400000);
+    const daysLeft = Math.ceil((new Date(finStr + 'T23:59:59') - new Date(hoyStr + 'T00:00:00')) / 86400000);
     if (daysLeft <= 30) {
       return { label: `Por vencer (${daysLeft}d)`, color: "#e65100", bg: "#fff3e0" };
     }
     return { label: "Activa", color: "#2e7d32", bg: "#e8f5e9" };
+  };
+
+  const necesitaSuscripcion = (e) => {
+    if (e.estado_sello !== "aprobado") return false;
+    if (!tiposConMembresia.includes(e.tipo)) return false;
+    return true;
   };
 
   const enMapa = (e) => {
@@ -861,16 +917,17 @@ export const PerfilPage = () => {
 
     const suscValida = () => {
       if (!e.fecha_fin_suscripcion) return true;
-      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-      const inicio = e.fecha_inicio_suscripcion ? new Date(e.fecha_inicio_suscripcion.split("T")[0]) : null;
-      const fin = new Date(e.fecha_fin_suscripcion.split("T")[0]);
-      if (inicio && hoy < inicio) return false;
-      if (hoy > fin) return false;
+      const d = new Date();
+      const hoyStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const inicioStr = e.fecha_inicio_suscripcion?.split("T")[0];
+      const finStr = e.fecha_fin_suscripcion.split("T")[0];
+      if (inicioStr && hoyStr < inicioStr) return false;
+      if (hoyStr > finStr) return false;
       return true;
     };
 
     if (e.tipo === "comercio" || e.tipo === "hospedaje" || e.tipo === "productor") {
-      return e.estado_pago === "al_dia" && suscValida();
+      return (e.estado_pago === "al_dia" || e.estado_pago === "reembolso_solicitado") && suscValida();
     }
 
     if (e.tipo === "evento") {
@@ -879,9 +936,7 @@ export const PerfilPage = () => {
         const ev = new Date(e.fecha_evento.split("T")[0]);
         if (ev < hoy) return false;
       }
-      if (e.estado_pago && e.estado_pago !== "al_dia") return false;
-      if (e.estado_pago === "al_dia") return suscValida();
-      return true;
+      return (e.estado_pago === "al_dia" || e.estado_pago === "reembolso_solicitado") && suscValida();
     }
 
     return true;
@@ -938,8 +993,10 @@ export const PerfilPage = () => {
   const SIDEBAR_SECTIONS = [
     { key: "profile", label: "Mi Perfil", icon: "→" },
     { key: "notificaciones", label: "Notificaciones", icon: "→" },
+    { key: "solicitar-sello", label: "Solicitar sello", icon: "→" },
     { key: "solicitudes", label: "Mis Solicitudes", icon: "→" },
     { key: "entidades", label: "Mis Entidades", icon: "→" },
+    { key: "suscripciones", label: "Planes", icon: "→" },
     { key: "favoritos", label: "Mis Favoritos", icon: "→" },
   ];
 
@@ -1023,7 +1080,7 @@ export const PerfilPage = () => {
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setSection(s.key)}
+                onClick={() => s.key === "solicitar-sello" ? setShowSelloModal(true) : setSection(s.key)}
                 style={sSidebarItem(section === s.key)}
                 onMouseEnter={(e) => { if (section !== s.key) e.currentTarget.style.color = "#999"; }}
                 onMouseLeave={(e) => { if (section !== s.key) e.currentTarget.style.color = "#555"; }}
@@ -1055,6 +1112,8 @@ export const PerfilPage = () => {
               borderBottom: "1px solid #e57373",
               marginTop: 32,
               transition: "opacity 0.2s ease",
+              width: "100%",
+              textAlign: "center",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "#999"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "#555"; }}
@@ -1077,9 +1136,44 @@ export const PerfilPage = () => {
               </p>
             </div>
           )}
+          {msg && (
+            <div style={{
+              position: "fixed",
+              top: 100,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 2000,
+              background: msg.includes("Error") ? "#ffebee" : "#e8f5e9",
+              border: `1px solid ${msg.includes("Error") ? "#ef9a9a" : "#a5d6a7"}`,
+              borderRadius: 12, padding: "16px 24px",
+              fontSize: 14, color: "#000", lineHeight: 1.5,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+              maxWidth: 480, width: "90%",
+            }}>
+              <span style={{ color: "#000" }}>{msg}</span>
+              <button
+                type="button"
+                onClick={() => setMsg("")}
+                style={{
+                  fontFamily: "inherit", fontSize: 16, cursor: "pointer",
+                  border: "none", background: "none", color: "#000", padding: "0 0 0 16px",
+                  opacity: 0.5,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {section === "profile" && (
               <>
                 <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Mi Perfil
+                </h2>
                 <form onSubmit={handleSave} style={{ width: "100%" }}>
                   <FloatingInput label="Nombre completo *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
                   <FloatingInput label="Profesión / oficio *" value={profesion} onChange={(e) => setProfesion(e.target.value)} />
@@ -1249,14 +1343,14 @@ export const PerfilPage = () => {
                 </h2>
                 {loadingEntidades ? (
                   <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
-                ) : entidades.filter((e) => e.estado_sello === "aprobado" && e.visible).length === 0 ? (
+                ) : entidades.filter((e) => e.estado_sello === "aprobado").length === 0 ? (
                   <p style={{ color: "#aaa", fontSize: 14 }}>
                     No tenés entidades aprobadas todavía.
                   </p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     {entidades
-                      .filter((e) => e.estado_sello === "aprobado" && e.visible)
+                      .filter((e) => e.estado_sello === "aprobado")
                       .map((e) => (
                          <div key={e.id} style={{
                            display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1343,6 +1437,46 @@ export const PerfilPage = () => {
                             >
                               Editar
                             </button>
+                            {tiposConMembresia.includes(e.tipo) && e.estado_pago !== "reembolso_solicitado" && (
+                              <button
+                                type="button"
+                                onClick={() => setSection("suscripciones")}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                  cursor: "pointer", border: "1px solid #f9a825", background: "transparent",
+                                  padding: "8px 16px", borderRadius: 6, color: "#f9a825",
+                                  whiteSpace: "nowrap", transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "#fff8e1"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                {e.estado_pago === "al_dia" && e.fecha_fin_suscripcion ? "Renovar" : "Suscribir"}
+                              </button>
+                            )}
+                            {e.estado_pago === "al_dia" && e.fecha_fin_suscripcion && (
+                              <button
+                                type="button"
+                                onClick={() => setCancelSubId(e.id)}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                  cursor: "pointer", border: "1px solid #e57373", background: "transparent",
+                                  padding: "8px 16px", borderRadius: 6, color: "#e57373",
+                                  whiteSpace: "nowrap", transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "#ffebee"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                Reclamar devolución
+                              </button>
+                            )}
+                            {e.estado_pago === "reembolso_solicitado" && (
+                              <span style={{
+                                fontSize: 12, fontWeight: 600, color: "#e65100",
+                                padding: "8px 0", whiteSpace: "nowrap",
+                              }}>
+                                Devolución solicitada
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => setDeleteEntityConfirm(e)}
@@ -1413,6 +1547,9 @@ export const PerfilPage = () => {
                         suscripcion_por_vencer: "!",
                         suscripcion_vencida: "!",
                         mapa_no_visible: "◌",
+                        devolucion_solicitada: "⟳",
+                        devolucion_aprobada: "✓",
+                        devolucion_rechazada: "✕",
                       };
                       const COLOR_MAP = {
                         bienvenida: "#863819",
@@ -1423,11 +1560,15 @@ export const PerfilPage = () => {
                         suscripcion_por_vencer: "#f9a825",
                         suscripcion_vencida: "#c62828",
                         mapa_no_visible: "#888",
+                        devolucion_solicitada: "#e65100",
+                        devolucion_aprobada: "#2e7d32",
+                        devolucion_rechazada: "#c62828",
                       };
                       return notificaciones.map((n) => (
                         <div
                           key={n.id}
                           onClick={async () => {
+                            if (deletingNotif.has(n.id)) return;
                             if (n.tipo === "bienvenida") {
                               setTourStep(0);
                               setSection("notificaciones");
@@ -1451,10 +1592,11 @@ export const PerfilPage = () => {
                           style={{
                             display: "flex", alignItems: "flex-start", gap: 12,
                             padding: "14px 18px", border: "1px solid #eee",
-                            borderRadius: 8, cursor: "pointer",
+                            borderRadius: 8, cursor: deletingNotif.has(n.id) ? "default" : "pointer",
                             background: n.leida ? "#fff" : "#fdfaf5",
-                            transition: "background 0.2s ease",
-                            opacity: n.leida ? 0.7 : 1,
+                            transition: "all 0.3s ease",
+                            opacity: deletingNotif.has(n.id) ? 0 : (n.leida ? 0.7 : 1),
+                            transform: deletingNotif.has(n.id) ? "translateX(40px)" : "translateX(0)",
                           }}
                         >
                           <div style={{
@@ -1498,9 +1640,246 @@ export const PerfilPage = () => {
                           {!n.leida && (
                             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#863819", flexShrink: 0, marginTop: 6 }} />
                           )}
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setDeletingNotif((prev) => new Set(prev).add(n.id));
+                              try {
+                                await fetch(`/api/notificaciones/${n.id}`, {
+                                  method: "DELETE",
+                                  headers: { Authorization: `Bearer ${getToken()}` },
+                                });
+                              } catch {}
+                              setTimeout(() => {
+                                setNotificaciones((prev) => prev.filter((x) => x.id !== n.id));
+                                setDeletingNotif((prev) => { const next = new Set(prev); next.delete(n.id); return next; });
+                              }, 300);
+                            }}
+                            style={{
+                              fontFamily: "inherit", fontSize: 14, fontWeight: 400,
+                              cursor: "pointer", border: "none", background: "transparent",
+                              padding: "2px 4px", color: "#ccc", flexShrink: 0,
+                              lineHeight: 1,
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "#c62828"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = "#ccc"; }}
+                          >
+                            ✕
+                          </button>
                         </div>
                       ));
                     })()}
+                  </div>
+                )}
+              </>
+            )}
+
+            {section === "suscripciones" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 8px", letterSpacing: "-0.02em",
+                }}>
+                  Planes y Suscripciones
+                </h2>
+                <p style={{ color: "#888", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>
+                  Elegí un plan para activar o renovar la suscripción de tus entidades.
+                  Con la suscripción activa, tu comercio, hospedaje, producto o evento
+                  aparece en el mapa de Made in Chaco.
+                </p>
+
+                {loadingPlanes ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando planes...</p>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20, marginBottom: 48 }}>
+                    {planes.map((plan) => (
+                      <div key={plan.id} style={{
+                        border: "2px solid #e0dcd0", borderRadius: 12,
+                        padding: "28px 24px", background: "#fcf9f4",
+                        display: "flex", flexDirection: "column",
+                        transition: "border-color 0.2s ease",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      }}>
+                        <h3 style={{
+                          fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                          color: "#1c1c18", margin: "0 0 4px",
+                        }}>
+                          {plan.nombre}
+                        </h3>
+                        <p style={{ color: "#666", fontSize: 13, lineHeight: 1.5, margin: "0 0 16px", flex: 1 }}>
+                          {plan.descripcion}
+                        </p>
+                        <div style={{ marginBottom: 16 }}>
+                          <span style={{
+                            fontSize: 28, fontWeight: 700, color: "#863819",
+                            fontFamily: "Cinzel, serif",
+                          }}>
+                            ${Number(plan.precio).toLocaleString("es-AR")}
+                          </span>
+                          <span style={{ color: "#888", fontSize: 13, marginLeft: 6 }}>
+                            / {plan.duracion_dias}días
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
+                          {plan.entidades_incluidas > 1
+                            ? `Hasta ${plan.entidades_incluidas} entidades`
+                            : "1 entidad"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const entitiesToShow = entidades.filter(necesitaSuscripcion);
+                            if (entitiesToShow.length === 0) {
+                              setMsg("No tenés entidades aprobadas que requieran suscripción.");
+                              return;
+                            }
+                            setPlanModal({ plan, entidades: entitiesToShow, entidadSeleccionada: null, mostrarActivas: false });
+                          }}
+                          style={{
+                            fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                            cursor: "pointer", border: "none", background: "#863819",
+                            padding: "12px 24px", borderRadius: 8, color: "#fff",
+                            letterSpacing: "0.04em", transition: "opacity 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        >
+                          ADQUIRIR
+                        </button>
+                      </div>
+                    ))}
+                    {(() => {
+                      const planBase = planes.find(p => p.duracion_dias === 30) || planes[0];
+                      const precioPorDia = planBase ? Math.round((planBase.precio / planBase.duracion_dias) * 1.2) : 200;
+                      const precioCalculado = customDias * precioPorDia;
+                      return (
+                        <div style={{
+                          border: "2px solid #e0dcd0", borderRadius: 12,
+                          padding: "28px 24px", background: "#fcf9f4",
+                          display: "flex", flexDirection: "column",
+                          transition: "border-color 0.2s ease",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                        }}>
+                          <h3 style={{
+                            fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                            color: "#1c1c18", margin: "0 0 4px",
+                          }}>
+                            Personalizado
+                          </h3>
+                          <p style={{ color: "#666", fontSize: 13, lineHeight: 1.5, margin: "0 0 16px", flex: 1 }}>
+                            Elegí la cantidad de días para tu suscripción personalizada.
+                          </p>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 4 }}>
+                              Cantidad de días
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={customDias}
+                              onChange={(e) => setCustomDias(Math.max(1, parseInt(e.target.value) || 1))}
+                              style={{
+                                width: "100%", padding: "10px 12px", borderRadius: 8,
+                                border: "2px solid #e0dcd0", fontSize: 16, fontWeight: 600,
+                                color: "#1c1c18", fontFamily: "inherit", boxSizing: "border-box",
+                                background: "#fff",
+                              }}
+                            />
+                          </div>
+                          <div style={{ marginBottom: 16 }}>
+                            <span style={{
+                              fontSize: 28, fontWeight: 700, color: "#863819",
+                              fontFamily: "Cinzel, serif",
+                            }}>
+                              ${precioCalculado.toLocaleString("es-AR")}
+                            </span>
+                            <span style={{ color: "#888", fontSize: 13, marginLeft: 6 }}>
+                              ({customDias}d × ${precioPorDia.toLocaleString("es-AR")}/día)
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
+                            1 entidad
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const entitiesToShow = entidades.filter(necesitaSuscripcion);
+                              if (entitiesToShow.length === 0) {
+                                setMsg("No tenés entidades aprobadas que requieran suscripción.");
+                                return;
+                              }
+                              setPlanModal({
+                                plan: {
+                                  id: null,
+                                  nombre: `Personalizado (${customDias} días)`,
+                                  precio: precioCalculado,
+                                  duracion_dias: customDias,
+                                },
+                                entidades: entitiesToShow,
+                                entidadSeleccionada: null,
+                                mostrarActivas: false,
+                              });
+                            }}
+                            style={{
+                              fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                              cursor: "pointer", border: "none", background: "#863819",
+                              padding: "12px 24px", borderRadius: 8, color: "#fff",
+                              letterSpacing: "0.04em", transition: "opacity 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                          >
+                            ADQUIRIR
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                <h3 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 20px", letterSpacing: "-0.02em",
+                }}>
+                  Historial de pagos
+                </h3>
+                {loadingPagos ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : pagos.length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    Todavía no realizaste ningún pago.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {pagos.map((p) => (
+                      <div key={p.id} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "14px 18px", border: "1px solid #e0dcd0", borderRadius: 8,
+                        background: "#fcf9f4",
+                      }}>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", margin: 0 }}>
+                            {p.plan_nombre}
+                          </p>
+                          <p style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+                            {p.entidad_nombre}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>
+                            {new Date(p.fecha_inicio).toLocaleDateString("es-AR")} → {new Date(p.fecha_fin).toLocaleDateString("es-AR")}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#506441", margin: 0 }}>
+                            ${Number(p.monto).toLocaleString("es-AR")}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#2e7d32", marginTop: 2 }}>
+                            {new Date(p.created_at).toLocaleDateString("es-AR")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </>
@@ -1966,6 +2345,331 @@ export const PerfilPage = () => {
             </div>
           </div>
         )}
+
+        {cancelSubId && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => !cancellingSub && (setCancelSubId(null), setAceptoPolitica(false))}>
+            <div style={{
+              background: "#fff", padding: "40px", maxWidth: 460, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              textAlign: "left",
+            }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 600,
+                color: "#c62828", margin: "0 0 12px", letterSpacing: "-0.02em",
+              }}>
+                Reclamar devolución
+              </h3>
+              <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 20px" }}>
+                Solicitá la devolución del pago. La suscripción quedará en revisión y el administrador evaluará tu solicitud.
+              </p>
+              <div style={{
+                background: "#fff8e1", border: "1px solid #ffcc80", borderRadius: 10,
+                padding: "14px 16px", marginBottom: 20, fontSize: 13, lineHeight: 1.6, color: "#333",
+              }}>
+                <strong style={{ color: "#e65100" }}>Política de devolución</strong>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "#333" }}>
+                  <li style={{ color: "#333" }}><strong style={{ color: "#333" }}>Plazo:</strong> solo se aceptan reclamos dentro de los primeros 7 días desde la compra.</li>
+                  <li style={{ color: "#333" }}><strong style={{ color: "#333" }}>Causales válidos:</strong> error en la carga, el usuario no entendió el servicio, baja voluntaria inmediata.</li>
+                  <li style={{ color: "#333" }}><strong style={{ color: "#333" }}>No aplica:</strong> si la entidad ya estuvo visible en el mapa por más de 7 días, o si el usuario ya usó el servicio.</li>
+                </ul>
+              </div>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                marginBottom: 24, fontSize: 13, color: "#555", lineHeight: 1.4,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={aceptoPolitica}
+                  onChange={(e) => setAceptoPolitica(e.target.checked)}
+                  style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#c62828" }}
+                />
+                <span style={{ color: "#333" }}>Leí y acepto la política de devolución</span>
+              </label>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => { setCancelSubId(null); setAceptoPolitica(false); }}
+                  disabled={cancellingSub}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  disabled={cancellingSub || !aceptoPolitica}
+                  onClick={async () => {
+                    setCancellingSub(true);
+                    try {
+                      const res = await fetch(`/api/suscripciones/reclamar-devolucion/${cancelSubId}`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${getToken()}` },
+                      });
+                      if (res.ok) {
+                        fetchEntidades();
+                        setMsg("Solicitud de devolución enviada. El administrador la revisará.");
+                      } else {
+                        const data = await res.json();
+                        setMsg(data.error || "Error al solicitar devolución");
+                      }
+                    } catch {
+                      setMsg("Error de conexión");
+                    } finally {
+                      setCancellingSub(false);
+                      setCancelSubId(null);
+                      setAceptoPolitica(false);
+                    }
+                  }}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+                    cursor: cancellingSub || !aceptoPolitica ? "not-allowed" : "pointer",
+                    border: "none", background: cancellingSub || !aceptoPolitica ? "#e0dcd0" : "#c62828",
+                    padding: "10px 24px", borderRadius: 8, color: cancellingSub || !aceptoPolitica ? "#aaa" : "#fff",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {cancellingSub ? "ENVIANDO..." : "SOLICITAR DEVOLUCIÓN"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {planModal && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => !adquiriendo && setPlanModal(null)}>
+            <div style={{
+              background: "#fff", padding: "40px", maxWidth: 520, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 600,
+                color: "#1c1c18", margin: "0 0 4px", letterSpacing: "-0.02em",
+              }}>
+                {planModal.plan ? "Confirmar suscripción" : "Seleccionar plan"}
+              </h3>
+              <p style={{ color: "#888", fontSize: 13, margin: "0 0 24px", lineHeight: 1.5 }}>
+                {planModal.plan
+                  ? `Estás por adquirir el plan ${planModal.plan.nombre}. Elegí la entidad para activarlo o renovarlo.`
+                  : "Elegí un plan desde la sección de planes para tu entidad."}
+              </p>
+
+              {planModal.plan && (
+                <div style={{
+                  border: "2px solid #e0dcd0", borderRadius: 10,
+                  padding: "16px 20px", background: "#fcf9f4", marginBottom: 20,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: "#1c1c18" }}>
+                      {planModal.plan.nombre}
+                    </span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#863819" }}>
+                      ${Number(planModal.plan.precio).toLocaleString("es-AR")}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                    {planModal.plan.duracion_dias} días de visibilidad
+                  </p>
+                  <p style={{ fontSize: 11, color: "#888", marginTop: 8, lineHeight: 1.4 }}>
+                    Si la entidad ya tiene una suscripción activa, la nueva se extiende desde la fecha de vencimiento actual.
+                  </p>
+                </div>
+              )}
+
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", marginBottom: 8 }}>
+                Seleccioná una entidad:
+              </p>
+               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24, maxHeight: 280, overflowY: "auto" }}>
+                  {planModal.entidades.length === 0 ? (
+                    <p style={{ color: "#aaa", fontSize: 13 }}>
+                      No hay entidades disponibles. Necesitás tener una entidad aprobada.
+                    </p>
+                  ) : (() => {
+                    const prioritarias = planModal.entidades.filter((e) => {
+                      if (!e.fecha_fin_suscripcion) return true;
+                      const d = new Date();
+                      const hoyStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                      const finStr = e.fecha_fin_suscripcion.split("T")[0];
+                      return hoyStr >= finStr;
+                    });
+                    const activas = planModal.entidades.filter((e) => {
+                      if (!e.fecha_fin_suscripcion) return false;
+                      const d = new Date();
+                      const hoyStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                      const finStr = e.fecha_fin_suscripcion.split("T")[0];
+                      return hoyStr < finStr;
+                    });
+                    return (
+                      <>
+                        {prioritarias.map((ent) => {
+                          const st = suscripcionStatus(ent);
+                          return (
+                            <label key={ent.id} style={{
+                              display: "flex", alignItems: "center", gap: 12,
+                              padding: "12px 16px", border: "1px solid #eee", borderRadius: 8,
+                              cursor: planModal.plan ? "pointer" : "default",
+                              background: planModal.entidadSeleccionada === ent.id ? "#fdfaf5" : "#fff",
+                              transition: "background 0.2s ease",
+                            }}>
+                              <input
+                                type="radio"
+                                name="entidad-suscripcion"
+                                disabled={!planModal.plan}
+                                checked={planModal.entidadSeleccionada === ent.id}
+                                onChange={() => setPlanModal({ ...planModal, entidadSeleccionada: ent.id })}
+                                style={{ accentColor: "#863819" }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: "#1c1c18", display: "block" }}>
+                                  {ent.nombre}
+                                </span>
+                                <span style={{ fontSize: 12, color: TIPO_COLOR[ent.tipo] || "#888" }}>
+                                  {TIPOS_LABEL[ent.tipo] || ent.tipo}
+                                  {st && (
+                                    <span style={{ color: st.color, marginLeft: 8 }}>
+                                      — {st.label}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                        {activas.length > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setPlanModal({ ...planModal, mostrarActivas: !planModal.mostrarActivas })}
+                              style={{
+                                fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                                cursor: "pointer", border: "none", background: "transparent",
+                                padding: "8px 4px", color: "#863819", textAlign: "left",
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              {planModal.mostrarActivas ? "▲ Ocultar activas" : `▼ Ver activas (${activas.length})`}
+                            </button>
+                            {planModal.mostrarActivas && activas.map((ent) => {
+                              const st = suscripcionStatus(ent);
+                              return (
+                                <label key={ent.id} style={{
+                                  display: "flex", alignItems: "center", gap: 12,
+                                  padding: "12px 16px", border: "1px solid #eee", borderRadius: 8,
+                                  cursor: planModal.plan ? "pointer" : "default",
+                                  background: planModal.entidadSeleccionada === ent.id ? "#fdfaf5" : "#fff",
+                                  transition: "background 0.2s ease",
+                                }}>
+                                  <input
+                                    type="radio"
+                                    name="entidad-suscripcion"
+                                    disabled={!planModal.plan}
+                                    checked={planModal.entidadSeleccionada === ent.id}
+                                    onChange={() => setPlanModal({ ...planModal, entidadSeleccionada: ent.id })}
+                                    style={{ accentColor: "#863819" }}
+                                  />
+                                  <div style={{ flex: 1 }}>
+                                    <span style={{ fontSize: 14, fontWeight: 500, color: "#1c1c18", display: "block" }}>
+                                      {ent.nombre}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: TIPO_COLOR[ent.tipo] || "#888" }}>
+                                      {TIPOS_LABEL[ent.tipo] || ent.tipo}
+                                      {st && (
+                                        <span style={{ color: st.color, marginLeft: 8 }}>
+                                          — {st.label}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setPlanModal(null)}
+                  disabled={adquiriendo}
+                  style={{
+                    fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                {planModal.plan && (
+                  <button
+                    type="button"
+                    disabled={!planModal.entidadSeleccionada || adquiriendo}
+                    onClick={async () => {
+                      if (!planModal.entidadSeleccionada) return;
+                      setAdquiriendo(true);
+                      try {
+                        const res = await fetch("/api/suscripciones/adquirir", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${getToken()}`,
+                          },
+                          body: JSON.stringify({
+                            entidad_id: planModal.entidadSeleccionada,
+                            plan_id: planModal.plan.id,
+                            ...(planModal.plan.id === null && {
+                              dias_personalizados: planModal.plan.duracion_dias,
+                              precio_personalizado: planModal.plan.precio,
+                            }),
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setPlanModal(null);
+                          fetchEntidades();
+                          fetchPagos();
+                          setMsg(data.message || "Suscripción activada correctamente");
+                        } else {
+                          setMsg(data.error || "Error al adquirir suscripción");
+                        }
+                      } catch {
+                        setMsg("Error de conexión");
+                      } finally {
+                        setAdquiriendo(false);
+                      }
+                    }}
+                    style={{
+                      fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+                      cursor: (!planModal.entidadSeleccionada || adquiriendo) ? "not-allowed" : "pointer",
+                      border: "none",
+                      background: (!planModal.entidadSeleccionada || adquiriendo) ? "#e0dcd0" : "#863819",
+                      padding: "10px 28px", borderRadius: 8,
+                      color: (!planModal.entidadSeleccionada || adquiriendo) ? "#aaa" : "#fff",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {adquiriendo ? "PROCESANDO..." : "CONFIRMAR PAGO"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <SelloModal isOpen={showSelloModal} onClose={() => setShowSelloModal(false)} />
       </div>
   );
 };

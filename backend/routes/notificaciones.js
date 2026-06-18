@@ -61,6 +61,22 @@ router.post("/notificaciones/leer-todas", authMiddleware, async (req, res) => {
   }
 });
 
+router.delete("/notificaciones/:id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "DELETE FROM notificaciones WHERE id = $1 AND perfil_id = $2 RETURNING id",
+      [req.params.id, req.user.id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Notificación no encontrada" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error DELETE /notificaciones/:id:", err);
+    res.status(500).json({ error: "Error al eliminar notificación" });
+  }
+});
+
 router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (req, res) => {
   try {
     const { rows: entities } = await pool.query(
@@ -71,15 +87,15 @@ router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (re
     );
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const hoyStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
     for (const ent of entities) {
       if (!ent.fecha_fin_suscripcion) continue;
 
-      const fin = new Date(ent.fecha_fin_suscripcion);
-      fin.setHours(0, 0, 0, 0);
+      const finDate = new Date(ent.fecha_fin_suscripcion);
+      const finStr = `${finDate.getFullYear()}-${String(finDate.getMonth()+1).padStart(2,'0')}-${String(finDate.getDate()).padStart(2,'0')}`;
 
-      const diffDays = Math.ceil((fin - today) / (1000 * 60 * 60 * 24));
+      const diffDays = Math.ceil((new Date(finStr + 'T23:59:59') - new Date(hoyStr + 'T00:00:00')) / (1000 * 60 * 60 * 24));
 
       if (diffDays < 0) {
         const { rows: existing } = await pool.query(

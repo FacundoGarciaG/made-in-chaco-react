@@ -12,10 +12,17 @@
 .solicitar-form-side {
   width: 50vw;
   flex-shrink: 0;
-  padding: 160px 100px 100px 120px;
+  padding: 100px 80px 40px 100px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+}
+
+.solicitar-form-side form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .solicitar-form-side--initial {
@@ -90,7 +97,7 @@
 
 /* Header */
 .solicitar-header {
-  margin-bottom: 56px;
+  margin-bottom: 16px;
   animation: solicitarFadeUp 0.6s ease-out;
 }
 
@@ -116,41 +123,41 @@
 
 /* Section */
 .solicitar-section {
-  margin-bottom: 64px;
+  margin-bottom: 12px;
   animation: solicitarFadeUp 0.6s ease-out;
 }
 
 .solicitar-section-title {
-  font-size: clamp(13px, 1vw, 15px);
+  font-size: clamp(11px, 0.9vw, 13px);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #863819;
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .solicitar-section-divider {
-  width: 40px;
-  height: 3px;
+  width: 32px;
+  height: 2px;
   background: #863819;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 
 /* Floating label groups */
 .solicitar-floating-group {
   position: relative;
-  margin-bottom: 36px;
-  padding-top: 28px;
+  margin-bottom: 8px;
+  padding-top: 14px;
 }
 
 .solicitar-floating-group input,
 .solicitar-floating-group textarea {
   width: 100%;
   max-width: 480px;
-  padding: 6px 0;
-  font-size: clamp(22px, 2.6vw, 36px);
+  padding: 3px 0;
+  font-size: clamp(15px, 1.4vw, 20px);
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   border: none;
   border-bottom: 1px solid #e8e8e8;
   background: transparent;
@@ -173,17 +180,17 @@
 
 .solicitar-floating-group textarea {
   resize: vertical;
-  min-height: 80px;
-  line-height: 1.4;
+  min-height: 50px;
+  line-height: 1.3;
 }
 
 .solicitar-floating-group label {
   position: absolute;
   left: 0;
-  top: 34px;
-  font-size: clamp(22px, 2.6vw, 36px);
+  top: 20px;
+  font-size: clamp(15px, 1.4vw, 20px);
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: #aaa;
   pointer-events: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -194,7 +201,7 @@
 .solicitar-floating-group input:not(:placeholder-shown) ~ label,
 .solicitar-floating-group textarea:not(:placeholder-shown) ~ label {
   top: 0;
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -204,10 +211,10 @@
 /* Regular label (for selects, etc) */
 .solicitar-label {
   display: block;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   color: #888;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -216,10 +223,10 @@
 .solicitar-select {
   width: 100%;
   max-width: 480px;
-  padding: 6px 0;
-  font-size: clamp(22px, 2.6vw, 36px);
+  padding: 3px 0;
+  font-size: clamp(15px, 1.4vw, 20px);
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   border: none;
   border-bottom: 1px solid #e8e8e8;
   background: transparent;
@@ -300,16 +307,16 @@
 .solicitar-dias {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .solicitar-dia-label {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   background: white;
@@ -603,58 +610,282 @@
   }
 
   .solicitar-header h1 {
-    font-size: 32px;
+    font-size: 28px;
   }
 
   .solicitar-floating-group {
-    margin-bottom: 28px;
+    margin-bottom: 20px;
   }
 
   .solicitar-floating-group input,
   .solicitar-floating-group textarea {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .solicitar-floating-group label {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .solicitar-floating-group input:focus ~ label,
   .solicitar-floating-group textarea:focus ~ label,
   .solicitar-floating-group input:not(:placeholder-shown) ~ label,
   .solicitar-floating-group textarea:not(:placeholder-shown) ~ label {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .solicitar-select {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .solicitar-tipo-btn {
-    font-size: 16px;
-    padding: 12px 20px;
+    font-size: 15px;
+    padding: 10px 16px;
   }
 }
 
 @media (max-width: 480px) {
   .solicitar-form-side {
-    padding: 48px 20px;
+    padding: 40px 16px;
   }
 
   .solicitar-header h1 {
-    font-size: 26px;
+    font-size: 22px;
   }
 
   .solicitar-floating-group input,
   .solicitar-floating-group textarea {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .solicitar-floating-group label {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .solicitar-select {
-    font-size: 20px;
+    font-size: 16px;
+  }
+}
+
+/* Step progress indicator */
+.solicitar-step-progress {
+  display: flex;
+  align-items: center;
+  margin: 24px 0 16px;
+  animation: solicitarFadeUp 0.6s ease-out;
+}
+
+.solicitar-step-item {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.solicitar-step-item.clickable {
+  cursor: pointer;
+}
+
+.solicitar-step-item.clickable:hover .solicitar-step-circle {
+  transform: scale(1.15);
+}
+
+.solicitar-step-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #ccc;
+  border: 1.5px solid #e8e8e8;
+  background: #fff;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.solicitar-step-item.active .solicitar-step-circle {
+  border-color: #863819;
+  color: #863819;
+}
+
+.solicitar-step-item.current .solicitar-step-circle {
+  background: #863819;
+  color: #fff;
+  border-color: #863819;
+}
+
+.solicitar-step-label {
+  font-size: 9px;
+  font-weight: 500;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 5px;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.solicitar-step-item.active .solicitar-step-label {
+  color: #888;
+}
+
+.solicitar-step-item.current .solicitar-step-label {
+  color: #1c1c18;
+  font-weight: 600;
+}
+
+.solicitar-step-line {
+  flex: 0 1 20px;
+  height: 1.5px;
+  background: #e8e8e8;
+  margin: 0 6px;
+  transition: background 0.3s ease;
+  min-width: 8px;
+}
+
+.solicitar-step-item.active .solicitar-step-line {
+  background: #863819;
+}
+
+/* Step content */
+.solicitar-step-content {
+  flex: 1;
+  animation: solicitarFadeUp 0.4s ease-out;
+}
+
+.solicitar-step-content--centered {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 40px;
+}
+
+/* Navigation buttons */
+.solicitar-step-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  animation: solicitarFadeUp 0.6s ease-out;
+}
+
+.solicitar-step-nav-right {
+  margin-left: auto;
+}
+
+.solicitar-btn-prev {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 12px 0;
+  color: #999;
+  transition: color 0.2s ease;
+}
+
+.solicitar-btn-prev:hover {
+  color: #1c1c18;
+}
+
+.solicitar-btn-next {
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: 2px solid #1a1a1a;
+  background: transparent;
+  padding: 12px 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #1a1a1a;
+  transition: all 0.25s ease;
+}
+
+.solicitar-btn-next:hover {
+  background: #1a1a1a;
+  color: white;
+}
+
+/* Review summary */
+.solicitar-review-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solicitar-review-item {
+  display: flex;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.solicitar-review-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.solicitar-review-value {
+  font-size: 18px;
+  color: #1c1c18;
+}
+
+@media (max-width: 768px) {
+  .solicitar-step-progress {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+
+  .solicitar-step-item {
+    flex: 0 0 auto;
+  }
+
+  .solicitar-step-label {
+    display: none;
+  }
+
+  .solicitar-step-line {
+    width: 24px;
+    flex: 0 0 24px;
+  }
+
+  .solicitar-step-nav {
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 40px;
+  }
+
+  .solicitar-step-nav-right {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .solicitar-btn-next,
+  .solicitar-btn-submit {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .solicitar-btn-prev {
+    width: 100%;
+    text-align: center;
+  }
+
+  .solicitar-review-item {
+    flex-direction: column;
+    gap: 4px;
   }
 }

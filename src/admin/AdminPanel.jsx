@@ -2091,6 +2091,11 @@ export const AdminPanel = () => {
                               <div style={{ fontSize: "11px", color: "#999", textTransform: "capitalize" }}>
                                 {e.tipo}
                               </div>
+                              {e.perfil_nombre && (
+                                <div style={{ fontSize: "11px", color: "#666", marginTop: 2 }}>
+                                  Dueño: {e.perfil_nombre}{e.perfil_email ? ` (${e.perfil_email})` : ""}
+                                </div>
+                              )}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                               <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", fontSize: "10px", fontWeight: 600, color: e.visible ? "#2e7d32" : "#999", userSelect: "none" }}

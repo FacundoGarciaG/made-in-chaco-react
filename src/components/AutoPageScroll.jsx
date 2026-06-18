@@ -28,6 +28,15 @@ export const AutoPageScroll = ({ isActive, onStop, onResume, blockScroll }) => {
 
     const intervalId = setInterval(() => {
       if (!isStopped) {
+        const atBottom =
+          window.innerHeight + window.scrollY >=
+          document.documentElement.scrollHeight - 2;
+        if (atBottom) {
+          isStopped = true;
+          clearInterval(intervalId);
+          onStop?.();
+          return;
+        }
         window.scrollBy(0, SCROLL_SPEED);
       }
     }, INTERVAL_MS);

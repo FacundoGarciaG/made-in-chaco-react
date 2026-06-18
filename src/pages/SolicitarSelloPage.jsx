@@ -113,6 +113,15 @@ const CAMPOS_POR_TIPO = {
   ],
 };
 
+const STEPS = [
+  { title: "Tipo de entidad" },
+  { title: "Información básica" },
+  { title: "Datos específicos" },
+  { title: "Contacto" },
+  { title: "Imágenes" },
+  { title: "Revisar y enviar" },
+];
+
 export const SolicitarSelloPage = () => {
   const navigate = useNavigate();
   const { perfil, getToken, isAuthenticated } = useAuthPublico();
@@ -151,6 +160,7 @@ export const SolicitarSelloPage = () => {
   const grayRef = useRef(1);
 
   const [extra, setExtra] = useState({});
+  const [step, setStep] = useState(0);
 
   useEffect(() => {
     fetch("/api/localidades")
@@ -383,6 +393,29 @@ export const SolicitarSelloPage = () => {
     img.src = url;
   };
 
+  const goNext = () => {
+    setError("");
+    if (step === 0 && !tipo) {
+      setError("Seleccioná un tipo de entidad");
+      return;
+    }
+    if (step === 1) {
+      if (!nombre.trim()) { setError("Completá el nombre"); return; }
+      if (!email.trim()) { setError("El email es obligatorio"); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Email inválido"); return; }
+      if (email.trim() !== confirmEmail.trim()) { setError("Los emails no coinciden"); return; }
+      if (!resumen.trim()) { setError("Completá la descripción"); return; }
+      if (!localidadId) { setError("Seleccioná una localidad"); return; }
+      if (!direccion.trim()) { setError("Completá la dirección"); return; }
+    }
+    setStep((s) => s + 1);
+  };
+
+  const goPrev = () => {
+    setError("");
+    setStep((s) => s - 1);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -500,40 +533,72 @@ export const SolicitarSelloPage = () => {
 
   return (
     <div className="solicitar-page">
-      <div className={`solicitar-form-side${!tipo ? " solicitar-form-side--initial" : ""}`}>
-        <div className="solicitar-header">
-          <h1>Solicitar el Sello</h1>
-          <p>
-            Obtené el Sello Made in Chaco para tu comercio, hospedaje, producto o evento.
-            Formá parte del mapa cultural y comercial de la provincia.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          {/* Tipo */}
-          <div style={{ marginBottom: 48 }}>
-            <label className="solicitar-label">Tipo de entidad</label>
-            <div className="solicitar-tipo-group">
-              {TIPOS.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => { setTipo(t.value); setExtra({}); }}
-                  className={`solicitar-tipo-btn ${tipo === t.value ? "active" : ""}`}
-                  style={{
-                    borderBottomColor: tipo === t.value ? t.color : undefined,
-                    color: tipo === t.value ? t.color : undefined,
-                  }}
-                >
-                  {t.label}
-                </button>
+      <div className="solicitar-form-side">
+        <form onSubmit={(e) => { e.preventDefault(); if (step === STEPS.length - 1) { handleSubmit(e); } else { goNext(); } }}>
+          {step !== 0 && (
+            <div className="solicitar-step-progress">
+              {STEPS.map((s, i) => (
+                i <= step && (
+                  <div key={i} className={`solicitar-step-item ${i <= step ? "active" : ""} ${i === step ? "current" : ""} ${i < step ? "clickable" : ""}`} onClick={() => i < step && setStep(i)}>
+                    <div className="solicitar-step-circle">{i + 1}</div>
+                    <div className="solicitar-step-label">{s.title}</div>
+                    {i < STEPS.length - 1 && <div className="solicitar-step-line" />}
+                  </div>
+                )
               ))}
             </div>
-          </div>
+          )}
 
-          {tipo && (
-            <>
-              {/* Básicos */}
+          <div className={`solicitar-step-content${step === 0 ? " solicitar-step-content--centered" : ""}`}>
+            {step === 0 && (
+              <>
+                <div className="solicitar-header">
+                  <h1>Solicitar el Sello</h1>
+                  <p>
+                    Obtené el Sello Made in Chaco para tu comercio, hospedaje, producto o evento.
+                    Formá parte del mapa cultural y comercial de la provincia.
+                  </p>
+                </div>
+                <div className="solicitar-step-progress" style={{ margin: "24px 0 32px" }}>
+                  {STEPS.map((s, i) => (
+                    i <= step && (
+                      <div key={i} className={`solicitar-step-item ${i <= step ? "active" : ""} ${i === step ? "current" : ""}`}>
+                        <div className="solicitar-step-circle">{i + 1}</div>
+                        <div className="solicitar-step-label">{s.title}</div>
+                        {i < STEPS.length - 1 && <div className="solicitar-step-line" />}
+                      </div>
+                    )
+                  ))}
+                </div>
+              </>
+            )}
+            {step === 0 && (
+              <div className="solicitar-section">
+                <div className="solicitar-section-title">Tipo de entidad</div>
+                <div className="solicitar-section-divider" />
+                <p className="solicitar-hint" style={{ marginBottom: 20 }}>
+                  Seleccioná qué tipo de entidad querés registrar en el mapa cultural y comercial de la provincia.
+                </p>
+                <div className="solicitar-tipo-group">
+                  {TIPOS.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => { setTipo(t.value); setExtra({}); }}
+                      className={`solicitar-tipo-btn ${tipo === t.value ? "active" : ""}`}
+                      style={{
+                        borderBottomColor: tipo === t.value ? t.color : undefined,
+                        color: tipo === t.value ? t.color : undefined,
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 1 && tipo && (
               <div className="solicitar-section">
                 <div className="solicitar-section-title">Información básica</div>
                 <div className="solicitar-section-divider" />
@@ -558,7 +623,7 @@ export const SolicitarSelloPage = () => {
                   <label htmlFor="sello-desc">Descripción *</label>
                 </div>
 
-                <div style={{ marginBottom: 32 }}>
+                <div style={{ marginBottom: 20 }}>
                   <label className="solicitar-label">Localidad *</label>
                   <select
                     className="solicitar-select"
@@ -637,152 +702,152 @@ export const SolicitarSelloPage = () => {
                   )}
                 </div>
               </div>
+            )}
 
-              {/* Campos específicos */}
-              {CAMPOS_POR_TIPO[tipo] && (
-                <div className="solicitar-section">
-                  <div className="solicitar-section-title">Datos de {TIPOS.find((t) => t.value === tipo)?.label}</div>
-                  <div className="solicitar-section-divider" />
-                  {CAMPOS_POR_TIPO[tipo].map((campo) => (
-                    <div key={campo.key} style={{ marginBottom: 32 }}>
-                      {campo.type === "rubro" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <select
-                            className="solicitar-select"
-                            value={extra[campo.key] || ""}
-                            onChange={(e) => handleExtraChange(campo.key, e.target.value)}
-                          >
-                            <option value="">Seleccionar rubro...</option>
-                            {RUBROS_COMERCIO.map((r) => <option key={r} value={r}>{r}</option>)}
-                            <option value="__otro__">Otros</option>
-                          </select>
-                          {extra[campo.key] === "__otro__" && (
-                            <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
-                              <input
-                                id={`sello-${campo.key}-custom`}
-                                value={extra[`${campo.key}_custom`] || ""}
-                                onChange={(e) => handleExtraChange(`${campo.key}_custom`, e.target.value)}
-                                placeholder=" "
-                              />
-                              <label htmlFor={`sello-${campo.key}-custom`}>Personalizado</label>
-                            </div>
-                          )}
-                        </>
-                      ) : campo.type === "categoria" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <select
-                            className="solicitar-select"
-                            value={extra[campo.key] || ""}
-                            onChange={(e) => handleExtraChange(campo.key, e.target.value)}
-                          >
-                            <option value="">Seleccionar categoría...</option>
-                            {CATEGORIAS_HOSPEDAJE.map((r) => <option key={r} value={r}>{r}</option>)}
-                            <option value="__otro__">Otros</option>
-                          </select>
-                          {extra[campo.key] === "__otro__" && (
-                            <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
-                              <input
-                                id={`sello-${campo.key}-custom`}
-                                value={extra[`${campo.key}_custom`] || ""}
-                                onChange={(e) => handleExtraChange(`${campo.key}_custom`, e.target.value)}
-                                placeholder=" "
-                              />
-                              <label htmlFor={`sello-${campo.key}-custom`}>Personalizado</label>
-                            </div>
-                          )}
-                        </>
-                      ) : campo.type === "dias" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <div className="solicitar-dias">
-                            {DIAS_SEMANA.map((dia) => {
-                              const dias = (extra[campo.key] || "").split(",").filter(Boolean);
-                              const checked = dias.includes(dia);
-                              return (
-                                <label
-                                  key={dia}
-                                  className={`solicitar-dia-label ${checked ? "checked" : ""}`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => {
-                                      const nuevos = checked
-                                        ? dias.filter((d) => d !== dia)
-                                        : [...dias, dia];
-                                      handleExtraChange(campo.key, nuevos.join(","));
-                                    }}
-                                  />
-                                  {dia.slice(0, 3)}
-                                </label>
-                              );
-                            })}
+            {step === 2 && tipo && CAMPOS_POR_TIPO[tipo] && (
+              <div className="solicitar-section">
+                <div className="solicitar-section-title">Datos de {TIPOS.find((t) => t.value === tipo)?.label}</div>
+                <div className="solicitar-section-divider" />
+                {CAMPOS_POR_TIPO[tipo].map((campo) => (
+                  <div key={campo.key} style={{ marginBottom: 32 }}>
+                    {campo.type === "rubro" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <select
+                          className="solicitar-select"
+                          value={extra[campo.key] || ""}
+                          onChange={(e) => handleExtraChange(campo.key, e.target.value)}
+                        >
+                          <option value="">Seleccionar rubro...</option>
+                          {RUBROS_COMERCIO.map((r) => <option key={r} value={r}>{r}</option>)}
+                          <option value="__otro__">Otros</option>
+                        </select>
+                        {extra[campo.key] === "__otro__" && (
+                          <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
+                            <input
+                              id={`sello-${campo.key}-custom`}
+                              value={extra[`${campo.key}_custom`] || ""}
+                              onChange={(e) => handleExtraChange(`${campo.key}_custom`, e.target.value)}
+                              placeholder=" "
+                            />
+                            <label htmlFor={`sello-${campo.key}-custom`}>Personalizado</label>
                           </div>
-                        </>
-                      ) : campo.type === "select" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <select
-                            className="solicitar-select"
-                            value={extra[campo.key] || ""}
-                            onChange={(e) => handleExtraChange(campo.key, e.target.value)}
-                          >
-                            <option value="">Seleccionar...</option>
-                            {campo.options.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </>
-                      ) : campo.type === "servicios" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <TagSelector
-                            value={extra[campo.key] || ""}
-                            onChange={(v) => handleExtraChange(campo.key, v)}
-                            suggestions={SERVICIOS_SUGERIDOS}
-                            placeholder="Escribí o seleccioná servicios..."
-                          />
-                        </>
-                      ) : campo.type === "select-multiple" ? (
-                        <>
-                          <label className="solicitar-label">{campo.label}</label>
-                          <TagSelector
-                            value={extra[campo.key] || ""}
-                            onChange={(v) => handleExtraChange(campo.key, v)}
-                            suggestions={campo.options || []}
-                            placeholder={campo.placeholder || "Escribí o seleccioná..."}
-                          />
-                        </>
-                      ) : campo.type === "textarea" ? (
-                        <div className="solicitar-floating-group">
-                          <textarea
-                            id={`sello-${campo.key}`}
-                            value={extra[campo.key] || ""}
-                            onChange={(e) => handleExtraChange(campo.key, e.target.value)}
-                            placeholder=" "
-                          />
-                          <label htmlFor={`sello-${campo.key}`}>{campo.label}</label>
+                        )}
+                      </>
+                    ) : campo.type === "categoria" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <select
+                          className="solicitar-select"
+                          value={extra[campo.key] || ""}
+                          onChange={(e) => handleExtraChange(campo.key, e.target.value)}
+                        >
+                          <option value="">Seleccionar categoría...</option>
+                          {CATEGORIAS_HOSPEDAJE.map((r) => <option key={r} value={r}>{r}</option>)}
+                          <option value="__otro__">Otros</option>
+                        </select>
+                        {extra[campo.key] === "__otro__" && (
+                          <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
+                            <input
+                              id={`sello-${campo.key}-custom`}
+                              value={extra[`${campo.key}_custom`] || ""}
+                              onChange={(e) => handleExtraChange(`${campo.key}_custom`, e.target.value)}
+                              placeholder=" "
+                            />
+                            <label htmlFor={`sello-${campo.key}-custom`}>Personalizado</label>
+                          </div>
+                        )}
+                      </>
+                    ) : campo.type === "dias" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <div className="solicitar-dias">
+                          {DIAS_SEMANA.map((dia) => {
+                            const dias = (extra[campo.key] || "").split(",").filter(Boolean);
+                            const checked = dias.includes(dia);
+                            return (
+                              <label
+                                key={dia}
+                                className={`solicitar-dia-label ${checked ? "checked" : ""}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    const nuevos = checked
+                                      ? dias.filter((d) => d !== dia)
+                                      : [...dias, dia];
+                                    handleExtraChange(campo.key, nuevos.join(","));
+                                  }}
+                                />
+                                {dia.slice(0, 3)}
+                              </label>
+                            );
+                          })}
                         </div>
-                      ) : (
-                        <div className="solicitar-floating-group">
-                          <input
-                            id={`sello-${campo.key}`}
-                            type={campo.type || "text"}
-                            value={extra[campo.key] || ""}
-                            onChange={(e) => handleExtraChange(campo.key, e.target.value)}
-                            placeholder=" "
-                          />
-                          <label htmlFor={`sello-${campo.key}`}>{campo.label}</label>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                      </>
+                    ) : campo.type === "select" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <select
+                          className="solicitar-select"
+                          value={extra[campo.key] || ""}
+                          onChange={(e) => handleExtraChange(campo.key, e.target.value)}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {campo.options.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </>
+                    ) : campo.type === "servicios" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <TagSelector
+                          value={extra[campo.key] || ""}
+                          onChange={(v) => handleExtraChange(campo.key, v)}
+                          suggestions={SERVICIOS_SUGERIDOS}
+                          placeholder="Escribí o seleccioná servicios..."
+                        />
+                      </>
+                    ) : campo.type === "select-multiple" ? (
+                      <>
+                        <label className="solicitar-label">{campo.label}</label>
+                        <TagSelector
+                          value={extra[campo.key] || ""}
+                          onChange={(v) => handleExtraChange(campo.key, v)}
+                          suggestions={campo.options || []}
+                          placeholder={campo.placeholder || "Escribí o seleccioná..."}
+                        />
+                      </>
+                    ) : campo.type === "textarea" ? (
+                      <div className="solicitar-floating-group">
+                        <textarea
+                          id={`sello-${campo.key}`}
+                          value={extra[campo.key] || ""}
+                          onChange={(e) => handleExtraChange(campo.key, e.target.value)}
+                          placeholder=" "
+                        />
+                        <label htmlFor={`sello-${campo.key}`}>{campo.label}</label>
+                      </div>
+                    ) : (
+                      <div className="solicitar-floating-group">
+                        <input
+                          id={`sello-${campo.key}`}
+                          type={campo.type || "text"}
+                          value={extra[campo.key] || ""}
+                          onChange={(e) => handleExtraChange(campo.key, e.target.value)}
+                          placeholder=" "
+                        />
+                        <label htmlFor={`sello-${campo.key}`}>{campo.label}</label>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
-              {/* Contacto */}
+            {step === 3 && tipo && (
               <div className="solicitar-section">
                 <div className="solicitar-section-title">Contacto / Redes sociales</div>
                 <div className="solicitar-section-divider" />
@@ -814,54 +879,112 @@ export const SolicitarSelloPage = () => {
                 ))}
                 <button type="button" className="solicitar-btn-add" onClick={agregarContacto}>+ Agregar contacto</button>
               </div>
+            )}
 
-              {/* Foto */}
-              <div className="solicitar-section">
-                <div className="solicitar-section-title">Foto de portada *</div>
-                <div className="solicitar-section-divider" />
-                <p className="solicitar-hint">
-                  Esta foto se va a usar como imagen principal de tu entidad en el mapa y en su página de detalle.
-                </p>
-                <div className="solicitar-upload-area">
-                  <label className="solicitar-upload-btn">
-                    {uploading ? "Subiendo..." : "Seleccionar archivo"}
-                    <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} disabled={uploading} />
-                  </label>
-                  {imagen && <img src={imagen} alt="" className="solicitar-upload-preview" />}
+            {step === 4 && tipo && (
+              <>
+                <div className="solicitar-section">
+                  <div className="solicitar-section-title">Foto de portada *</div>
+                  <div className="solicitar-section-divider" />
+                  <p className="solicitar-hint">
+                    Esta foto se va a usar como imagen principal de tu entidad en el mapa y en su página de detalle.
+                  </p>
+                  <div className="solicitar-upload-area">
+                    <label className="solicitar-upload-btn">
+                      {uploading ? "Subiendo..." : "Seleccionar archivo"}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} disabled={uploading} />
+                    </label>
+                    {imagen && <img src={imagen} alt="" className="solicitar-upload-preview" />}
+                  </div>
+                  <div className="solicitar-small">Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
                 </div>
-                <div className="solicitar-small">Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
-              </div>
 
-              {/* Icono */}
-              <div className="solicitar-section">
-                <div className="solicitar-section-title">Icono personalizado (opcional)</div>
-                <div className="solicitar-section-divider" />
-                <p className="solicitar-hint">
-                  Subí un icono PNG de 24×24 px para tu entidad. Si no subís ninguno, se usará el icono predeterminado según el tipo.
-                </p>
-                <div className="solicitar-upload-area">
-                  <label className="solicitar-upload-btn">
-                    {subiendoIcono ? "Subiendo..." : "Seleccionar archivo"}
-                    <input type="file" accept="image/png" hidden onChange={handleIconUpload} disabled={subiendoIcono} />
-                  </label>
-                  {icono && (
-                    <>
-                      <img src={icono} alt="" className="solicitar-upload-preview-sm" />
-                      <button type="button" onClick={() => { if (iconoPublicId) fetch("/api/delete-public-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ public_id: iconoPublicId }) }).catch(() => {}); setIcono(""); setIconoPublicId(""); }} style={{ background: "none", border: "none", borderBottom: "1px solid #e8e8e8", color: "#d32f2f", cursor: "pointer", fontSize: 16, padding: "4px 0", lineHeight: 1 }}>✕</button>
-                    </>
-                  )}
-                  {!icono && tipo && (
-                    <img src={`/icons/${tipo}.png`} alt="" className="solicitar-upload-preview-sm dim" />
-                  )}
+                <div className="solicitar-section">
+                  <div className="solicitar-section-title">Icono personalizado (opcional)</div>
+                  <div className="solicitar-section-divider" />
+                  <p className="solicitar-hint">
+                    Subí un icono PNG de 24×24 px para tu entidad. Si no subís ninguno, se usará el icono predeterminado según el tipo.
+                  </p>
+                  <div className="solicitar-upload-area">
+                    <label className="solicitar-upload-btn">
+                      {subiendoIcono ? "Subiendo..." : "Seleccionar archivo"}
+                      <input type="file" accept="image/png" hidden onChange={handleIconUpload} disabled={subiendoIcono} />
+                    </label>
+                    {icono && (
+                      <>
+                        <img src={icono} alt="" className="solicitar-upload-preview-sm" />
+                        <button type="button" onClick={() => { if (iconoPublicId) fetch("/api/delete-public-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ public_id: iconoPublicId }) }).catch(() => {}); setIcono(""); setIconoPublicId(""); }} style={{ background: "none", border: "none", borderBottom: "1px solid #e8e8e8", color: "#d32f2f", cursor: "pointer", fontSize: 16, padding: "4px 0", lineHeight: 1 }}>✕</button>
+                      </>
+                    )}
+                    {!icono && tipo && (
+                      <img src={`/icons/${tipo}.png`} alt="" className="solicitar-upload-preview-sm dim" />
+                    )}
+                  </div>
+                  <div className="solicitar-small">Solo PNG • 24×24 px</div>
                 </div>
-                <div className="solicitar-small">Solo PNG • 24×24 px</div>
+              </>
+            )}
+
+            {step === 5 && tipo && (
+              <div className="solicitar-section">
+                <div className="solicitar-section-title">Revisar y enviar</div>
+                <div className="solicitar-section-divider" />
+                <p className="solicitar-hint" style={{ marginBottom: 24 }}>
+                  Revisá que todos los datos sean correctos antes de enviar tu solicitud.
+                </p>
+
+                <div className="solicitar-review-grid">
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Tipo</span>
+                    <span className="solicitar-review-value">{TIPOS.find((t) => t.value === tipo)?.label || tipo}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Nombre</span>
+                    <span className="solicitar-review-value">{nombre || "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Email</span>
+                    <span className="solicitar-review-value">{email || "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Localidad</span>
+                    <span className="solicitar-review-value">{localidades.find((l) => l.id === parseInt(localidadId))?.nombre || "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Dirección</span>
+                    <span className="solicitar-review-value">{direccion || "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Contactos</span>
+                    <span className="solicitar-review-value">{contactos.length > 0 ? `${contactos.length} agregado(s)` : "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Foto de portada</span>
+                    <span className="solicitar-review-value">{imagen ? "✓ Subida" : "—"}</span>
+                  </div>
+                  <div className="solicitar-review-item">
+                    <span className="solicitar-review-label">Icono</span>
+                    <span className="solicitar-review-value">{icono ? "✓ Subido" : "No (usará default)"}</span>
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
 
-              {/* Error */}
-              {error && <div className="solicitar-error">{error}</div>}
+          {error && <div className="solicitar-error">{error}</div>}
 
-              {/* Submit */}
-              <div className="solicitar-submit-row">
+          <div className="solicitar-step-nav">
+            {step > 0 && (
+              <button type="button" className="solicitar-btn-prev" onClick={goPrev}>
+                ← Anterior
+              </button>
+            )}
+            <div className="solicitar-step-nav-right">
+              {step < STEPS.length - 1 ? (
+                <button type="submit" className="solicitar-btn-next">
+                  Siguiente →
+                </button>
+              ) : (
                 <button
                   type="submit"
                   className="solicitar-btn-submit"
@@ -870,9 +993,9 @@ export const SolicitarSelloPage = () => {
                   {submitting ? "Enviando solicitud..." : uploading ? "Subiendo imagen..." : subiendoIcono ? "Subiendo icono..." : "Enviar solicitud"}
                   {!submitting && !uploading && !subiendoIcono && <span className="arrow">→</span>}
                 </button>
-              </div>
-            </>
-          )}
+              )}
+            </div>
+          </div>
         </form>
       </div>
 

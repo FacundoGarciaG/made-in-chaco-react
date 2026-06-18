@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { AuthPublicoProvider } from "./context/AuthPublicoContext";
@@ -34,7 +34,7 @@ function MadeInChacoApp() {
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const html = document.documentElement;
     const prev = html.style.scrollBehavior;
     html.style.scrollBehavior = "auto";

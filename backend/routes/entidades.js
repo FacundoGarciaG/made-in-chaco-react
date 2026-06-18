@@ -18,7 +18,10 @@ const router = Router();
 router.get("/entidades", async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT * FROM entidades ORDER BY nombre ASC",
+      `SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email
+       FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       ORDER BY e.nombre ASC`,
     );
     res.json(rows);
   } catch (err) {

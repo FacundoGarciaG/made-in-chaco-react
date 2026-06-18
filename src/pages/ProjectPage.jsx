@@ -3,36 +3,22 @@ import "../styles/ProjectPage.css";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
 import { AutoPageScroll } from "../components/AutoPageScroll";
+import { ProjectMapBackground } from "../components/ProjectMapBackground";
+import { useNavigate } from "react-router-dom";
+import logoHero from "../assets/imagenes/logo-madeinchaco.png";
 
 export const ProjectPage = () => {
+  const navigate = useNavigate();
   const [autoScroll, setAutoScroll] = useState(false);
-  const [scrollLocked, setScrollLocked] = useState(true);
-  const [hasStarted, setHasStarted] = useState(false);
   const [showResumeHint, setShowResumeHint] = useState(false);
   const hintTimerRef = useRef(null);
+  const startedRef = useRef(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
     restDelta: 0.001,
   });
-
-  const handleStartAutoScroll = (e) => {
-    e.preventDefault();
-
-    setScrollLocked(false); // desbloquear scroll
-    setHasStarted(true);
-
-    // Hacer scroll suave hasta el contenido
-    const target = document.getElementById("project-resume");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth" });
-
-      setTimeout(() => {
-        setAutoScroll(true);
-      }, 1000);
-    }
-  };
 
   const stopAutoScroll = useCallback(() => {
     setAutoScroll(false);
@@ -43,21 +29,33 @@ export const ProjectPage = () => {
     setAutoScroll(true);
   }, []);
 
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    setTimeout(() => {
+      setAutoScroll(true);
+    }, 800);
+  }, []);
+
   // Fondo negro en body/html mientras esté en esta página
   useEffect(() => {
     const prevBodyBg = document.body.style.backgroundColor;
     const prevHtmlBg = document.documentElement.style.backgroundColor;
+    const prevOverscroll = document.documentElement.style.overscrollBehavior;
     document.body.style.backgroundColor = "#0a0a0a";
     document.documentElement.style.backgroundColor = "#0a0a0a";
+    document.documentElement.style.overscrollBehavior = "none";
     return () => {
       document.body.style.backgroundColor = prevBodyBg;
       document.documentElement.style.backgroundColor = prevHtmlBg;
+      document.documentElement.style.overscrollBehavior = prevOverscroll;
     };
   }, []);
 
   // Mostrar hint a los 5s de pausado
   useEffect(() => {
-    if (!hasStarted || autoScroll) {
+    if (autoScroll) {
       setShowResumeHint(false);
       return;
     }
@@ -69,29 +67,23 @@ export const ProjectPage = () => {
     return () => {
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
-  }, [hasStarted, autoScroll]);
+  }, [autoScroll]);
 
   return (
     <div className="project-page">
-      {/* Bloquear scroll mientras scrollLocked sea true */}
+      <div className="project-map-wrapper">
+        <ProjectMapBackground scrollYProgress={scrollYProgress} />
+        <div className="project-map-overlay" />
+      </div>
+
       <AutoPageScroll
         isActive={autoScroll}
         onStop={stopAutoScroll}
         onResume={resumeAutoScroll}
-        blockScroll={scrollLocked}
+        blockScroll={false}
       />
 
-      {/* Overlay click para empezar */}
-      {!hasStarted && (
-        <div className="project-start-overlay">
-          <div className="project-start-cta" onClick={handleStartAutoScroll}>
-            <img src="/icons/touch.png" className="project-start-icon" />
-            <p className="project-start-text">Hacé click o tocá la pantalla</p>
-          </div>
-        </div>
-      )}
-
-      <section id="project-resume" className="project-container">
+      <section id="project-resume" className="project-container project-container--with-ending">
         <p className="project-intro">
           Made in Chaco es un proyecto cultural, educativo y de identidad
           territorial que busca documentar, visibilizar y difundir de forma
@@ -295,6 +287,10 @@ export const ProjectPage = () => {
             </li>
           </ul>
         </motion.div>
+
+        <div className="project-ending" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+          <img src={logoHero} alt="Made in Chaco" className="project-ending-logo" />
+        </div>
 
         <motion.div className="progress" style={{ scaleX, originX: 0 }} />
       </section>

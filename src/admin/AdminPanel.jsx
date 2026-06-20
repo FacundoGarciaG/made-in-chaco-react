@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { validarArchivo, validarFormato, INFO_FORMATOS } from "../utils/mediaValidation";
 import { subirArchivo, subirImagen } from "./uploadService";
 import TagSelector from "../components/TagSelector";
+import { MiniMap } from "../components/MiniMap";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -444,6 +445,7 @@ function SocialMediaManager({ value, onChange, label = "Redes sociales y contact
 export const AdminPanel = () => {
   const { user, logout } = useAuth();
   const [view, setView] = useState("entidades");
+  const [expandedGroups, setExpandedGroups] = useState({ entidades: true, recorridos: false });
   const [loading, setLoading] = useState(false);
   const [localidades, setLocalidades] = useState([]);
   const [editValues, setEditValues] = useState({});
@@ -508,6 +510,8 @@ export const AdminPanel = () => {
   };
 
   const [allEntities, setAllEntities] = useState([]);
+  const [entidadSearch, setEntidadSearch] = useState("");
+  const [entidadFilterPerfil, setEntidadFilterPerfil] = useState("");
   const [solicitudes, setSolicitudes] = useState([]);
   const [solicitudesLoading, setSolicitudesLoading] = useState(false);
   const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
@@ -573,6 +577,7 @@ export const AdminPanel = () => {
   const recImagenRef = useRef(null);
 
   const [popup, setPopup] = useState(null);
+  const [confirmEmailInput, setConfirmEmailInput] = useState("");
   const pendingConfirm = useRef(null);
   const fotoPerfilRef = useRef(null);
 
@@ -581,10 +586,11 @@ export const AdminPanel = () => {
     setTimeout(() => setPopup(null), duration);
   };
 
-  const showConfirm = (msg, confirmLabel = "ELIMINAR") => {
+  const showConfirm = (msg, confirmLabel = "ELIMINAR", confirmEmail = null) => {
     return new Promise((resolve) => {
       pendingConfirm.current = resolve;
-      setPopup({ message: msg, confirmLabel, isConfirm: true });
+      setConfirmEmailInput("");
+      setPopup({ message: msg, confirmLabel, isConfirm: true, confirmEmail });
     });
   };
 
@@ -1907,64 +1913,144 @@ export const AdminPanel = () => {
             </div>
           </div>
           <div style={styles.sidebarNav}>
-            {[
-              { id: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
-              { id: "entidades", label: "Entidades", icon: "/icons/book.png" },
-              { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png" },
-              { id: "ediciones", label: "Ediciones", icon: "/icons/edit.png" },
-              { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
-              { id: "nuevo-recorrido", label: "Recorridos", icon: "/icons/route.png" },
-              { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
-              { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
-              { id: "palabras", label: "Palabras", icon: "/icons/edit.png" },
-              { id: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                className="admin-nav-btn"
-                onClick={() => {
-                  if (item.id === "nuevo-editar") resetWizard();
-                  if (item.id === "nuevo-recorrido") { resetRecForm(); setView(item.id); }
-                  else if (item.id === "nuevo-recorrido-form") { resetRecForm(); setEditingRecorridoId("new"); setView("nuevo-recorrido"); }
-                  else setView(item.id);
-                }}
-                  style={{
-                    ...styles.navBtn,
-                    background:
-                      item.id === "entidades" && view === "nuevo-editar" && editingEntityId
-                        ? "#f0ede8"
-                      : item.id === "nuevo-recorrido" && view === "nuevo-recorrido" && editingRecorridoId !== "new"
-                        ? "#f0ede8"
-                      : item.id === "nuevo-recorrido-form" && view === "nuevo-recorrido" && editingRecorridoId === "new"
-                        ? "#f0ede8"
-                      : view === item.id && !(item.id === "nuevo-editar" && editingEntityId)
-                        ? "#f0ede8"
-                        : "transparent",
-                    color:
-                      item.id === "entidades" && view === "nuevo-editar" && editingEntityId
-                        ? "#863819"
-                      : item.id === "nuevo-recorrido" && view === "nuevo-recorrido" && editingRecorridoId !== "new"
-                        ? "#863819"
-                      : item.id === "nuevo-recorrido-form" && view === "nuevo-recorrido" && editingRecorridoId === "new"
-                        ? "#863819"
-                      : view === item.id && !(item.id === "nuevo-editar" && editingEntityId)
-                        ? "#863819"
-                        : "#555",
-                  }}
-              >
-                <img src={item.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                {item.label}
-                {item.id === "solicitudes" && pendingSolicitudes > 0 && (
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d4a017", marginLeft: 8, verticalAlign: "middle" }} />
-                )}
-                {item.id === "ediciones" && pendingEdiciones > 0 && (
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d4a017", marginLeft: 8, verticalAlign: "middle" }} />
-                )}
-                {item.id === "devoluciones" && pendingDevoluciones > 0 && (
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#e65100", marginLeft: 8, verticalAlign: "middle" }} />
-                )}
-              </button>
-            ))}
+            {(() => {
+              const isEntityActive = view === "entidades" || view === "nuevo-editar" || view === "solicitudes" || view === "ediciones";
+              const isRecorridoActive = view === "nuevo-recorrido" || view === "nuevo-recorrido-form";
+
+              const groups = [
+                {
+                  key: "entidades",
+                  label: "Entidades",
+                  icon: "/icons/book.png",
+                  viewId: "entidades",
+                  isActive: isEntityActive,
+                  children: [
+                    { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png", badge: pendingSolicitudes > 0 ? { color: "#d4a017" } : null },
+                    { id: "ediciones", label: "Ediciones", icon: "/icons/edit.png", badge: pendingEdiciones > 0 ? { color: "#d4a017" } : null },
+                    { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
+                  ],
+                },
+                {
+                  key: "recorridos",
+                  label: "Recorridos",
+                  icon: "/icons/route.png",
+                  viewId: "nuevo-recorrido",
+                  isActive: isRecorridoActive,
+                  children: [
+                    { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
+                  ],
+                },
+              ];
+
+              const flatItems = [
+                { id: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
+                { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
+                { id: "palabras", label: "Palabras", icon: "/icons/edit.png" },
+                { id: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png", badge: pendingDevoluciones > 0 ? { color: "#e65100" } : null },
+                { id: "planes", label: "Planes", icon: "/icons/card.png" },
+                { id: "usuarios", label: "Usuarios", icon: "/icons/user.png" },
+              ];
+
+              const handleNavClick = (id) => {
+                if (id === "nuevo-editar") resetWizard();
+                if (id === "nuevo-recorrido") { resetRecForm(); setView(id); }
+                else if (id === "nuevo-recorrido-form") { resetRecForm(); setEditingRecorridoId("new"); setView("nuevo-recorrido"); }
+                else setView(id);
+              };
+
+              const isItemActive = (id) => {
+                if (id === "entidades") return isEntityActive;
+                if (id === "nuevo-recorrido") return isRecorridoActive;
+                if (id === "nuevo-editar") return view === "nuevo-editar" && !editingEntityId;
+                return view === id;
+              };
+
+              const items = [];
+
+              groups.forEach((group) => {
+                const expanded = expandedGroups[group.key];
+                items.push(
+                  <button
+                    key={group.key}
+                    className="admin-nav-btn"
+                    onClick={() => {
+                      if (group.key === "recorridos") resetRecForm();
+                      setView(group.viewId);
+                      setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }));
+                    }}
+                    style={{
+                      ...styles.navBtn,
+                      background: group.isActive ? "#f0ede8" : "transparent",
+                      color: "#1c1c18",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center" }}>
+                      <img src={group.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                      {group.label}
+                    </span>
+                    <span style={{
+                      fontSize: "10px",
+                      transition: "transform 0.2s",
+                      transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+                    }}>
+                      ▶
+                    </span>
+                  </button>
+                );
+                if (expanded) {
+                  group.children.forEach((child) => {
+                    const active = view === child.id && !(child.id === "nuevo-editar" && editingEntityId);
+                    items.push(
+                      <button
+                        key={child.id}
+                        className="admin-nav-btn"
+                        onClick={() => handleNavClick(child.id)}
+                        style={{
+                          ...styles.navBtn,
+                          paddingLeft: "44px",
+                          background: active ? "#f0ede8" : "transparent",
+                          color: active ? "#863819" : "#1c1c18",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <img src={child.icon} style={{ width: "16px", height: "16px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                        {child.label}
+                        {child.badge && (
+                          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: child.badge.color, marginLeft: 8, verticalAlign: "middle" }} />
+                        )}
+                      </button>
+                    );
+                  });
+                }
+              });
+
+              flatItems.forEach((item) => {
+                const active = isItemActive(item.id);
+                items.push(
+                  <button
+                    key={item.id}
+                    className="admin-nav-btn"
+                    onClick={() => handleNavClick(item.id)}
+                    style={{
+                      ...styles.navBtn,
+                      background: active ? "#f0ede8" : "transparent",
+                      color: active ? "#863819" : "#1c1c18",
+                    }}
+                  >
+                    <img src={item.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle", filter: item.id === "planes" ? "brightness(0)" : undefined }} alt="" />
+                    {item.label}
+                    {item.badge && (
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: item.badge.color, marginLeft: 8, verticalAlign: "middle" }} />
+                    )}
+                  </button>
+                );
+              });
+
+              return items;
+            })()}
           </div>
           <button onClick={logout} className="admin-logout-btn" style={styles.logoutBtn}>
             <img src="/icons/logout.png" style={{ width: "16px", height: "16px", marginRight: "8px", verticalAlign: "middle" }} alt="" />
@@ -1977,36 +2063,91 @@ export const AdminPanel = () => {
           <div style={styles.viewContainer}>
             {view === "entidades" && (
               <>
-                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h2 style={styles.sectionTitle}>
-                    <img src="/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                    Entidades
-                  </h2>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={cargarEntidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                      <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-                      ACTUALIZAR
-                    </button>
-                    <button
-                      onClick={() => {
-                        resetWizard();
-                        setView("nuevo-editar");
+                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h2 style={styles.sectionTitle}>
+                      <img src="/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                      Entidades
+                    </h2>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={cargarEntidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+                        ACTUALIZAR
+                      </button>
+                      <button
+                        onClick={() => {
+                          resetWizard();
+                          setView("nuevo-editar");
+                        }}
+                        className="admin-btn"
+                        style={{ ...styles.btnPrimary, background: "#2e7d32" }}
+                      >
+                        + NUEVA
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <input
+                      placeholder="Buscar entidad por nombre..."
+                      value={entidadSearch}
+                      onChange={(e) => setEntidadSearch(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 14px",
+                        border: "1px solid #ddd",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        outline: "none",
+                        fontFamily: "inherit",
+                        background: "white",
                       }}
-                      className="admin-btn"
-                      style={{ ...styles.btnPrimary, background: "#2e7d32" }}
+                    />
+                    <select
+                      value={entidadFilterPerfil}
+                      onChange={(e) => setEntidadFilterPerfil(e.target.value)}
+                      style={{
+                        padding: "10px 14px",
+                        border: "1px solid #ddd",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        outline: "none",
+                        fontFamily: "inherit",
+                        background: "white",
+                        minWidth: "220px",
+                        cursor: "pointer",
+                      }}
                     >
-                      + NUEVA
-                    </button>
+                      <option value="">Todos los propietarios</option>
+                      {(() => {
+                        const owners = {};
+                        for (const e of allEntities) {
+                          if (e.perfil_id && (e.perfil_nombre || e.perfil_email)) {
+                            const key = e.perfil_id;
+                            if (!owners[key]) owners[key] = { id: key, nombre: e.perfil_nombre, email: e.perfil_email };
+                          }
+                        }
+                        return Object.values(owners).sort((a, b) => (a.nombre || a.email || "").localeCompare(b.nombre || b.email || "")).map((o) => (
+                          <option key={o.id} value={o.id}>{o.nombre || o.email}</option>
+                        ));
+                      })()}
+                    </select>
                   </div>
                 </div>
-                {allEntities.length === 0 && (
-                  <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>
-                    No hay entidades todavía
-                  </div>
-                )}
                 {(() => {
+                  const filtrados = allEntities.filter((e) => {
+                    const matchSearch = !entidadSearch || e.nombre.toLowerCase().includes(entidadSearch.toLowerCase());
+                    const matchPerfil = !entidadFilterPerfil || String(e.perfil_id) === entidadFilterPerfil;
+                    return matchSearch && matchPerfil;
+                  });
+                  if (filtrados.length === 0) {
+                    return (
+                      <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>
+                        {allEntities.length === 0 ? "No hay entidades todavía" : "No se encontraron entidades con los filtros actuales"}
+                      </div>
+                    );
+                  }
                   const grupos = {};
-                  for (const e of allEntities) {
+                  for (const e of filtrados) {
                     if (!grupos[e.tipo]) grupos[e.tipo] = [];
                     grupos[e.tipo].push(e);
                   }
@@ -3240,7 +3381,7 @@ export const AdminPanel = () => {
                     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
                       onClick={() => setSolicitudDetalle(null)}
                     >
-                      <div style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "640px", width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
+                      <div className="admin-modal" style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "640px", width: "100%", maxHeight: "96vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -3318,8 +3459,14 @@ export const AdminPanel = () => {
                             )}
                           </div>
                         ))}
-                      </div>
+                      {sol.latitud && sol.longitud && (
+                        <div style={{ marginTop: "16px" }}>
+                          <div style={{ fontSize: "12px", fontWeight: 700, color: "#863819", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}>Ubicación</div>
+                          <MiniMap lat={Number(sol.latitud)} lng={Number(sol.longitud)} nombre={sol.nombre} tipo={sol.tipo} icono={sol.icono} />
+                        </div>
+                      )}
                     </div>
+                  </div>
                   );
                 })()}
               </div>
@@ -3610,6 +3757,20 @@ export const AdminPanel = () => {
             {/* PALABRAS */}
             {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
 
+            {/* PLANES */}
+            {view === "planes" && <PlanesView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
+
+            {/* USUARIOS */}
+            {view === "usuarios" && (
+              <UsuariosView
+                authFetch={authFetch}
+                authHeaders={authHeaders}
+                showConfirm={showConfirm}
+                showPopup={showPopup}
+                onEditEntity={(id) => { cargarEntidadParaEditar(id); setView("nuevo-editar"); }}
+              />
+            )}
+
             {/* DEVOLUCIONES */}
             {view === "devoluciones" && (
               <DevolucionesView
@@ -3695,7 +3856,7 @@ export const AdminPanel = () => {
               padding: "32px",
               borderRadius: "14px",
               boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-              minWidth: "360px",
+              minWidth: "380px",
               maxWidth: "440px",
               textAlign: "center",
               fontFamily: "Merriweather, serif",
@@ -3707,6 +3868,33 @@ export const AdminPanel = () => {
             <p style={{ margin: "0 0 20px", fontSize: "15px", lineHeight: 1.5, color: "#000" }}>
               {popup.message}
             </p>
+            {popup.confirmEmail && (
+              <div style={{ marginBottom: "20px", textAlign: "left" }}>
+                <label style={{ fontSize: "12px", fontWeight: 700, color: "#c62828", display: "block", marginBottom: "6px" }}>
+                  Escribí el email del usuario para confirmar:
+                </label>
+                <input
+                  autoFocus
+                  type="email"
+                  value={confirmEmailInput}
+                  onChange={(e) => setConfirmEmailInput(e.target.value)}
+                  placeholder={popup.confirmEmail}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    border: `2px solid ${confirmEmailInput && confirmEmailInput !== popup.confirmEmail ? "#c62828" : "#ddd"}`,
+                    borderRadius: "10px",
+                    fontSize: "14px",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontFamily: "inherit",
+                  }}
+                />
+                {confirmEmailInput && confirmEmailInput !== popup.confirmEmail && (
+                  <p style={{ fontSize: "12px", color: "#c62828", margin: "4px 0 0" }}>El email no coincide</p>
+                )}
+              </div>
+            )}
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
               <button
                 className="admin-btn"
@@ -3715,15 +3903,19 @@ export const AdminPanel = () => {
                   setPopup(null);
                   pendingConfirm.current = null;
                 }}
+                disabled={popup.confirmEmail ? confirmEmailInput !== popup.confirmEmail : false}
                 style={{
                   padding: "10px 28px",
-                  background: popup.confirmLabel === "ELIMINAR" ? "#863819" : "#2e7d32",
+                  background: popup.confirmEmail
+                    ? (confirmEmailInput === popup.confirmEmail ? "#c62828" : "#ccc")
+                    : (popup.confirmLabel === "ELIMINAR" ? "#863819" : "#2e7d32"),
                   color: "white",
                   border: "none",
                   borderRadius: "10px",
                   fontWeight: 700,
                   fontSize: "14px",
-                  cursor: "pointer",
+                  cursor: popup.confirmEmail ? (confirmEmailInput === popup.confirmEmail ? "pointer" : "not-allowed") : "pointer",
+                  opacity: popup.confirmEmail && confirmEmailInput !== popup.confirmEmail ? 0.5 : 1,
                 }}
               >
                 {popup.confirmLabel || "ELIMINAR"}
@@ -4803,6 +4995,517 @@ function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdicio
         </>
       )}
       {revisando && <RevisarModal sol={revisando} onClose={() => setRevisando(null)} />}
+    </div>
+  );
+}
+
+/* ─── Planes View ─── */
+/* ─── Usuarios View ─── */
+function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, onEditEntity }) {
+  const [perfiles, setPerfiles] = useState(null);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const cargar = useCallback(async (q) => {
+    setLoading(true);
+    try {
+      const url = q ? `/api/admin/perfiles?search=${encodeURIComponent(q)}` : "/api/admin/perfiles";
+      const res = await authFetch(url, { headers: authHeaders() });
+      if (res.ok) setPerfiles(await res.json());
+    } catch {} finally {
+      setLoading(false);
+    }
+  }, [authFetch, authHeaders]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const verDetalle = async (id) => {
+    try {
+      const res = await authFetch(`/api/admin/perfiles/${id}`, { headers: authHeaders() });
+      if (res.ok) setSelected(await res.json());
+    } catch {}
+  };
+
+  const toggleBan = async (perfil, baneado) => {
+    const accion = baneado ? "BANEAR" : "DESBANEAR";
+    const msg = baneado
+      ? `¿Banear a "${perfil.nombre || perfil.email}"? No podrá iniciar sesión ni acceder al sistema.\n\nEscribí su email para confirmar.`
+      : `¿Desbanear a "${perfil.nombre || perfil.email}"? Recuperará el acceso al sistema.`;
+    const ok = await showConfirm(msg, accion, baneado ? perfil.email : null);
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/admin/perfiles/${perfil.id}/ban`, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ baneado }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        showPopup(baneado ? "Usuario baneado" : "Usuario desbaneado");
+        // Update list
+        setPerfiles((prev) => prev.map((p) => p.id === updated.id ? { ...p, baneado: updated.baneado } : p));
+        // Update detail if open
+        if (selected && selected.perfil.id === updated.id) {
+          setSelected((prev) => ({ ...prev, perfil: { ...prev.perfil, baneado: updated.baneado } }));
+        }
+      }
+    } catch {}
+  };
+
+  if (selected) {
+    const { perfil, entidades } = selected;
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+          <button onClick={() => setSelected(null)} style={{
+            background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#888", padding: "4px 8px",
+          }}>←</button>
+          <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
+            <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+            {perfil.nombre || "Sin nombre"}
+          </h2>
+        </div>
+
+        <div style={{ display: "flex", gap: "24px", flex: 1, minHeight: 0 }}>
+          {/* Profile info */}
+          <div style={{ flex: 1, background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
+              {perfil.avatar_url ? (
+                <img src={perfil.avatar_url} alt="" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "2px solid #f0ede8" }} />
+              ) : (
+                <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "#999" }}>👤</div>
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "20px", fontWeight: 700, color: "#1c1c18" }}>{perfil.nombre || "Sin nombre"}</span>
+                  {perfil.baneado && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>BANEADO</span>
+                  )}
+                  {perfil.verified ? (
+                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>VERIFICADO</span>
+                  ) : (
+                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>NO VERIFICADO</span>
+                  )}
+                </div>
+                <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{perfil.email}</div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+              {[
+                { label: "Email", val: perfil.email },
+                { label: "Profesión", val: perfil.profesion || "—" },
+                { label: "País", val: perfil.pais || "—" },
+                { label: "Provincia", val: perfil.provincia || "—" },
+                { label: "Localidad", val: perfil.localidad || "—" },
+                { label: "Nacionalidad", val: perfil.nacionalidad || "—" },
+                { label: "Sexo", val: perfil.sexo || "—" },
+                { label: "Fecha de nacimiento", val: perfil.fecha_nacimiento ? new Date(perfil.fecha_nacimiento).toLocaleDateString("es-AR") : "—" },
+                { label: "WhatsApp", val: perfil.whatsapp || "—" },
+                { label: "Bio", val: perfil.bio || "—", fullWidth: true },
+                { label: "Google ID", val: perfil.google_id || "—" },
+                { label: "Registrado", val: perfil.created_at ? new Date(perfil.created_at).toLocaleDateString("es-AR") : "—" },
+                { label: "Actualizado", val: perfil.updated_at ? new Date(perfil.updated_at).toLocaleDateString("es-AR") : "—" },
+              ].map((f) => (
+                <div key={f.label} style={f.fullWidth ? { gridColumn: "1 / -1" } : {}}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{f.label}</div>
+                  <div style={{ fontSize: "14px", color: "#000", wordBreak: "break-word" }}>{f.val}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", marginTop: "24px", flexWrap: "wrap" }}>
+              <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(perfil.email)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#863819", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", textDecoration: "none", fontFamily: "inherit" }}>
+                <img src="/icons/mail.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
+                ENVIAR EMAIL
+              </a>
+              {perfil.whatsapp && (
+                <a href={`https://wa.me/${perfil.whatsapp.replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#25D366", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", textDecoration: "none", fontFamily: "inherit" }}>
+                  <img src="/icons/whatsapp.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
+                  WHATSAPP
+                </a>
+              )}
+              {perfil.baneado ? (
+                <button onClick={() => toggleBan(perfil, false)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  DESBANEAR
+                </button>
+              ) : (
+                <button onClick={() => toggleBan(perfil, true)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#c62828", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  <img src="/icons/delete.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
+                  BANEAR
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Entities list */}
+          <div style={{ width: "360px", minWidth: "300px", background: "white", borderRadius: "12px", padding: "20px", border: "1px solid #eee", display: "flex", flexDirection: "column" }}>
+            <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: "16px" }}>
+              Entidades ({entidades.length})
+            </h3>
+            <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+              {entidades.length === 0 ? (
+                <p style={{ color: "#aaa", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No tiene entidades.</p>
+              ) : (
+                entidades.map((ent) => (
+                  <a
+                    key={ent.id}
+                    href={`/entidad/${ent.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "none", display: "block" }}
+                  >
+                    <div style={{
+                      padding: "12px", border: "1px solid #f0ede8", borderRadius: "8px", marginBottom: "8px",
+                      background: ent.visible ? "#fff" : "#f9f9f9", opacity: ent.visible ? 1 : 0.6,
+                      cursor: "pointer", transition: "box-shadow 0.15s",
+                    }}
+                      onMouseEnter={(e) => { if (ent.visible) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: colorMapAdmin[ent.tipo] || "#555", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          {ent.tipo}
+                        </span>
+                        {!ent.visible && (
+                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>OCULTA</span>
+                        )}
+                        {ent.estado_sello === "aprobado" && (
+                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>SELLO</span>
+                        )}
+                        {ent.estado_pago === "atrasado" && (
+                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>DEUDA</span>
+                        )}
+                        {ent.estado_pago === "reembolso_solicitado" && (
+                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#e65100", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>DEVOLUCIÓN</span>
+                        )}
+                        {ent.fecha_fin_suscripcion && (() => {
+                          try {
+                            const d = new Date();
+                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            const fin = ent.fecha_fin_suscripcion.split('T')[0];
+                            if (fin < hoy) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>VENCIDA</span>;
+                          } catch {}
+                          return null;
+                        })()}
+                        {ent.fecha_fin_suscripcion && ent.estado_pago === "al_dia" && (() => {
+                          try {
+                            const d = new Date();
+                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            const fin = ent.fecha_fin_suscripcion.split('T')[0];
+                            const diff = Math.ceil((new Date(fin + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
+                            if (diff >= 0 && diff <= 30) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
+                          } catch {}
+                          return null;
+                        })()}
+                        {ent.tipo === "evento" && ent.fecha_evento && (() => {
+                          try {
+                            const d = new Date();
+                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            const fe = ent.fecha_evento.split('T')[0];
+                            if (fe < hoy) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>VENCIDO</span>;
+                            const diff = Math.ceil((new Date(fe + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
+                            if (diff <= 7) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>PRONTO ({diff}d)</span>;
+                            return <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>FALTAN {diff}d</span>;
+                          } catch {}
+                          return null;
+                        })()}
+                      </div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#1c1c18", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        {ent.nombre}
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditEntity(ent.id); }}
+                          style={{
+                            padding: "4px 10px", background: "transparent", color: "#863819",
+                            border: "1px solid #863819", borderRadius: "6px", fontSize: "10px",
+                            fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                            whiteSpace: "nowrap", transition: "0.15s",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#863819"; e.currentTarget.style.color = "white"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#863819"; }}
+                        >
+                          EDITAR
+                        </button>
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+                        {new Date(ent.created_at).toLocaleDateString("es-AR")}
+                      </div>
+                    </div>
+                  </a>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <h2 style={styles.sectionTitle}>
+          <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+          Usuarios
+        </h2>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input
+            placeholder="Buscar por nombre o email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") cargar(search); }}
+            style={{
+              padding: "8px 14px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "13px",
+              outline: "none", width: "260px", fontFamily: "inherit",
+            }}
+          />
+          <button onClick={() => cargar(search)} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+            <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+            BUSCAR
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+      ) : perfiles === null ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+      ) : perfiles.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay usuarios registrados.</p>
+      ) : (
+        <div style={{ background: "white", borderRadius: "12px", border: "1px solid #eee", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1.2fr 0.8fr 0.8fr 0.6fr 80px", gap: "16px", padding: "16px 16px 9px", fontWeight: 800, fontSize: "13px", textTransform: "uppercase", borderBottom: "1px solid #d4cfc4", background: "#f0ede8", borderRadius: "8px 8px 0 0", alignItems: "center" }}>
+            <div></div>
+            <div style={{ color: "#1c1c18" }}>Nombre</div>
+            <div style={{ color: "#1c1c18" }}>Email</div>
+            <div style={{ color: "#1c1c18" }}>Localidad</div>
+            <div style={{ color: "#1c1c18" }}>Registro</div>
+            <div style={{ color: "#1c1c18" }}>Entidades</div>
+            <div></div>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "8px 16px 16px" }}>
+            {perfiles.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => verDetalle(p.id)}
+                style={{
+                  display: "grid", gridTemplateColumns: "40px 1fr 1.2fr 0.8fr 0.8fr 0.6fr 80px", gap: "16px",
+                  padding: "12px 0", fontSize: "14px", borderBottom: "1px solid #f5f2eb", alignItems: "center",
+                  cursor: "pointer", transition: "background 0.1s",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#fafaf8"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <div>
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", color: "#999" }}>👤</div>
+                  )}
+                </div>
+                <div style={{ fontWeight: 600, color: "#1c1c18", display: "flex", alignItems: "center", gap: "6px" }}>
+                  {p.nombre || "Sin nombre"}
+                  {p.baneado && <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>B</span>}
+                  {p.verified && <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>V</span>}
+                </div>
+                <div style={{ color: "#666", fontSize: "13px" }}>{p.email}</div>
+                <div style={{ color: "#888", fontSize: "13px" }}>{p.localidad || "—"}</div>
+                <div style={{ color: "#888", fontSize: "13px" }}>{p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : "—"}</div>
+                <div style={{ color: "#888", fontSize: "13px", textAlign: "center" }}>{p.entidades_count}</div>
+                <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                  <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(p.email)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "8px", background: "#f0ede8", cursor: "pointer", textDecoration: "none" }}
+                    title="Enviar email por Gmail"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <img src="/icons/mail.png" style={{ width: "16px", height: "16px" }} alt="email" />
+                  </a>
+                  {p.whatsapp && (
+                    <a href={`https://wa.me/${p.whatsapp.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "8px", background: "#25D366", cursor: "pointer", textDecoration: "none" }}
+                      title="Enviar WhatsApp"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <img src="/icons/whatsapp.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="whatsapp" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanesView({ authFetch, showConfirm, showPopup }) {
+  const [planes, setPlanes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
+  const [editando, setEditando] = useState({});
+
+  const cargarPlanes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/planes/admin", { headers: authHeaders() });
+      if (res.ok) setPlanes(await res.json());
+    } catch {} finally {
+      setLoading(false);
+    }
+  }, [authFetch]);
+
+  useEffect(() => { cargarPlanes(); }, [cargarPlanes]);
+
+  const iniciarEdicion = (plan) => {
+    setEditandoId(plan.id);
+    setEditando({
+      nombre: plan.nombre,
+      descripcion: plan.descripcion || "",
+      precio: plan.precio,
+      duracion_dias: plan.duracion_dias,
+      entidades_incluidas: plan.entidades_incluidas,
+      activo: plan.activo,
+    });
+  };
+
+  const guardar = async (id) => {
+    if (!editando.nombre.trim()) return;
+    try {
+      const res = await authFetch(`/api/planes/${id}`, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(editando),
+      });
+      if (res.ok) {
+        setEditandoId(null);
+        showPopup("Plan actualizado");
+        cargarPlanes();
+      }
+    } catch {}
+  };
+
+  const eliminar = async (id, nombre) => {
+    const ok = await showConfirm(`¿Eliminar el plan "${nombre}"?`, "ELIMINAR");
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/planes/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        showPopup("Plan eliminado");
+        cargarPlanes();
+      }
+    } catch {}
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <h2 style={styles.sectionTitle}>
+          <img src="/icons/card.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle", filter: "brightness(0)" }} alt="" />
+          Planes
+        </h2>
+        <button onClick={cargarPlanes} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
+          ACTUALIZAR
+        </button>
+      </div>
+
+      {loading ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+      ) : planes.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay planes todavía.</p>
+      ) : (
+        planes.map((plan) => (
+          <div key={plan.id} style={styles.entityCard}>
+            {editandoId === plan.id ? (
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "8px" }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>NOMBRE</label>
+                    <input style={styles.input} value={editando.nombre} onChange={(e) => setEditando({ ...editando, nombre: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>PRECIO ($)</label>
+                    <input style={styles.input} type="number" step="0.01" value={editando.precio} onChange={(e) => setEditando({ ...editando, precio: e.target.value })} />
+                  </div>
+                  {plan.nombre !== "Personalizado" && (
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>DURACIÓN (DÍAS)</label>
+                      <input style={styles.input} type="number" value={editando.duracion_dias} onChange={(e) => setEditando({ ...editando, duracion_dias: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "8px" }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>DESCRIPCIÓN</label>
+                    <textarea style={styles.input} rows={2} value={editando.descripcion} onChange={(e) => setEditando({ ...editando, descripcion: e.target.value })} />
+                  </div>
+                  {plan.nombre !== "Personalizado" && (
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>ENTIDADES INCLUIDAS</label>
+                      <input style={styles.input} type="number" value={editando.entidades_incluidas} onChange={(e) => setEditando({ ...editando, entidades_incluidas: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: 13, cursor: "pointer" }}>
+                    <input type="checkbox" checked={editando.activo} onChange={(e) => setEditando({ ...editando, activo: e.target.checked })} />
+                    Plan activo
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => guardar(plan.id)} className="admin-btn" style={{ ...styles.btnPrimary, fontSize: 12, padding: "8px 16px" }}>
+                    GUARDAR
+                  </button>
+                  <button onClick={() => setEditandoId(null)} className="admin-btn" style={{ ...styles.btnSecondary, fontSize: 12, padding: "8px 16px" }}>
+                    CANCELAR
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: "#1c1c18" }}>{plan.nombre}</span>
+                    {!plan.activo && (
+                      <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>INACTIVO</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
+                    {plan.descripcion ? `${plan.descripcion} · ` : ""}
+                    <strong>${Number(plan.precio).toLocaleString("es-AR")}</strong> · {plan.duracion_dias} días · {plan.entidades_incluidas} entidad{plan.entidades_incluidas !== 1 ? "es" : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                  <button onClick={() => iniciarEdicion(plan)} className="admin-btn" style={styles.smallBtn("#863819")}>
+                    EDITAR
+                  </button>
+                  <button onClick={() => eliminar(plan.id, plan.nombre)} className="admin-btn" style={{ ...styles.smallBtn("#c62828") }}>
+                    <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
+                    ELIMINAR
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))
+      )}
     </div>
   );
 }

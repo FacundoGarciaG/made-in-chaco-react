@@ -631,6 +631,9 @@ export const SolicitarSelloPage = () => {
                     onChange={(e) => {
                       const id = e.target.value;
                       setLocalidadId(id);
+                      setDireccion("");
+                      setGeoQuery("");
+                      setGeoResults([]);
                       const loc = localidades.find((l) => l.id === parseInt(id));
                       if (loc?.latitud && loc?.longitud && mapRef.current && markerRef.current) {
                         mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 14, speed: 1.2 });
@@ -658,7 +661,8 @@ export const SolicitarSelloPage = () => {
                       clearTimeout(geoTimeoutRef.current);
                       geoTimeoutRef.current = setTimeout(async () => {
                         try {
-                          const q = e.target.value.includes(",") ? e.target.value : `${e.target.value}, Chaco, Argentina`;
+                          const locNombre = localidades.find((l) => l.id === parseInt(localidadId))?.nombre;
+                          const q = e.target.value.includes(",") ? e.target.value : `${e.target.value}${locNombre ? `, ${locNombre}` : ""}, Chaco, Argentina`;
                           const r = await fetch(
                             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=ar`,
                             { headers: { "User-Agent": "MadeInChaco/1.0", "Accept-Language": "es" } },

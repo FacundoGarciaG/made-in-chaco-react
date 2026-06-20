@@ -105,6 +105,67 @@ const FloatingInput = ({ label, value, onChange, type = "text", autoFocus = fals
   );
 };
 
+const WhatsAppField = ({ prefix, number, onPrefixChange, onNumberChange }) => {
+  const [focused, setFocused] = useState(false);
+  const filled = !!number;
+  return (
+    <div style={sField}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+        <select
+          value={prefix}
+          onChange={(e) => onPrefixChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            ...sInput,
+            width: "auto",
+            minWidth: "90px",
+            flexShrink: 0,
+            cursor: "pointer",
+            appearance: "none",
+            background: "transparent",
+            paddingRight: "16px",
+            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaa'/%3E%3C/svg%3E\")",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right 0 center",
+          }}
+        >
+          <option value="+54">🇦🇷 +54</option>
+          <option value="+55">🇧🇷 +55</option>
+          <option value="+595">🇵🇾 +595</option>
+          <option value="+598">🇺🇾 +598</option>
+          <option value="+56">🇨🇱 +56</option>
+          <option value="+591">🇧🇴 +591</option>
+          <option value="+51">🇵🇪 +51</option>
+          <option value="+593">🇪🇨 +593</option>
+          <option value="+57">🇨🇴 +57</option>
+          <option value="+58">🇻🇪 +58</option>
+          <option value="+1">🇺🇸 +1</option>
+          <option value="+34">🇪🇸 +34</option>
+          <option value="+39">🇮🇹 +39</option>
+          <option value="+49">🇩🇪 +49</option>
+          <option value="+33">🇫🇷 +33</option>
+          <option value="+44">🇬🇧 +44</option>
+          <option value="+52">🇲🇽 +52</option>
+          <option value="+86">🇨🇳 +86</option>
+          <option value="+81">🇯🇵 +81</option>
+        </select>
+        <div style={{ flex: 1, position: "relative" }}>
+          <input
+            type="tel"
+            value={number}
+            onChange={(e) => onNumberChange(e.target.value.replace(/\D/g, ""))}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            style={sInput}
+          />
+          <label style={{ ...sFloatingLabel(focused, filled), top: focused || filled ? -28 : 6, zIndex: 1 }}>WhatsApp</label>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FloatingTextarea = ({ label, value, onChange }) => {
   const [focused, setFocused] = useState(false);
   const ref = useRef(null);
@@ -580,6 +641,8 @@ export const PerfilPage = () => {
   const [sexo, setSexo] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarPublicId, setAvatarPublicId] = useState("");
+  const [whatsappPrefix, setWhatsappPrefix] = useState("+54");
+  const [whatsapp, setWhatsapp] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
@@ -608,6 +671,7 @@ export const PerfilPage = () => {
   const [deletingEntity, setDeletingEntity] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [planes, setPlanes] = useState([]);
+  const [planPersonalizado, setPlanPersonalizado] = useState(null);
   const [loadingPlanes, setLoadingPlanes] = useState(false);
   const [pagos, setPagos] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
@@ -632,6 +696,10 @@ export const PerfilPage = () => {
       setSexo(perfil.sexo || "");
       setAvatarUrl(perfil.avatar_url || "");
       setAvatarPublicId(perfil.avatar_public_id || "");
+      const wa = perfil.whatsapp || "";
+      setWhatsapp(wa);
+      const match = wa.match(/^(\+\d+)\s*/);
+      if (match) setWhatsappPrefix(match[1]);
       setLoaded(true);
     }
   }, [isAuthenticated, perfil, navigate, loaded]);
@@ -680,6 +748,7 @@ export const PerfilPage = () => {
           sexo,
           avatar_url: avatarUrl,
           avatar_public_id: avatarPublicId,
+          whatsapp,
         }),
       });
       if (!res.ok) throw new Error("Error al guardar");
@@ -796,8 +865,15 @@ export const PerfilPage = () => {
   const fetchPlanes = useCallback(async () => {
     setLoadingPlanes(true);
     try {
-      const res = await fetch("/api/planes");
-      if (res.ok) setPlanes(await res.json());
+      const [res, resPers] = await Promise.all([
+        fetch("/api/planes"),
+        fetch("/api/planes/personalizado"),
+      ]);
+      if (res.ok) {
+        const data = await res.json();
+        setPlanes(data.filter(p => p.nombre !== "Personalizado"));
+      }
+      if (resPers.ok) setPlanPersonalizado(await resPers.json());
     } catch {} finally {
       setLoadingPlanes(false);
     }
@@ -1177,6 +1253,16 @@ export const PerfilPage = () => {
                 <form onSubmit={handleSave} style={{ width: "100%" }}>
                   <FloatingInput label="Nombre completo *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
                   <FloatingInput label="Profesión / oficio *" value={profesion} onChange={(e) => setProfesion(e.target.value)} />
+                  <WhatsAppField
+                    prefix={whatsappPrefix}
+                    number={whatsapp.replace(/^\+\d+\s*/, "")}
+                    onPrefixChange={(p) => {
+                      const n = whatsapp.replace(/^\+\d+\s*/, "");
+                      setWhatsappPrefix(p);
+                      setWhatsapp(p + " " + n);
+                    }}
+                    onNumberChange={(n) => setWhatsapp(whatsappPrefix + " " + n)}
+                  />
                   <FloatingTextarea label="Biografía *" value={bio} onChange={(e) => setBio(e.target.value)} />
 
                   <div style={{ height: 24 }} />
@@ -1405,6 +1491,11 @@ export const PerfilPage = () => {
                             {e.updated_at && (
                               <p style={{ fontSize: 11, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>
                                 Última actualización: {new Date(e.updated_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric" })}
+                              </p>
+                            )}
+                            {e.fecha_inicio_suscripcion && e.fecha_fin_suscripcion && (
+                              <p style={{ fontSize: 11, color: "#6b5b4e", marginTop: 4, letterSpacing: "-0.01em" }}>
+                                Suscripción: {new Date(e.fecha_inicio_suscripcion.split("T")[0]).toLocaleDateString("es-AR")} → {new Date(e.fecha_fin_suscripcion.split("T")[0]).toLocaleDateString("es-AR")}
                               </p>
                             )}
                           </div>
@@ -1735,7 +1826,7 @@ export const PerfilPage = () => {
                               setMsg("No tenés entidades aprobadas que requieran suscripción.");
                               return;
                             }
-                            setPlanModal({ plan, entidades: entitiesToShow, entidadSeleccionada: null, mostrarActivas: false });
+                            setPlanModal({ plan, entidades: entitiesToShow, entidadesSeleccionadas: [], mostrarActivas: false });
                           }}
                           style={{
                             fontFamily: "inherit", fontSize: 13, fontWeight: 600,
@@ -1750,9 +1841,8 @@ export const PerfilPage = () => {
                         </button>
                       </div>
                     ))}
-                    {(() => {
-                      const planBase = planes.find(p => p.duracion_dias === 30) || planes[0];
-                      const precioPorDia = planBase ? Math.round((planBase.precio / planBase.duracion_dias) * 1.2) : 200;
+                    {planPersonalizado?.activo && (() => {
+                      const precioPorDia = Number(planPersonalizado.precio);
                       const precioCalculado = customDias * precioPorDia;
                       return (
                         <div style={{
@@ -1766,10 +1856,10 @@ export const PerfilPage = () => {
                             fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
                             color: "#1c1c18", margin: "0 0 4px",
                           }}>
-                            Personalizado
+                            {planPersonalizado.nombre}
                           </h3>
                           <p style={{ color: "#666", fontSize: 13, lineHeight: 1.5, margin: "0 0 16px", flex: 1 }}>
-                            Elegí la cantidad de días para tu suscripción personalizada.
+                            {planPersonalizado.descripcion || "Elegí la cantidad de días para tu suscripción personalizada."}
                           </p>
                           <div style={{ marginBottom: 12 }}>
                             <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 4 }}>
@@ -1816,9 +1906,10 @@ export const PerfilPage = () => {
                                   nombre: `Personalizado (${customDias} días)`,
                                   precio: precioCalculado,
                                   duracion_dias: customDias,
+                                  entidades_incluidas: 1,
                                 },
                                 entidades: entitiesToShow,
-                                entidadSeleccionada: null,
+                                entidadesSeleccionadas: [],
                                 mostrarActivas: false,
                               });
                             }}
@@ -2486,15 +2577,26 @@ export const PerfilPage = () => {
                 </div>
               )}
 
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", marginBottom: 8 }}>
-                Seleccioná una entidad:
-              </p>
+              {planModal.plan && planModal.plan.entidades_incluidas > 1 ? (
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", marginBottom: 8 }}>
+                  Seleccioná hasta {planModal.plan.entidades_incluidas} entidades:
+                  <span style={{ fontWeight: 400, marginLeft: 8, color: "#863819" }}>
+                    {planModal.entidadesSeleccionadas.length}/{planModal.plan.entidades_incluidas}
+                  </span>
+                </p>
+              ) : (
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", marginBottom: 8 }}>
+                  Seleccioná una entidad:
+                </p>
+              )}
                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24, maxHeight: 280, overflowY: "auto" }}>
                   {planModal.entidades.length === 0 ? (
                     <p style={{ color: "#aaa", fontSize: 13 }}>
                       No hay entidades disponibles. Necesitás tener una entidad aprobada.
                     </p>
                   ) : (() => {
+                    const maxEnt = planModal.plan ? planModal.plan.entidades_incluidas : 1;
+                    const isMulti = maxEnt > 1;
                     const prioritarias = planModal.entidades.filter((e) => {
                       if (!e.fecha_fin_suscripcion) return true;
                       const d = new Date();
@@ -2509,24 +2611,39 @@ export const PerfilPage = () => {
                       const finStr = e.fecha_fin_suscripcion.split("T")[0];
                       return hoyStr < finStr;
                     });
+                    const toggleEntidad = (id) => {
+                      if (isMulti) {
+                        const sel = planModal.entidadesSeleccionadas;
+                        if (sel.includes(id)) {
+                          setPlanModal({ ...planModal, entidadesSeleccionadas: sel.filter((x) => x !== id) });
+                        } else if (sel.length < maxEnt) {
+                          setPlanModal({ ...planModal, entidadesSeleccionadas: [...sel, id] });
+                        }
+                      } else {
+                        setPlanModal({ ...planModal, entidadesSeleccionadas: [id] });
+                      }
+                    };
+                    const isChecked = (id) => planModal.entidadesSeleccionadas.includes(id);
                     return (
                       <>
                         {prioritarias.map((ent) => {
                           const st = suscripcionStatus(ent);
+                          const checked = isChecked(ent.id);
+                          const atLimit = isMulti && !checked && planModal.entidadesSeleccionadas.length >= maxEnt;
                           return (
                             <label key={ent.id} style={{
                               display: "flex", alignItems: "center", gap: 12,
                               padding: "12px 16px", border: "1px solid #eee", borderRadius: 8,
-                              cursor: planModal.plan ? "pointer" : "default",
-                              background: planModal.entidadSeleccionada === ent.id ? "#fdfaf5" : "#fff",
+                              cursor: planModal.plan && !atLimit ? "pointer" : "default",
+                              background: checked ? "#fdfaf5" : "#fff",
                               transition: "background 0.2s ease",
                             }}>
                               <input
-                                type="radio"
+                                type={isMulti ? "checkbox" : "radio"}
                                 name="entidad-suscripcion"
-                                disabled={!planModal.plan}
-                                checked={planModal.entidadSeleccionada === ent.id}
-                                onChange={() => setPlanModal({ ...planModal, entidadSeleccionada: ent.id })}
+                                disabled={!planModal.plan || atLimit}
+                                checked={checked}
+                                onChange={() => toggleEntidad(ent.id)}
                                 style={{ accentColor: "#863819" }}
                               />
                               <div style={{ flex: 1 }}>
@@ -2561,20 +2678,22 @@ export const PerfilPage = () => {
                             </button>
                             {planModal.mostrarActivas && activas.map((ent) => {
                               const st = suscripcionStatus(ent);
+                              const checked = isChecked(ent.id);
+                              const atLimit = isMulti && !checked && planModal.entidadesSeleccionadas.length >= maxEnt;
                               return (
                                 <label key={ent.id} style={{
                                   display: "flex", alignItems: "center", gap: 12,
                                   padding: "12px 16px", border: "1px solid #eee", borderRadius: 8,
-                                  cursor: planModal.plan ? "pointer" : "default",
-                                  background: planModal.entidadSeleccionada === ent.id ? "#fdfaf5" : "#fff",
+                                  cursor: planModal.plan && !atLimit ? "pointer" : "default",
+                                  background: checked ? "#fdfaf5" : "#fff",
                                   transition: "background 0.2s ease",
                                 }}>
                                   <input
-                                    type="radio"
+                                    type={isMulti ? "checkbox" : "radio"}
                                     name="entidad-suscripcion"
-                                    disabled={!planModal.plan}
-                                    checked={planModal.entidadSeleccionada === ent.id}
-                                    onChange={() => setPlanModal({ ...planModal, entidadSeleccionada: ent.id })}
+                                    disabled={!planModal.plan || atLimit}
+                                    checked={checked}
+                                    onChange={() => toggleEntidad(ent.id)}
                                     style={{ accentColor: "#863819" }}
                                   />
                                   <div style={{ flex: 1 }}>
@@ -2616,9 +2735,9 @@ export const PerfilPage = () => {
                 {planModal.plan && (
                   <button
                     type="button"
-                    disabled={!planModal.entidadSeleccionada || adquiriendo}
+                    disabled={planModal.entidadesSeleccionadas.length === 0 || adquiriendo}
                     onClick={async () => {
-                      if (!planModal.entidadSeleccionada) return;
+                      if (planModal.entidadesSeleccionadas.length === 0) return;
                       setAdquiriendo(true);
                       try {
                         const res = await fetch("/api/suscripciones/adquirir", {
@@ -2628,7 +2747,7 @@ export const PerfilPage = () => {
                             Authorization: `Bearer ${getToken()}`,
                           },
                           body: JSON.stringify({
-                            entidad_id: planModal.entidadSeleccionada,
+                            entidad_ids: planModal.entidadesSeleccionadas,
                             plan_id: planModal.plan.id,
                             ...(planModal.plan.id === null && {
                               dias_personalizados: planModal.plan.duracion_dias,
@@ -2653,11 +2772,11 @@ export const PerfilPage = () => {
                     }}
                     style={{
                       fontFamily: "inherit", fontSize: 13, fontWeight: 700,
-                      cursor: (!planModal.entidadSeleccionada || adquiriendo) ? "not-allowed" : "pointer",
+                      cursor: (planModal.entidadesSeleccionadas.length === 0 || adquiriendo) ? "not-allowed" : "pointer",
                       border: "none",
-                      background: (!planModal.entidadSeleccionada || adquiriendo) ? "#e0dcd0" : "#863819",
+                      background: (planModal.entidadesSeleccionadas.length === 0 || adquiriendo) ? "#e0dcd0" : "#863819",
                       padding: "10px 28px", borderRadius: 8,
-                      color: (!planModal.entidadSeleccionada || adquiriendo) ? "#aaa" : "#fff",
+                      color: (planModal.entidadesSeleccionadas.length === 0 || adquiriendo) ? "#aaa" : "#fff",
                       letterSpacing: "0.04em",
                     }}
                   >

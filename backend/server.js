@@ -20,6 +20,7 @@ import authPublicoRoutes from "./routes/auth_publico.js";
 import notificacionesRoutes from "./routes/notificaciones.js";
 import planesRoutes from "./routes/planes.js";
 import suscripcionesRoutes from "./routes/suscripciones.js";
+import adminPerfilesRoutes from "./routes/admin_perfiles.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ app.use("/api", authPublicoRoutes);
 app.use("/api", notificacionesRoutes);
 app.use("/api", planesRoutes);
 app.use("/api", suscripcionesRoutes);
+app.use("/api", adminPerfilesRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

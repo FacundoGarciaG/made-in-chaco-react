@@ -16,6 +16,29 @@ router.get("/planes", async (_req, res) => {
   }
 });
 
+router.get("/planes/personalizado", async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM planes WHERE nombre = 'Personalizado' LIMIT 1",
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Plan personalizado no encontrado" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error GET /planes/personalizado:", err);
+    res.status(500).json({ error: "Error al obtener plan personalizado" });
+  }
+});
+
+router.get("/planes/admin", authMiddleware, async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM planes ORDER BY precio ASC");
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /planes/admin:", err);
+    res.status(500).json({ error: "Error al obtener planes" });
+  }
+});
+
 router.get("/planes/:id", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM planes WHERE id = $1", [req.params.id]);

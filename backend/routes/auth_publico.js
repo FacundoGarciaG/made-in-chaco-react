@@ -50,7 +50,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "made-in-chaco-secret-dev";
 
 router.post("/auth/registro", async (req, res) => {
   try {
-    const { email, password, nombre } = req.body;
+    const { email, password, nombre, whatsapp } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email y contraseña requeridos" });
@@ -68,8 +68,8 @@ router.post("/auth/registro", async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const result = await pool.query(
-      "INSERT INTO perfiles (email, password, nombre, verification_token) VALUES ($1, $2, $3, $4) RETURNING id, email, nombre, created_at",
-      [email, hashed, nombre || "", verificationToken],
+      "INSERT INTO perfiles (email, password, nombre, verification_token, whatsapp) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, nombre, created_at",
+      [email, hashed, nombre || "", verificationToken, whatsapp || ""],
     );
 
     const perfil = result.rows[0];
@@ -162,7 +162,7 @@ router.post("/auth/login-publico", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      "SELECT id, email, password, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified FROM perfiles WHERE email = $1",
+      "SELECT id, email, password, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, baneado, whatsapp FROM perfiles WHERE email = $1",
       [email],
     );
 
@@ -171,6 +171,10 @@ router.post("/auth/login-publico", async (req, res) => {
     }
 
     const perfil = rows[0];
+
+    if (perfil.baneado) {
+      return res.status(403).json({ error: "Tu cuenta ha sido suspendida. Contactá al administrador." });
+    }
 
     if (!perfil.password) {
       return res.status(401).json({ error: "Esta cuenta usa Google Sign-In" });
@@ -204,6 +208,7 @@ router.post("/auth/login-publico", async (req, res) => {
         sexo: perfil.sexo,
         avatar_public_id: perfil.avatar_public_id,
         verified: perfil.verified,
+        whatsapp: perfil.whatsapp,
       },
     });
   } catch (err) {
@@ -215,7 +220,7 @@ router.post("/auth/login-publico", async (req, res) => {
 router.get("/auth/perfil", authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id, email, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, google_id, verified, created_at FROM perfiles WHERE id = $1",
+      "SELECT id, email, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, google_id, verified, created_at, whatsapp FROM perfiles WHERE id = $1",
       [req.user.id],
     );
 
@@ -232,7 +237,7 @@ router.get("/auth/perfil", authMiddleware, async (req, res) => {
 
 router.put("/auth/perfil", authMiddleware, async (req, res) => {
   try {
-    const { nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id } = req.body;
+    const { nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, whatsapp } = req.body;
 
     const result = await pool.query(
       `UPDATE perfiles SET
@@ -247,10 +252,11 @@ router.put("/auth/perfil", authMiddleware, async (req, res) => {
         fecha_nacimiento = COALESCE($9, fecha_nacimiento),
         sexo = COALESCE($10, sexo),
         avatar_public_id = COALESCE($11, avatar_public_id),
+        whatsapp = COALESCE($12, whatsapp),
         updated_at = NOW()
-      WHERE id = $12
-      RETURNING id, email, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, created_at`,
-      [nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, req.user.id],
+      WHERE id = $13
+      RETURNING id, email, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, created_at, whatsapp`,
+      [nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, whatsapp, req.user.id],
     );
 
     if (result.rows.length === 0) {

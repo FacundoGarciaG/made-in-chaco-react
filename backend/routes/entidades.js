@@ -18,10 +18,10 @@ const router = Router();
 router.get("/entidades", async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email
-       FROM entidades e
-       LEFT JOIN perfiles p ON e.perfil_id = p.id
-       ORDER BY e.nombre ASC`,
+`SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
+        FROM entidades e
+        LEFT JOIN perfiles p ON e.perfil_id = p.id
+        ORDER BY e.nombre ASC`,
     );
     res.json(rows);
   } catch (err) {
@@ -433,8 +433,8 @@ router.get("/solicitudes", authMiddleware, async (_req, res) => {
                e.tipo_producto, e.metodos_produccion, e.certificaciones,
                e.fecha_evento, e.duracion_dias, e.actividades_principales,
                e.link_entradas, e.fecha_inicio_suscripcion, e.fecha_fin_suscripcion,
-               e.estado_pago, e.latitud, e.longitud,
-               p.nombre AS perfil_nombre, p.email AS perfil_email
+                e.estado_pago, e.latitud, e.longitud, e.icono,
+               p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
         FROM entidades e
         LEFT JOIN perfiles p ON e.perfil_id = p.id
         WHERE e.visible = false AND e.estado_sello = 'pendiente'

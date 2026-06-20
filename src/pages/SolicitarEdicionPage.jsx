@@ -4,6 +4,7 @@ import { useAuthPublico } from "../context/AuthPublicoContext";
 import TagSelector from "../components/TagSelector";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import "../styles/SolicitarSelloPage.css";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const TIPO_COLOR = {
@@ -206,49 +207,7 @@ const CAMPOS_POR_TIPO = {
   ],
 };
 
-const sInput = {
-  width: "100%",
-  padding: "8px 0 6px",
-  border: "none",
-  borderBottom: "1px solid #e8e8e8",
-  borderRadius: 0,
-  fontSize: "24px",
-  fontWeight: 400,
-  letterSpacing: "-0.02em",
-  outline: "none",
-  boxSizing: "border-box",
-  background: "transparent",
-  color: "#1a1a1a",
-  fontFamily: "inherit",
-  WebkitAppearance: "none",
-  appearance: "none",
-  cursor: "text",
-  transition: "border-color 0.2s",
-};
 
-const sTextarea = {
-  ...sInput,
-  minHeight: 100,
-  resize: "vertical",
-  lineHeight: 1.4,
-};
-
-const sLabel = {
-  display: "block",
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "#888",
-  marginBottom: 2,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-};
-
-const sectionDividerStyle = {
-  width: 40,
-  height: 3,
-  background: "#863819",
-  marginBottom: 28,
-};
 
 export const SolicitarEdicionPage = () => {
   const { id } = useParams();
@@ -341,19 +300,53 @@ export const SolicitarEdicionPage = () => {
   }, [isAuthenticated, id, getToken, navigate]);
 
   useLayoutEffect(() => {
-    if (!entity || mapInitialized.current || !mapContainer.current) return;
-    mapInitialized.current = true;
+    if (!entity || mapInitialized.current) return;
     const el = mapContainer.current;
+    console.log("Map init check, container:", el, "entity:", !!entity);
+    if (!el) {
+      console.log("Map container not ready, retrying...");
+      const timer = setTimeout(() => {
+        const el2 = mapContainer.current;
+        if (el2 && !mapInitialized.current) initMap(el2);
+      }, 100);
+      return () => { clearTimeout(timer); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; mapInitialized.current = false; } };
+    }
+    initMap(el);
+    return () => {
+      mapInitialized.current = false;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [entity]);
+
+  const initMap = (el) => {
+    mapInitialized.current = true;
+    console.log("Init map, size:", el.offsetWidth, el.offsetHeight);
     const lng = parseFloat(form.longitud) || -58.9861;
     const lat = parseFloat(form.latitud) || -27.4511;
     const m = new mapboxgl.Map({
       container: el,
-      style: "mapbox://styles/mapbox/light-v10",
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [lng, lat],
       zoom: 8,
       attributionControl: false,
     });
-    const mk = new mapboxgl.Marker({ draggable: true, color: "#863819" })
+    requestAnimationFrame(() => { try { m.resize(); } catch {} });
+    const markerEl = document.createElement("div");
+    markerEl.style.width = "28px";
+    markerEl.style.height = "28px";
+    markerEl.style.cursor = "pointer";
+    const img = document.createElement("img");
+    img.src = icono || `/icons/${entity.tipo}.png`;
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "contain";
+    img.style.filter = "drop-shadow(0 1px 4px rgba(0,0,0,0.3))";
+    markerEl.appendChild(img);
+    const mk = new mapboxgl.Marker({ element: markerEl, draggable: true })
       .setLngLat([lng, lat])
       .addTo(m);
     mk.on("dragend", () => {
@@ -366,15 +359,22 @@ export const SolicitarEdicionPage = () => {
     });
     mapRef.current = m;
     markerRef.current = mk;
-    return () => {
-      mapInitialized.current = false;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markerRef.current = null;
-      }
-    };
-  }, [entity]);
+  };
+
+  useEffect(() => {
+    const mk = markerRef.current;
+    if (!mk) return;
+    const el = mk.getElement();
+    if (!el) return;
+    el.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = icono || `/icons/${entity?.tipo}.png`;
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "contain";
+    img.style.filter = "drop-shadow(0 1px 4px rgba(0,0,0,0.3))";
+    el.appendChild(img);
+  }, [icono]);
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -520,21 +520,13 @@ export const SolicitarEdicionPage = () => {
 
   if (saved) {
     return (
-      <div style={{ background: "#f5f2e8", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Epilogue, sans-serif" }}>
-        <div style={{ textAlign: "center", maxWidth: 480, padding: 40 }}>
-          <p style={{ fontSize: 13, color: "#999", fontWeight: 500, letterSpacing: "0.04em", marginBottom: 12 }}>Solicitud enviada</p>
-          <h2 style={{ fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px" }}>
-            Edición enviada para revisión
-          </h2>
-          <p style={{ color: "#666", lineHeight: 1.7, fontSize: 15 }}>
-            Tu solicitud de edición fue registrada. Un administrador la revisará y aprobará en breve.
-          </p>
-          <button onClick={() => navigate("/perfil")} style={{
-            marginTop: 32, padding: "14px 48px", background: "#863819", color: "#fff",
-            border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
-            cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em",
-          }}>
-            Volver al perfil
+      <div className="solicitar-success">
+        <div className="solicitar-success-inner">
+          <div className="solicitar-success-icon">✓</div>
+          <h1>Edición enviada para revisión</h1>
+          <p>Tu solicitud de edición fue registrada. Un administrador la revisará y aprobará en breve.</p>
+          <button className="solicitar-btn-back" onClick={() => navigate("/perfil")}>
+            Volver al perfil <span className="arrow-up">↑</span>
           </button>
         </div>
       </div>
@@ -563,54 +555,37 @@ export const SolicitarEdicionPage = () => {
 
   const renderField = (c) => {
     if (c.type === "textarea") {
-      return <textarea style={sTextarea} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} />;
+      return <textarea id={`edit-${c.key}`} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder=" " />;
     }
     if (c.type === "select") {
       return (
-        <select style={{ ...sInput, cursor: "pointer", color: form[c.key] ? "#1a1a1a" : "#aaa" }} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)}>
+        <select className="solicitar-select" style={{ color: form[c.key] ? "#1a1a1a" : "#aaa" }} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)}>
           <option value="">Seleccionar...</option>
           {c.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       );
     }
     if (c.type === "number") {
-      return <input type="number" style={sInput} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder={c.label} />;
+      return <input type="number" id={`edit-${c.key}`} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder=" " />;
     }
     if (c.type === "date") {
-      return <input type="date" style={sInput} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} />;
+      return <input type="date" id={`edit-${c.key}`} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder=" " />;
     }
     if (c.type === "time") {
-      return <input type="time" style={sInput} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} />;
+      return <input type="time" id={`edit-${c.key}`} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder=" " />;
     }
     if (c.type === "dias") {
       const dias = (form[c.key] || "").split(",").filter(Boolean);
       return (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        <div className="solicitar-dias">
           {DIAS_SEMANA.map((dia) => {
             const checked = dias.includes(dia);
             return (
-              <label
-                key={dia}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: "4px",
-                  padding: "6px 12px", borderRadius: "8px", fontSize: "12px",
-                  fontWeight: 600, cursor: "pointer",
-                  background: checked ? "#863819" : "white",
-                  color: checked ? "#fff" : "#555",
-                  border: checked ? "1px solid #863819" : "1px solid #ddd",
-                  transition: "all 0.15s",
-                }}
-              >
-                <input
-                  type="checkbox" style={{ display: "none" }}
-                  checked={checked}
-                  onChange={() => {
-                    const nuevos = checked
-                      ? dias.filter((d) => d !== dia)
-                      : [...dias, dia];
-                    set(c.key, nuevos.join(","));
-                  }}
-                />
+              <label key={dia} className={`solicitar-dia-label ${checked ? "checked" : ""}`}>
+                <input type="checkbox" checked={checked} onChange={() => {
+                  const nuevos = checked ? dias.filter((d) => d !== dia) : [...dias, dia];
+                  set(c.key, nuevos.join(","));
+                }} />
                 {dia.slice(0, 3)}
               </label>
             );
@@ -622,7 +597,7 @@ export const SolicitarEdicionPage = () => {
       const val = form[c.key] || "";
       return (
         <>
-          <select style={{ ...sInput, cursor: "pointer", color: val ? "#1a1a1a" : "#aaa" }}
+          <select className="solicitar-select" style={{ color: val ? "#1a1a1a" : "#aaa" }}
             value={val} onChange={(e) => set(c.key, e.target.value)}
           >
             <option value="">Seleccionar rubro...</option>
@@ -630,12 +605,10 @@ export const SolicitarEdicionPage = () => {
             <option value="__otro__">Otros</option>
           </select>
           {val === "__otro__" && (
-            <input
-              style={{ ...sInput, marginTop: 8 }}
-              placeholder="Escribí el rubro..."
-              value={form[`${c.key}_custom`] || ""}
-              onChange={(e) => set(`${c.key}_custom`, e.target.value)}
-            />
+            <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
+              <input id={`edit-${c.key}-custom`} value={form[`${c.key}_custom`] || ""} onChange={(e) => set(`${c.key}_custom`, e.target.value)} placeholder=" " />
+              <label htmlFor={`edit-${c.key}-custom`}>Personalizado</label>
+            </div>
           )}
         </>
       );
@@ -644,7 +617,7 @@ export const SolicitarEdicionPage = () => {
       const val = form[c.key] || "";
       return (
         <>
-          <select style={{ ...sInput, cursor: "pointer", color: val ? "#1a1a1a" : "#aaa" }}
+          <select className="solicitar-select" style={{ color: val ? "#1a1a1a" : "#aaa" }}
             value={val} onChange={(e) => set(c.key, e.target.value)}
           >
             <option value="">Seleccionar categoría...</option>
@@ -652,12 +625,10 @@ export const SolicitarEdicionPage = () => {
             <option value="__otro__">Otros</option>
           </select>
           {val === "__otro__" && (
-            <input
-              style={{ ...sInput, marginTop: 8 }}
-              placeholder="Escribí la categoría..."
-              value={form[`${c.key}_custom`] || ""}
-              onChange={(e) => set(`${c.key}_custom`, e.target.value)}
-            />
+            <div className="solicitar-floating-group" style={{ marginTop: 8 }}>
+              <input id={`edit-${c.key}-custom`} value={form[`${c.key}_custom`] || ""} onChange={(e) => set(`${c.key}_custom`, e.target.value)} placeholder=" " />
+              <label htmlFor={`edit-${c.key}-custom`}>Personalizado</label>
+            </div>
           )}
         </>
       );
@@ -682,50 +653,46 @@ export const SolicitarEdicionPage = () => {
         />
       );
     }
-    return <input type={c.type || "text"} style={sInput} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} />;
+    return <input type={c.type || "text"} id={`edit-${c.key}`} value={form[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} placeholder=" " />;
   };
 
   return (
-    <div style={{ minHeight: "100vh", fontFamily: "Epilogue, sans-serif" }}>
-      <div style={{ maxWidth: 720, margin: "80px auto 0", padding: "80px 40px 120px" }}>
-        <div style={{ marginBottom: 64 }}>
-          <p style={{ fontSize: 20, fontWeight: 400, color: catColor, margin: "0 0 4px" }}>
-            {TIPOS_LABEL[entity.tipo] || entity.tipo}
-          </p>
-          <h1 style={{ fontFamily: "Cinzel, serif", fontSize: 48, fontWeight: 600, color: "#1c1c18", margin: 0, letterSpacing: "-0.03em", lineHeight: 1.05 }}>
-            Editar {entity.nombre}
-          </h1>
-          <p style={{ color: "#777", fontSize: 20, lineHeight: 1.5, letterSpacing: "-0.01em", marginTop: 12 }}>
-            Los cambios quedarán pendientes hasta aprobación del administrador.
-          </p>
-        </div>
-
+    <div className="solicitar-page">
+      <div className="solicitar-form-side" style={{ marginTop: 60, minHeight: "calc(100vh - 60px)" }}>
         <form onSubmit={handleSubmit}>
-          <div>
-            <label style={sLabel}>Nombre</label>
-            <input style={sInput} value={form.nombre ?? ""} onChange={(e) => set("nombre", e.target.value)} />
+          <div className="solicitar-header">
+            <p style={{ fontSize: 20, fontWeight: 400, color: catColor, margin: "0 0 4px" }}>
+              {TIPOS_LABEL[entity.tipo] || entity.tipo}
+            </p>
+            <h1>Editar {entity.nombre}</h1>
+            <p>Los cambios quedarán pendientes hasta aprobación del administrador.</p>
           </div>
 
-          <div style={{ marginTop: 32 }}>
-            <label style={sLabel}>Descripción</label>
-            <textarea style={sTextarea} value={form.resumen ?? ""} onChange={(e) => set("resumen", e.target.value)} />
+          <div className="solicitar-floating-group">
+            <input id="edit-nombre" value={form.nombre ?? ""} onChange={(e) => set("nombre", e.target.value)} placeholder=" " />
+            <label htmlFor="edit-nombre">Nombre</label>
           </div>
 
-          <div style={{ marginTop: 32 }}>
-            <label style={sLabel}>Email de contacto</label>
-            <input style={sInput} type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
+          <div className="solicitar-floating-group">
+            <textarea id="edit-resumen" value={form.resumen ?? ""} onChange={(e) => set("resumen", e.target.value)} placeholder=" " />
+            <label htmlFor="edit-resumen">Descripción</label>
           </div>
 
-          <div style={{ marginTop: 32 }}>
-            <label style={sLabel}>Localidad</label>
-            <select style={{ ...sInput, cursor: "pointer", color: form.localidad_id ? "#1a1a1a" : "#aaa" }}
+          <div className="solicitar-floating-group">
+            <input id="edit-email" type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} placeholder=" " />
+            <label htmlFor="edit-email">Email de contacto</label>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label className="solicitar-label">Localidad</label>
+            <select className="solicitar-select" style={{ color: form.localidad_id ? "#1a1a1a" : "#aaa" }}
               value={form.localidad_id ?? ""}
               onChange={(e) => {
                 const val = e.target.value;
                 set("localidad_id", val ? Number(val) : null);
                 const loc = localidades.find((l) => l.id === parseInt(val));
                 if (loc?.latitud && loc?.longitud && mapRef.current && markerRef.current) {
-                  mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 10, speed: 1.2 });
+                  mapRef.current.flyTo({ center: [parseFloat(loc.longitud), parseFloat(loc.latitud)], zoom: 15, speed: 1.2 });
                   markerRef.current.setLngLat([parseFloat(loc.longitud), parseFloat(loc.latitud)]);
                   setForm((f) => ({ ...f, latitud: loc.latitud, longitud: loc.longitud }));
                 }
@@ -738,9 +705,8 @@ export const SolicitarEdicionPage = () => {
             </select>
           </div>
 
-          <div style={{ marginTop: 32, position: "relative" }}>
-            <label style={sLabel}>Dirección</label>
-            <input style={sInput} placeholder="Ej: San Martín 123, Resistencia..." value={geoQuery}
+          <div className="solicitar-floating-group" style={{ position: "relative" }}>
+            <input id="edit-direccion" value={geoQuery}
               onChange={(e) => {
                 setGeoQuery(e.target.value);
                 set("direccion_escrita", e.target.value);
@@ -759,19 +725,14 @@ export const SolicitarEdicionPage = () => {
                 }, 400);
               }}
               onFocus={() => geoResults.length > 0 && setGeoResults(geoResults)}
+              placeholder=" "
+              autoComplete="off"
             />
+            <label htmlFor="edit-direccion">Dirección</label>
             {geoResults.length > 0 && (
-              <div style={{
-                position: "absolute", top: "100%", left: 0, right: 0,
-                background: "white", border: "1px solid #eee",
-                borderRadius: "10px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                zIndex: 100, maxHeight: "200px", overflowY: "auto",
-              }}>
+              <div className="solicitar-geo-results">
                 {geoResults.map((r, i) => (
-                  <div key={i} style={{
-                    padding: "10px 14px", cursor: "pointer", fontSize: "14px",
-                    color: "#1c1c18", borderBottom: i < geoResults.length - 1 ? "1px solid #f5f2eb" : "none",
-                  }}
+                  <div key={i} className="solicitar-geo-item"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       clearTimeout(geoTimeoutRef.current);
@@ -785,8 +746,6 @@ export const SolicitarEdicionPage = () => {
                         markerRef.current.setLngLat([lon, lat]);
                       }
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#f5f2eb"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     {r.display_name}
                   </div>
@@ -795,57 +754,39 @@ export const SolicitarEdicionPage = () => {
             )}
           </div>
 
-          <div style={{ marginTop: 32 }}>
-            <label style={sLabel}>Ubicación en el mapa</label>
-            <p style={{ fontSize: 13, color: "#999", margin: "0 0 8px" }}>Hacé clic o arrastrá el marcador para ubicar tu entidad en el mapa</p>
-            <div style={{ position: "relative" }}>
-              <div ref={mapContainer} style={{ height: 250, borderRadius: 12, overflow: "hidden" }} />
-              <div style={{ position: "absolute", bottom: 10, right: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-                <button type="button" onClick={() => mapRef.current?.zoomIn()} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#333" }}>+</button>
-                <button type="button" onClick={() => mapRef.current?.zoomOut()} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#333" }}>−</button>
-              </div>
-            </div>
-            {form.latitud && form.longitud && (
-              <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                Lat: {form.latitud}, Lng: {form.longitud}
-              </div>
-            )}
-          </div>
-
-          {/* Suscripción */}
-
-
           {campos.length > 0 && (
-            <div style={{ marginTop: 56 }}>
-              <h3 style={{
-                fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-                fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-              }}>
-                Datos de {entity.tipo ? TIPOS_LABEL[entity.tipo] || entity.tipo : ""}
-              </h3>
-              <div style={sectionDividerStyle} />
-              {campos.map((c) => (
-                <div key={c.key} style={{ marginBottom: 32 }}>
-                  <label style={sLabel}>{c.label}</label>
-                  {renderField(c)}
-                </div>
-              ))}
+            <div style={{ marginTop: 40 }}>
+              <div className="solicitar-section-title">Datos de {entity.tipo ? TIPOS_LABEL[entity.tipo] || entity.tipo : ""}</div>
+              <div className="solicitar-section-divider" />
+              {campos.map((c) => {
+                if (c.type === "textarea" || c.type === "number" || c.type === "date" || c.type === "time" || !c.type || c.type === "text") {
+                  return (
+                    <div key={c.key} className="solicitar-floating-group">
+                      {renderField(c)}
+                      <label htmlFor={`edit-${c.key}`}>{c.label}</label>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={c.key} style={{ marginBottom: 32 }}>
+                    <label className="solicitar-label">{c.label}</label>
+                    {renderField(c)}
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Contacto / Redes sociales */}
-          <div style={{ marginTop: 56 }}>
-            <h3 style={{
-              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-            }}>Contacto / Redes sociales</h3>
-            <div style={sectionDividerStyle} />
+          <div style={{ marginTop: 40 }}>
+            <div className="solicitar-section-title">Contacto / Redes sociales</div>
+            <div className="solicitar-section-divider" />
             {contactos.map((item, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "center", background: "#fafaf8", padding: "8px 12px" }}>
+              <div key={i} className="solicitar-contact-row">
                 <select
+                  className="solicitar-contact-select"
                   value={item.type}
                   onChange={(e) => actualizarContacto(i, "type", e.target.value)}
-                  style={{ ...sInput, width: 150, flexShrink: 0, marginBottom: 0, fontSize: 16, cursor: "pointer" }}
                 >
                   <option value="instagram">Instagram</option>
                   <option value="whatsapp">WhatsApp</option>
@@ -858,97 +799,66 @@ export const SolicitarEdicionPage = () => {
                   <option value="otro">Otro</option>
                 </select>
                 <input
-                  style={{ ...sInput, flex: 1, marginBottom: 0 }}
+                  className="solicitar-contact-input"
                   value={item.value}
                   onChange={(e) => actualizarContacto(i, "value", e.target.value)}
                   placeholder="Valor"
                 />
-                <button
-                  type="button"
-                  onClick={() => eliminarContacto(i)}
-                  style={{
-                    background: "none", border: "none", borderBottom: "1px solid #e8e8e8",
-                    color: "#d32f2f", cursor: "pointer", fontSize: 18, padding: "8px 0", lineHeight: 1,
-                  }}
-                >✕</button>
+                <button type="button" className="solicitar-contact-remove" onClick={() => eliminarContacto(i)}>✕</button>
               </div>
             ))}
-            <button
-              type="button" onClick={agregarContacto}
-              style={{
-                fontFamily: "inherit", fontSize: 15, fontWeight: 400, cursor: "pointer",
-                border: "none", borderBottom: "1px solid #e8e8e8", background: "none",
-                padding: "8px 0", color: "#aaa", letterSpacing: "-0.01em", marginTop: 8,
-              }}
-            >+ Agregar contacto</button>
+            <button type="button" className="solicitar-btn-add" onClick={agregarContacto}>+ Agregar contacto</button>
           </div>
 
           {/* Foto de portada */}
-          <div style={{ marginTop: 56 }}>
-            <h3 style={{
-              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-            }}>Foto de portada</h3>
-            <div style={sectionDividerStyle} />
-            <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          <div style={{ marginTop: 40 }}>
+            <div className="solicitar-section-title">Foto de portada</div>
+            <div className="solicitar-section-divider" />
+            <p className="solicitar-hint">
               Esta foto se va a usar como imagen principal de tu entidad en el mapa y en su página de detalle.
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, border: "1px dashed #ddd", padding: "20px 24px", background: "#fafaf8" }}>
-              <label style={{
-                fontFamily: "inherit", fontSize: 15, letterSpacing: "-0.01em", cursor: "pointer",
-                border: "none", borderBottom: "1px solid #bbb", background: "none", padding: "4px 0", color: "#555",
-              }}>
+            <div className="solicitar-upload-area">
+              <label className="solicitar-upload-btn">
                 {uploadingImagen ? "Subiendo..." : "Seleccionar archivo"}
                 <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUploadImagen} disabled={uploadingImagen} />
               </label>
               {imagen && (
-                <img src={imagen} alt="" style={{ width: 72, height: 72, borderRadius: 4, objectFit: "cover", border: "1px solid #eee" }} />
+                <img src={imagen} alt="" className="solicitar-upload-preview" />
               )}
             </div>
-            <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
+            <div className="solicitar-small">Formatos: JPG, PNG, WebP • Mínimo 1920×1080 px (16:9)</div>
             {uploadError && (
-              <div style={{ fontSize: 14, color: "#d32f2f", fontWeight: 400, marginTop: 8 }}>{uploadError}</div>
+              <div className="solicitar-error">{uploadError}</div>
             )}
           </div>
 
           {/* Icono personalizado */}
-          <div style={{ marginTop: 56 }}>
-            <h3 style={{
-              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-            }}>Icono personalizado</h3>
-            <div style={sectionDividerStyle} />
-            <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          <div style={{ marginTop: 40 }}>
+            <div className="solicitar-section-title">Icono personalizado</div>
+            <div className="solicitar-section-divider" />
+            <p className="solicitar-hint">
               Subí un icono PNG de exactamente 24×24 px para identificar tu entidad en el mapa.
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, border: "1px dashed #ddd", padding: "20px 24px", background: "#fafaf8" }}>
+            <div className="solicitar-upload-area">
               {icono && (
-                <img src={icono} alt="" style={{ width: 24, height: 24, borderRadius: 3, objectFit: "contain", border: "1px solid #eee" }} />
+                <img src={icono} alt="" className="solicitar-upload-preview-sm" />
               )}
-              <label style={{
-                fontFamily: "inherit", fontSize: 15, letterSpacing: "-0.01em", cursor: "pointer",
-                border: "none", borderBottom: "1px solid #bbb", background: "none", padding: "4px 0", color: "#555",
-              }}>
+              <label className="solicitar-upload-btn">
                 {subiendoIcono ? "Subiendo..." : icono ? "Cambiar icono" : "Seleccionar archivo"}
                 <input type="file" accept="image/png" hidden onChange={handleUploadIcono} disabled={subiendoIcono} />
               </label>
               {icono && (
-                <button type="button" onClick={() => setIcono("")}
-                  style={{ background: "none", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: 16 }}
-                >✕</button>
+                <button type="button" className="solicitar-contact-remove" onClick={() => setIcono("")}>✕</button>
               )}
             </div>
-            <div style={{ fontSize: 13, color: "#aaa", marginTop: 6, letterSpacing: "-0.01em" }}>Solo PNG • 24×24 px exacto</div>
+            <div className="solicitar-small">Solo PNG • 24×24 px exacto</div>
           </div>
 
           {/* Multimedia */}
-          <div style={{ marginTop: 56 }}>
-            <h3 style={{
-              fontFamily: "Cinzel, serif", color: "#1a1a1a", margin: "0 0 8px",
-              fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em",
-            }}>Multimedia</h3>
-            <div style={sectionDividerStyle} />
-            <p style={{ fontSize: 15, color: "#777", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          <div style={{ marginTop: 40 }}>
+            <div className="solicitar-section-title">Multimedia</div>
+            <div className="solicitar-section-divider" />
+            <p className="solicitar-hint">
               Agregá fotos, videos o audios para mostrar en la página de detalle de tu entidad.
             </p>
             {multimediaItems.filter((m) => m.id).length > 0 && (
@@ -976,9 +886,9 @@ export const SolicitarEdicionPage = () => {
                 <div key={realIdx} style={{ marginBottom: 20, padding: 16, background: "#fafaf8", borderRadius: 12, border: "1px solid #eee" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
                     <select
+                      className="solicitar-contact-select"
                       value={item.tipo_recurso}
                       onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, tipo_recurso: e.target.value } : m))}
-                      style={{ ...sInput, width: 140, flexShrink: 0, fontSize: 14, cursor: "pointer" }}
                     >
                       <option value="foto">📷 Foto</option>
                       <option value="video">🎥 Video</option>
@@ -1012,12 +922,12 @@ export const SolicitarEdicionPage = () => {
                     >✕</button>
                   </div>
                   <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-                    <input style={{ ...sInput, flex: 1, minWidth: 160, fontSize: 16 }}
+                    <input className="solicitar-contact-input"
                       placeholder="Título"
                       value={item.titulo_alternativo}
                       onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, titulo_alternativo: e.target.value } : m))}
                     />
-                    <input style={{ ...sInput, flex: 1, minWidth: 160, fontSize: 16 }}
+                    <input className="solicitar-contact-input"
                       placeholder="Descripción"
                       value={item.descripcion_recurso}
                       onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, descripcion_recurso: e.target.value } : m))}
@@ -1026,25 +936,33 @@ export const SolicitarEdicionPage = () => {
                 </div>
               );
             })}
-            <button
-              type="button" onClick={agregarMultimedia}
-              style={{
-                fontFamily: "inherit", fontSize: 15, fontWeight: 400, cursor: "pointer",
-                border: "none", borderBottom: "1px solid #e8e8e8", background: "none",
-                padding: "8px 0", color: "#aaa", letterSpacing: "-0.01em",
-              }}
-            >+ Agregar multimedia</button>
+            <button type="button" className="solicitar-btn-add" onClick={agregarMultimedia}>+ Agregar multimedia</button>
           </div>
 
-          <button type="submit" disabled={!hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null} style={{
-            fontFamily: "inherit", fontSize: 14, fontWeight: 600, letterSpacing: "0.06em",
-            padding: "16px 40px", background: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "#ccc" : "#863819", color: "#fff",
-            border: "none", borderRadius: 8, cursor: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? "not-allowed" : "pointer",
-            width: "100%", marginTop: 32,
-          }}>
-            {saving ? "Enviando..." : uploadingImagen ? "Subiendo portada..." : subiendoIcono ? "Subiendo icono..." : uploadingMultimediaIndex !== null ? "Subiendo multimedia..." : "Enviar solicitud de edición"}
-          </button>
+          <div style={{ marginTop: 40 }}>
+            <button type="submit" className="solicitar-btn-submit" disabled={!hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null}
+              style={{
+                background: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? undefined : "#863819",
+                color: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? undefined : "#fff",
+                borderColor: !hasChanges || saving || uploadingImagen || subiendoIcono || uploadingMultimediaIndex !== null ? undefined : "#863819",
+              }}
+            >
+              {saving ? "Enviando..." : uploadingImagen ? "Subiendo portada..." : subiendoIcono ? "Subiendo icono..." : uploadingMultimediaIndex !== null ? "Subiendo multimedia..." : "Enviar solicitud de edición"}
+              {!saving && !uploadingImagen && !subiendoIcono && uploadingMultimediaIndex === null && <span className="arrow">→</span>}
+            </button>
+          </div>
         </form>
+      </div>
+
+      <div className="solicitar-map-side">
+        <div ref={mapContainer} className="solicitar-map-container" style={{ width: "100%", height: "100vh" }} />
+        <div className="solicitar-map-zoom">
+          <button type="button" onClick={() => mapRef.current?.zoomIn()}>+</button>
+          <button type="button" onClick={() => mapRef.current?.zoomOut()}>−</button>
+        </div>
+        {form.latitud && form.longitud && (
+          <div className="solicitar-map-coords">Lat: {form.latitud}, Lng: {form.longitud}</div>
+        )}
       </div>
     </div>
   );

@@ -9,27 +9,49 @@ const tiposConMembresia = ["comercio", "hospedaje", "productor", "evento"];
 
 router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
   try {
-    const { entidad_id, plan_id, dias_personalizados, precio_personalizado } = req.body;
+    let { entidad_id, entidad_ids, plan_id, dias_personalizados, precio_personalizado } = req.body;
 
-    if (!entidad_id) {
-      return res.status(400).json({ error: "entidad_id es requerido" });
+    if (entidad_id && !entidad_ids) {
+      entidad_ids = [entidad_id];
+    }
+
+    if (!entidad_ids || entidad_ids.length === 0) {
+      return res.status(400).json({ error: "entidad_ids es requerido" });
+    }
+
+    if (plan_id) {
+      const { rows: planRows } = await pool.query(
+        "SELECT * FROM planes WHERE id = $1 AND activo = true",
+        [plan_id],
+      );
+      if (planRows.length === 0) {
+        return res.status(400).json({ error: "Plan no válido o inactivo" });
+      }
+      const plan = planRows[0];
+      if (entidad_ids.length > plan.entidades_incluidas) {
+        return res.status(400).json({
+          error: `Este plan permite hasta ${plan.entidades_incluidas} entidades`,
+        });
+      }
     }
 
     const { rows: entRows } = await pool.query(
-      "SELECT id, tipo, perfil_id, fecha_inicio_suscripcion, fecha_fin_suscripcion FROM entidades WHERE id = $1",
-      [entidad_id],
+      `SELECT id, tipo, perfil_id, fecha_inicio_suscripcion, fecha_fin_suscripcion
+       FROM entidades WHERE id = ANY($1)`,
+      [entidad_ids],
     );
-    if (entRows.length === 0) {
-      return res.status(404).json({ error: "Entidad no encontrada" });
+
+    if (entRows.length !== entidad_ids.length) {
+      return res.status(404).json({ error: "Una o más entidades no encontradas" });
     }
 
-    const entidad = entRows[0];
-    if (entidad.perfil_id !== req.user.id) {
-      return res.status(403).json({ error: "No autorizado" });
-    }
-
-    if (!tiposConMembresia.includes(entidad.tipo)) {
-      return res.status(400).json({ error: "Este tipo de entidad no requiere suscripción" });
+    for (const ent of entRows) {
+      if (ent.perfil_id !== req.user.id) {
+        return res.status(403).json({ error: `No autorizado sobre la entidad ${ent.id}` });
+      }
+      if (!tiposConMembresia.includes(ent.tipo)) {
+        return res.status(400).json({ error: `La entidad "${ent.nombre}" no requiere suscripción` });
+      }
     }
 
     let planNombre, duracionDias, precio;
@@ -64,52 +86,53 @@ router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    const finActual = entidad.fecha_fin_suscripcion
-      ? new Date(entidad.fecha_fin_suscripcion)
-      : null;
+    for (const ent of entRows) {
+      const finActual = ent.fecha_fin_suscripcion
+        ? new Date(ent.fecha_fin_suscripcion)
+        : null;
 
-    let inicio = null;
-    let fin;
+      let inicio = null;
+      let fin;
 
-    if (finActual && finActual >= hoy) {
-      fin = new Date(finActual);
-      fin.setDate(fin.getDate() + duracionDias);
-    } else {
-      inicio = hoy;
-      fin = new Date(hoy);
-      fin.setDate(fin.getDate() + duracionDias);
+      if (finActual && finActual >= hoy) {
+        fin = new Date(finActual);
+        fin.setDate(fin.getDate() + duracionDias);
+      } else {
+        inicio = hoy;
+        fin = new Date(hoy);
+        fin.setDate(fin.getDate() + duracionDias);
+      }
+
+      const finStr = fin.toISOString().split("T")[0];
+      const setClauses = ["plan_tipo = $1", "estado_pago = 'al_dia'"];
+      const params = [planNombre];
+      let pIdx = 2;
+
+      if (inicio) {
+        setClauses.push(`fecha_inicio_suscripcion = $${pIdx++}`);
+        params.push(inicio.toISOString().split("T")[0]);
+      }
+
+      setClauses.push(`fecha_fin_suscripcion = $${pIdx++}`);
+      params.push(finStr);
+      params.push(ent.id);
+
+      await pool.query(
+        `UPDATE entidades SET ${setClauses.join(", ")} WHERE id = $${pIdx++}`,
+        params,
+      );
+
+      await pool.query(
+        `INSERT INTO pagos (perfil_id, entidad_id, plan_id, monto, metodo_pago, estado, fecha_inicio, fecha_fin)
+         VALUES ($1, $2, $3, $4, 'simulado', 'aprobado', $5, $6)`,
+        [req.user.id, ent.id, plan_id || null, precio, inicio ? inicio.toISOString().split("T")[0] : ent.fecha_inicio_suscripcion, finStr],
+      );
     }
-
-    const finStr = fin.toISOString().split("T")[0];
-    const setClauses = ["plan_tipo = $1", "estado_pago = 'al_dia'"];
-    const params = [planNombre];
-    let pIdx = 2;
-
-    if (inicio) {
-      setClauses.push(`fecha_inicio_suscripcion = $${pIdx++}`);
-      params.push(inicio.toISOString().split("T")[0]);
-    }
-
-    setClauses.push(`fecha_fin_suscripcion = $${pIdx++}`);
-    params.push(finStr);
-
-    params.push(entidad_id);
-
-    await pool.query(
-      `UPDATE entidades SET ${setClauses.join(", ")} WHERE id = $${pIdx++}`,
-      params,
-    );
-
-    await pool.query(
-      `INSERT INTO pagos (perfil_id, entidad_id, plan_id, monto, metodo_pago, estado, fecha_inicio, fecha_fin)
-       VALUES ($1, $2, $3, $4, 'simulado', 'aprobado', $5, $6)`,
-      [req.user.id, entidad_id, plan_id || null, precio, inicio ? inicio.toISOString().split("T")[0] : entidad.fecha_inicio_suscripcion, finStr],
-    );
 
     res.json({
       ok: true,
       message: `Suscripción activada: ${planNombre}`,
-      fecha_fin: finStr,
+      entidades_actualizadas: entRows.length,
     });
   } catch (err) {
     console.error("Error POST /suscripciones/adquirir:", err);

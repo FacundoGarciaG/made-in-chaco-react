@@ -20,6 +20,14 @@
   gap: 0;
 }
 
+.admin-container * {
+  color: inherit;
+}
+
+.admin-container button {
+  color: inherit;
+}
+
 /* Panel del Formulario */
 .form-panel {
   width: 420px;
@@ -556,4 +564,60 @@ button[type="submit"]:hover {
 .admin-logout-btn:hover {
   background: #fdecea !important;
   color: #c0392b !important;
+}
+
+/* === MINIMAP EN MODAL === */
+.admin-modal .minimap-wrapper {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.admin-modal .minimap-container {
+  width: 100%;
+  height: 220px;
+}
+
+.admin-modal .minimap-container .mapboxgl-ctrl-bottom-left,
+.admin-modal .minimap-container .mapboxgl-ctrl-bottom-right {
+  display: none;
+}
+
+.admin-modal .minimap-marker {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.admin-modal .minimap-marker-pin {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  background: #863819;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.admin-modal .minimap-marker-custom {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.admin-modal .minimap-marker-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  background: rgba(134, 56, 25, 0.25);
+  border-radius: 50%;
+  animation: none;
 }

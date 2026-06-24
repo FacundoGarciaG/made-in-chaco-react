@@ -2,6 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { buildSetClause } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getIO } from "../services/socket.js";
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.put("/localidades/:id", authMiddleware, async (req, res) => {
       `UPDATE localidades SET ${built.clause} WHERE id = $${built.values.length + 1}`,
       [...built.values, req.params.id],
     );
+    getIO()?.emit("localidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error PUT /localidades/:id:", err);

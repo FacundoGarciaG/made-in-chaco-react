@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { AuthPublicoProvider } from "./context/AuthPublicoContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HeaderComponent } from "./components/HeaderComponent";
 import { FullscreenToggle } from "./components/FullscreenToggle";
@@ -79,7 +80,9 @@ function MadeInChacoApp() {
   return (
     <AuthProvider>
       <AuthPublicoProvider>
-        {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
+        <NotificationProvider>
+          {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
+        </NotificationProvider>
       </AuthPublicoProvider>
     </AuthProvider>
   );

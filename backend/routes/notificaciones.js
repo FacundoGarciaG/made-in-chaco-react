@@ -1,16 +1,29 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getIO } from "../services/socket.js";
 
 const router = Router();
 
 export async function crearNotificacion(perfilId, tipo, titulo, mensaje, entidadId) {
   try {
-    await pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO notificaciones (perfil_id, tipo, titulo, mensaje, entidad_id)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, created_at`,
       [perfilId, tipo, titulo, mensaje, entidadId || null],
     );
+    const notif = rows[0];
+    getIO()?.to(`perfil:${perfilId}`).emit("notificacion:nueva", {
+      id: notif.id,
+      perfil_id: perfilId,
+      tipo,
+      titulo,
+      mensaje,
+      entidad_id: entidadId || null,
+      leida: false,
+      created_at: notif.created_at,
+    });
   } catch (err) {
     console.error("Error al crear notificacion:", err);
   }
@@ -58,6 +71,19 @@ router.post("/notificaciones/leer-todas", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Error POST /notificaciones/leer-todas:", err);
     res.status(500).json({ error: "Error al marcar notificaciones" });
+  }
+});
+
+router.delete("/notificaciones", authMiddleware, async (req, res) => {
+  try {
+    await pool.query(
+      "DELETE FROM notificaciones WHERE perfil_id = $1",
+      [req.user.id],
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error DELETE /notificaciones:", err);
+    res.status(500).json({ error: "Error al eliminar notificaciones" });
   }
 });
 

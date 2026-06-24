@@ -13,6 +13,7 @@ import { LocalidadDetailPanel } from "../components/map/LocalidadDetailPanel";
 import { useMapConexiones } from "../hooks/useMapConexiones";
 import { useMapRecorridos } from "../hooks/useMapRecorridos";
 import { useMapStore } from "../store/useMapStore";
+import { useSocketEvent } from "../hooks/useSocket";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -64,6 +65,11 @@ export const MapChaco = () => {
 
   const { limpiarConexiones, dibujarConexiones } = useMapConexiones(entidadCoordsRef, entidadDataRef, popupRef);
   const { limpiarRutaRecorrido, recorridoRouteDataRef, savedPuntosFilterRef, prevRecorridoRef, recorridoLayerRef, recorridoGlowLayerRef, recorridoSourceRef, routeAnimRef } = useMapRecorridos();
+
+  const [socketRefresh, setSocketRefresh] = useState(0);
+  useSocketEvent("entidad:change", () => setSocketRefresh((t) => t + 1));
+  useSocketEvent("recorrido:change", () => setSocketRefresh((t) => t + 1));
+  useSocketEvent("localidad:change", () => setSocketRefresh((t) => t + 1));
 
   // 0. Restaurar estado del mapa al volver
   const savedState = sessionStorage.getItem("mapState");
@@ -339,7 +345,7 @@ export const MapChaco = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [socketRefresh]);
 
   // Construir lookups por ID de entidad
   useEffect(() => {

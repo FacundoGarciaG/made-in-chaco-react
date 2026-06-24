@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getIO } from "../services/socket.js";
 
 const router = Router();
 
@@ -65,6 +66,7 @@ router.post("/recorridos", authMiddleware, async (req, res) => {
       [nombre, descripcion || "", slug, imagen || ""],
     );
 
+    getIO()?.emit("recorrido:change");
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
     console.error("Error POST /recorridos:", err);
@@ -80,6 +82,7 @@ router.put("/recorridos/:id", authMiddleware, async (req, res) => {
       "UPDATE recorridos SET nombre = $1, descripcion = $2, slug = $3, imagen = $4 WHERE id = $5",
       [nombre, descripcion || "", slug, imagen || "", req.params.id],
     );
+    getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error PUT /recorridos/:id:", err);
@@ -91,6 +94,7 @@ router.put("/recorridos/:id", authMiddleware, async (req, res) => {
 router.delete("/recorridos/:id", authMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM recorridos WHERE id = $1", [req.params.id]);
+    getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error DELETE /recorridos/:id:", err);
@@ -114,6 +118,7 @@ router.post("/recorridos/:id/pasos", authMiddleware, async (req, res) => {
       );
     }
 
+    getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /recorridos/:id/pasos:", err);

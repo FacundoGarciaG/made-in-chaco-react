@@ -5,6 +5,7 @@ import { MiniMap } from "../components/MiniMap";
 import { FavoritoButton } from "../components/FavoritoButton";
 import { track } from "../utils/tracking";
 import "../styles/EntidadDetallePage.css";
+import { useSocketEvent } from "../hooks/useSocket";
 
 const colorMap = {
   artesano: "#ff5722",
@@ -91,6 +92,8 @@ export const EntidadDetallePage = () => {
   const [entityTags, setEntityTags] = useState({});
   const [allEntitiesMap, setAllEntitiesMap] = useState({});
   const videoRef = useRef(null);
+  const [socketRefresh, setSocketRefresh] = useState(0);
+  useSocketEvent("entidad:change", () => setSocketRefresh((t) => t + 1));
 
   const formatTime = (sec) => {
     if (sec == null) return "";
@@ -314,7 +317,7 @@ export const EntidadDetallePage = () => {
         setAllEntitiesMap(map);
       })
       .catch(() => {});
-  }, [slug]);
+  }, [slug, socketRefresh]);
 
   const direccionStr = (d) => {
     if (!d) return null;

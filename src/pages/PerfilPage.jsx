@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthPublico } from "../context/AuthPublicoContext";
 import { SelloModal } from "../components/SelloModal";
+import { useSocketEvent } from "../hooks/useSocket";
+import { useNotificationContext } from "../context/NotificationContext";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -679,6 +681,8 @@ export const PerfilPage = () => {
   const [adquiriendo, setAdquiriendo] = useState(false);
   const [customDias, setCustomDias] = useState(1);
 
+  const { unreadCount, fetchUnreadCount } = useNotificationContext();
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate("/iniciar-sesion", { replace: true });
@@ -906,6 +910,14 @@ export const PerfilPage = () => {
       fetchPagos();
     }
   }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos]);
+
+  useSocketEvent("notificacion:nueva", () => {
+    fetchNotificaciones();
+  });
+
+  useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
 
   useEffect(() => {
     if (!msg) return;
@@ -1162,7 +1174,7 @@ export const PerfilPage = () => {
                 onMouseLeave={(e) => { if (section !== s.key) e.currentTarget.style.color = "#555"; }}
               >
                 {s.label}
-                {s.key === "notificaciones" && notificaciones.some((n) => !n.leida) && (
+                {s.key === "notificaciones" && unreadCount > 0 && (
                   <span style={{
                     display: "inline-block", width: 8, height: 8, borderRadius: "50%",
                     background: "#863819", marginLeft: 8, verticalAlign: "middle",
@@ -1616,6 +1628,7 @@ export const PerfilPage = () => {
                             headers: { Authorization: `Bearer ${getToken()}` },
                           });
                           setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+                          fetchUnreadCount();
                         }}
                         style={{
                           alignSelf: "flex-end",
@@ -1626,6 +1639,28 @@ export const PerfilPage = () => {
                         }}
                       >
                         Marcar todas como leídas
+                      </button>
+                    )}
+                    {notificaciones.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch("/api/notificaciones", {
+                            method: "DELETE",
+                            headers: { Authorization: `Bearer ${getToken()}` },
+                          });
+                          setNotificaciones([]);
+                          fetchUnreadCount();
+                        }}
+                        style={{
+                          alignSelf: "flex-end",
+                          fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                          cursor: "pointer", border: "none", background: "transparent",
+                          padding: "4px 0", color: "#e57373", textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Eliminar todas
                       </button>
                     )}
                     {(() => {
@@ -1669,6 +1704,7 @@ export const PerfilPage = () => {
                                   headers: { Authorization: `Bearer ${getToken()}` },
                                 });
                                 setNotificaciones((prev) => prev.map((x) => x.id === n.id ? { ...x, leida: true } : x));
+                                fetchUnreadCount();
                               }
                               return;
                             }
@@ -1678,6 +1714,7 @@ export const PerfilPage = () => {
                                 headers: { Authorization: `Bearer ${getToken()}` },
                               });
                               setNotificaciones((prev) => prev.map((x) => x.id === n.id ? { ...x, leida: true } : x));
+                              fetchUnreadCount();
                             }
                           }}
                           style={{
@@ -1745,6 +1782,7 @@ export const PerfilPage = () => {
                               setTimeout(() => {
                                 setNotificaciones((prev) => prev.filter((x) => x.id !== n.id));
                                 setDeletingNotif((prev) => { const next = new Set(prev); next.delete(n.id); return next; });
+                                fetchUnreadCount();
                               }, 300);
                             }}
                             style={{

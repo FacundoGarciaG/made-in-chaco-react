@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { connectSocket } from "../services/socket";
 
 const AuthContext = createContext(null);
 
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
 
     localStorage.setItem("made_in_chaco_token", data.token);
     localStorage.setItem("made_in_chaco_user", data.username);
+    connectSocket(data.token);
     setUser({ username: data.username });
     return data;
   };

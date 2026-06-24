@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { connectSocket } from "../services/socket";
 
 const AuthPublicoContext = createContext(null);
 
@@ -15,6 +16,7 @@ export const AuthPublicoProvider = ({ children }) => {
     if (token && stored) {
       try {
         setPerfil(JSON.parse(stored));
+        connectSocket(token);
       } catch {
         localStorage.removeItem(STORAGE_KEY_TOKEN);
         localStorage.removeItem(STORAGE_KEY_PERFIL);
@@ -33,6 +35,7 @@ export const AuthPublicoProvider = ({ children }) => {
     if (!res.ok) throw new Error(data.error || "Error al iniciar sesión");
     localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
     localStorage.setItem(STORAGE_KEY_PERFIL, JSON.stringify(data.perfil));
+    connectSocket(data.token);
     setPerfil(data.perfil);
     return data;
   }, []);
@@ -47,6 +50,7 @@ export const AuthPublicoProvider = ({ children }) => {
     if (!res.ok) throw new Error(data.error || "Error al registrarse");
     localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
     localStorage.setItem(STORAGE_KEY_PERFIL, JSON.stringify(data.perfil));
+    connectSocket(data.token);
     setPerfil(data.perfil);
     return data;
   }, []);

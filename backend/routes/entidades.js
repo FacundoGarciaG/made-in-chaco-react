@@ -5,6 +5,7 @@ import { buildSetClause } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { crearNotificacion } from "./notificaciones.js";
 import cloudinary from "cloudinary";
+import { getIO } from "../services/socket.js";
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -88,6 +89,7 @@ router.post("/entidades", authMiddleware, async (req, res) => {
       ],
     );
 
+    getIO()?.emit("entidad:change");
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
     console.error("Error POST /entidades:", err);
@@ -170,6 +172,7 @@ router.post("/solicitar-sello", async (req, res) => {
       );
     }
 
+    getIO()?.emit("entidad:change");
     res.status(201).json({ id: entityId, slug });
   } catch (err) {
     console.error("Error POST /solicitar-sello:", err);
@@ -210,6 +213,7 @@ router.put("/entidades/:id", authMiddleware, async (req, res) => {
         imagen || "", biografia_larga || "", icono || "", req.params.id,
       ],
     );
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error PUT /entidades/:id:", err);
@@ -231,6 +235,7 @@ router.put("/entidades/:id/detalles", authMiddleware, async (req, res) => {
       [...built.values, req.params.id],
     );
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error PUT /entidades/:id/detalles:", err);
@@ -252,6 +257,7 @@ router.post("/entidades/:id/detalles", authMiddleware, async (req, res) => {
       [...built.values, req.params.id],
     );
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /entidades/:id/detalles:", err);
@@ -317,6 +323,7 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
     }
 
     await pool.query("DELETE FROM entidades WHERE id = $1", [req.params.id]);
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error DELETE /entidades/:id:", err);
@@ -371,6 +378,7 @@ router.post("/entidades/:id/conexiones", authMiddleware, async (req, res) => {
       );
     }
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /conexiones:", err);
@@ -471,6 +479,7 @@ router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
       await crearNotificacion(ent.perfil_id, "sello_aprobado", "Sello aprobado", `¡Felicidades! Tu solicitud de sello para "${ent.nombre}" ha sido aprobada. No olvides adquirir un plan de suscripción desde tu perfil para que ${ent.nombre} aparezca en el mapa de Made in Chaco.`, parseInt(id));
     }
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /solicitudes/:id/aprobar:", err);
@@ -531,6 +540,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
       await crearNotificacion(entProp[0].perfil_id, "sello_rechazado", "Sello rechazado", `Tu solicitud de sello para "${entProp[0].nombre}" no ha sido aprobada en esta instancia.`, parseInt(id));
     }
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /solicitudes/:id/rechazar:", err);
@@ -579,6 +589,7 @@ router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
     }
 
     await pool.query("DELETE FROM entidades WHERE id = $1", [req.params.id]);
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error DELETE /mis-entidades/:id:", err);
@@ -732,6 +743,7 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
       await crearNotificacion(ownerRows[0].id, "edicion_aprobada", "Edición aprobada", `Los cambios propuestos para "${ownerRows[0].entidad_nombre}" han sido aprobados y aplicados.`, solicitud.entidad_id);
     }
 
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /solicitudes-edicion/:id/aprobar:", err);
@@ -786,6 +798,11 @@ router.patch("/entidades/:id/visible", authMiddleware, async (req, res) => {
       await crearNotificacion(oldRows[0].perfil_id, "mapa_no_visible", "Entidad oculta del mapa", `"${oldRows[0].nombre}" ya no se muestra en el mapa.`, parseInt(id));
     }
 
+    if (visible && oldRows[0]?.perfil_id && !oldRows[0]?.visible) {
+      await crearNotificacion(oldRows[0].perfil_id, "mapa_visible", "Entidad visible en el mapa", `"${oldRows[0].nombre}" ahora se muestra en el mapa de Made in Chaco.`, parseInt(id));
+    }
+
+    getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error PATCH /entidades/:id/visible:", err);

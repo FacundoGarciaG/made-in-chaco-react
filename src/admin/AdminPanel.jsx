@@ -7,6 +7,7 @@ import { validarArchivo, validarFormato, INFO_FORMATOS } from "../utils/mediaVal
 import { subirArchivo, subirImagen } from "./uploadService";
 import TagSelector from "../components/TagSelector";
 import { MiniMap } from "../components/MiniMap";
+import { useSocketEvent } from "../hooks/useSocket";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -576,6 +577,11 @@ export const AdminPanel = () => {
   const [recSaving, setRecSaving] = useState(false);
   const recImagenRef = useRef(null);
 
+  const [socketRefresh, setSocketRefresh] = useState(0);
+  useSocketEvent("entidad:change", () => setSocketRefresh((t) => t + 1));
+  useSocketEvent("recorrido:change", () => setSocketRefresh((t) => t + 1));
+  useSocketEvent("localidad:change", () => setSocketRefresh((t) => t + 1));
+
   const [popup, setPopup] = useState(null);
   const [confirmEmailInput, setConfirmEmailInput] = useState("");
   const pendingConfirm = useRef(null);
@@ -646,7 +652,7 @@ export const AdminPanel = () => {
         if (devRes.ok) { const data = await devRes.json(); setPendingDevoluciones(data.length); }
       } catch {}
     })();
-  }, []);
+  }, [socketRefresh]);
 
   useEffect(() => {
     if (view === "solicitudes") cargarSolicitudes();

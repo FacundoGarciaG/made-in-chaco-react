@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useSpring } from "motion/react";
 import "../styles/RecorridosPage.css";
+import { useSocketEvent } from "../hooks/useSocket";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0);
@@ -63,6 +64,9 @@ export const RecorridosPage = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [heroReady, setHeroReady] = useState(false);
 
+  const [socketRefresh, setSocketRefresh] = useState(0);
+  useSocketEvent("recorrido:change", () => setSocketRefresh((t) => t + 1));
+
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -79,7 +83,7 @@ export const RecorridosPage = () => {
         setLoading(false);
         setTimeout(() => setHeroReady(true), 50);
       });
-  }, []);
+  }, [socketRefresh]);
 
   if (loading) {
     return (

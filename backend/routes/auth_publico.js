@@ -60,7 +60,10 @@ router.post("/auth/registro", async (req, res) => {
       return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
     }
 
-    const existe = await pool.query("SELECT id FROM perfiles WHERE email = $1", [email]);
+    const existe = await pool.query(
+      "SELECT id FROM perfiles WHERE email = $1 AND deleted_at IS NULL",
+      [email],
+    );
     if (existe.rows.length > 0) {
       return res.status(409).json({ error: "Ya existe una cuenta con ese email" });
     }
@@ -162,7 +165,7 @@ router.post("/auth/login-publico", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      "SELECT id, email, password, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, baneado, whatsapp FROM perfiles WHERE email = $1",
+      "SELECT id, email, password, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, baneado, whatsapp, deleted_at FROM perfiles WHERE email = $1",
       [email],
     );
 
@@ -174,6 +177,14 @@ router.post("/auth/login-publico", async (req, res) => {
 
     if (perfil.baneado) {
       return res.status(403).json({ error: "Tu cuenta ha sido suspendida. Contactá al administrador." });
+    }
+
+    if (perfil.deleted_at) {
+      return res.status(403).json({
+        error: "Esta cuenta fue eliminada. Podés restaurarla dentro de 30 días.",
+        codigo: "cuenta_eliminada",
+        deleted_at: perfil.deleted_at,
+      });
     }
 
     if (!perfil.password) {
@@ -350,67 +361,137 @@ router.delete("/auth/avatar", authMiddleware, async (req, res) => {
 router.delete("/auth/perfil", authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id FROM perfiles WHERE id = $1",
+      "SELECT id, email, nombre FROM perfiles WHERE id = $1 AND deleted_at IS NULL",
       [req.user.id],
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: "Perfil no encontrado" });
     }
 
-    // Find all entities owned by this profile
-    const { rows: entidades } = await pool.query(
-      "SELECT id, imagen FROM entidades WHERE perfil_id = $1",
+    const perfil = rows[0];
+
+    // Soft delete: oculta entidades y marca el perfil
+    await pool.query(
+      "UPDATE entidades SET visible = false WHERE perfil_id = $1",
+      [req.user.id],
+    );
+    await pool.query(
+      "UPDATE perfiles SET deleted_at = NOW() WHERE id = $1",
       [req.user.id],
     );
 
-    // Get profile data for cloudinary cleanup
-    const { rows: perfilData } = await pool.query(
-      "SELECT avatar_public_id FROM perfiles WHERE id = $1",
-      [req.user.id],
-    );
-
-    for (const ent of entidades) {
-      // Delete all multimedia cloudinary images for this entity
-      const { rows: mm } = await pool.query(
-        "SELECT public_id, url_recurso FROM multimedia WHERE entidad_id = $1 AND public_id IS NOT NULL",
-        [ent.id],
-      );
-      for (const m of mm) {
-        try {
-          await cloudinary.v2.uploader.destroy(m.public_id);
-        } catch {}
-      }
-
-      // Delete the entity's portada image from cloudinary
-      if (ent.imagen) {
-        const publicId = extractPublicId(ent.imagen);
-        if (publicId) {
-          try {
-            await cloudinary.v2.uploader.destroy(publicId);
-          } catch {}
-        }
-      }
+    // Notificar al usuario por email
+    const restoreLink = `${SITE_URL}/iniciar-sesion`;
+    try {
+      await transporter.sendMail({
+        from: process.env.MAIL_FROM || "noreply@madeinchaco.com",
+        to: perfil.email,
+        subject: "Made in Chaco — Eliminación de cuenta",
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+            <h2 style="color:#863819;margin:0 0 8px">Qué lástima que nos dejes de elegir</h2>
+            <p style="color:#555;margin:0 0 16px;font-size:14px">
+              Hola ${perfil.nombre || ""}, lamentamos ver que eliminaste tu cuenta en Made in Chaco.
+            </p>
+            <p style="color:#555;margin:0 0 16px;font-size:14px">
+              Tus entidades ya no se muestran en el mapa, pero no todo está perdido. Te damos <strong>30 días</strong> para que puedas revertir esta decisión. Pasado ese tiempo, los datos se eliminarán de forma permanente.
+            </p>
+            <p style="color:#555;margin:0 0 20px;font-size:14px">
+              Si fue un error o simplemente cambiaste de opinión, podés restaurar tu cuenta iniciando sesión:
+            </p>
+            <a href="${restoreLink}" style="display:inline-block;padding:12px 28px;background:#863819;color:#fff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">Restaurar mi cuenta</a>
+            <p style="color:#aaa;font-size:12px;margin-top:20px">O copiá este enlace:<br>${restoreLink}</p>
+            <p style="color:#888;font-size:12px;margin-top:24px;border-top:1px solid #eee;padding-top:16px">
+              Gracias por haber sido parte de Made in Chaco. Siempre vas a ser bienvenido.
+            </p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.warn("Email de eliminación no enviado:", mailErr.message);
     }
 
-    // Delete all entities (cascades to multimedia, conexiones, pasos_recorrido, etc.)
-    if (entidades.length > 0) {
-      const ids = entidades.map((e) => e.id);
-      await pool.query("DELETE FROM entidades WHERE id = ANY($1)", [ids]);
-    }
-
-    // Delete avatar from Cloudinary
-    if (perfilData[0]?.avatar_public_id) {
-      try {
-        await cloudinary.v2.uploader.destroy(perfilData[0].avatar_public_id);
-      } catch {}
-    }
-
-    // Delete profile (cascades to favoritos, notificaciones)
-    await pool.query("DELETE FROM perfiles WHERE id = $1", [req.user.id]);
-
-    res.json({ ok: true });
+    res.json({ ok: true, message: "Cuenta marcada para eliminación. Tenés 30 días para restaurarla." });
   } catch (err) {
     console.error("Delete perfil error:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// Restaurar perfil dentro del período de gracia de 30 días (público, con email + password)
+router.post("/auth/restaurar", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email y contraseña requeridos" });
+    }
+
+    const { rows } = await pool.query(
+      "SELECT id, password, deleted_at FROM perfiles WHERE email = $1",
+      [email],
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+
+    const perfil = rows[0];
+
+    if (!perfil.deleted_at) {
+      return res.status(400).json({ error: "Esta cuenta no está eliminada." });
+    }
+
+    if (!perfil.password) {
+      return res.status(400).json({ error: "Esta cuenta usa Google Sign-In. No se puede restaurar automáticamente." });
+    }
+
+    const valid = await bcrypt.compare(password, perfil.password);
+    if (!valid) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+
+    await pool.query(
+      "UPDATE perfiles SET deleted_at = NULL WHERE id = $1",
+      [perfil.id],
+    );
+    await pool.query(
+      "UPDATE entidades SET visible = true WHERE perfil_id = $1",
+      [perfil.id],
+    );
+
+    // Notificar al usuario por email
+    try {
+      await transporter.sendMail({
+        from: process.env.MAIL_FROM || "noreply@madeinchaco.com",
+        to: email,
+        subject: "Made in Chaco — Gracias por volver",
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+            <h2 style="color:#863819;margin:0 0 8px">¡Gracias por volver!</h2>
+            <p style="color:#555;margin:0 0 16px;font-size:14px">
+              Nos alegra que hayas decidido quedarte. Tu cuenta de Made in Chaco fue restaurada exitosamente.
+            </p>
+            <p style="color:#555;margin:0 0 16px;font-size:14px">
+              Tus entidades vuelven a estar visibles en el mapa y todo está como lo dejaste.
+            </p>
+            <p style="color:#555;margin:0 0 20px;font-size:14px">
+              Ya podés iniciar sesión con tu email y contraseña para gestionar tu perfil y contenido.
+            </p>
+            <a href="${SITE_URL}/iniciar-sesion" style="display:inline-block;padding:12px 28px;background:#863819;color:#fff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">Iniciar sesión</a>
+            <p style="color:#888;font-size:12px;margin-top:24px;border-top:1px solid #eee;padding-top:16px">
+              Gracias por seguir formando parte de esta comunidad.
+            </p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.warn("Email de restauración no enviado:", mailErr.message);
+    }
+
+    res.json({ ok: true, message: "Cuenta restaurada exitosamente. Ya podés iniciar sesión." });
+  } catch (err) {
+    console.error("Restaurar perfil error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });

@@ -32,7 +32,11 @@ export const AuthPublicoProvider = ({ children }) => {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al iniciar sesión");
+    if (!res.ok) {
+      const err = new Error(data.error || "Error al iniciar sesión");
+      err.data = data;
+      throw err;
+    }
     localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
     localStorage.setItem(STORAGE_KEY_PERFIL, JSON.stringify(data.perfil));
     connectSocket(data.token);

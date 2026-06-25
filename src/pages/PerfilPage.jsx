@@ -30,18 +30,18 @@ const sLabel = {
 
 const sField = {
   position: "relative",
-  marginBottom: 48,
-  paddingTop: 28,
+  marginBottom: 40,
+  paddingTop: 24,
 };
 
 const sInput = {
   width: "100%",
   padding: "6px 0",
-  fontSize: 24,
+  fontSize: 18,
   fontWeight: 400,
-  letterSpacing: "-0.02em",
+  letterSpacing: "-0.01em",
   border: "none",
-  borderBottom: "1px solid #e8e8e8",
+  borderBottom: "1px solid #e0dcd0",
   background: "transparent",
   color: "#1a1a1a",
   fontFamily: "inherit",
@@ -68,12 +68,12 @@ const sDateInput = {
 const sFloatingLabel = (focused, filled) => ({
   position: "absolute",
   left: 0,
-  top: focused || filled ? 0 : 34,
-  fontSize: focused || filled ? 13 : 24,
-  fontWeight: focused || filled ? 500 : 400,
-  letterSpacing: focused || filled ? "0.06em" : "-0.02em",
+  top: focused || filled ? 0 : 30,
+  fontSize: focused || filled ? 12 : 18,
+  fontWeight: focused || filled ? 600 : 400,
+  letterSpacing: focused || filled ? "0.08em" : "-0.01em",
   textTransform: focused || filled ? "uppercase" : "none",
-  color: focused ? "#863819" : "#aaa",
+  color: focused ? "#863819" : "#999",
   pointerEvents: "none",
   transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
 });
@@ -1258,92 +1258,127 @@ export const PerfilPage = () => {
                 <div style={sDivider} />
                 <h2 style={{
                   fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
-                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                  color: "#1c1c18", margin: "0 0 16px", letterSpacing: "-0.02em",
                 }}>
                   Mi Perfil
                 </h2>
+                <p style={{
+                  fontSize: 13, color: "#888", margin: "0 0 40px",
+                  fontFamily: "inherit", letterSpacing: "0.02em",
+                }}>
+                  Completa tu perfil para aparecer en Made in Chaco
+                </p>
                 <form onSubmit={handleSave} style={{ width: "100%" }}>
-                  <FloatingInput label="Nombre completo *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-                  <FloatingInput label="Profesión / oficio *" value={profesion} onChange={(e) => setProfesion(e.target.value)} />
-                  <WhatsAppField
-                    prefix={whatsappPrefix}
-                    number={whatsapp.replace(/^\+\d+\s*/, "")}
-                    onPrefixChange={(p) => {
-                      const n = whatsapp.replace(/^\+\d+\s*/, "");
-                      setWhatsappPrefix(p);
-                      setWhatsapp(p + " " + n);
-                    }}
-                    onNumberChange={(n) => setWhatsapp(whatsappPrefix + " " + n)}
-                  />
-                  <FloatingTextarea label="Biografía *" value={bio} onChange={(e) => setBio(e.target.value)} />
-
-                  <div style={{ height: 24 }} />
-
-                  <CountryAutocomplete label="Nacionalidad *" value={nacionalidad} onChange={setNacionalidad} />
-                  <CountryAutocomplete label="País de residencia *" value={pais} onChange={setPais} />
-                  <RegionAutocomplete label="Provincia / Estado *" value={provincia} onChange={setProvincia} />
-
-                  <LocationAutocomplete
-                    label="Localidad *"
-                    value={localidad}
-                    onChange={setLocalidad}
-                    onLocationSelect={handleLocationSelect}
-                  />
-
-                  <SexoCombobox label="Sexo *" value={sexo} onChange={setSexo} />
-
-                  <FloatingDate label="Fecha de nacimiento *" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} />
-
-                  <div style={{ display: "flex", gap: 32, marginTop: 56, alignItems: "center" }}>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      style={{
-                        fontFamily: "inherit",
-                        fontSize: 15,
-                        fontWeight: 500,
-                        letterSpacing: "0.02em",
-                        cursor: "pointer",
-                        border: "none",
-                        background: "none",
-                        padding: "14px 0",
-                        color: "#888",
-                        borderBottom: "1px solid #90a88a",
-                        transition: "opacity 0.25s ease",
+                  <div style={{
+                    background: "#fff", borderRadius: 16, padding: "32px 40px",
+                    border: "1px solid #e8e4da", marginBottom: 32,
+                  }}>
+                    <p style={{
+                      fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
+                      textTransform: "uppercase", color: "#863819", margin: "0 0 24px",
+                    }}>
+                      Información personal
+                    </p>
+                    <FloatingInput label="Nombre completo *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                    <FloatingInput label="Profesión / oficio *" value={profesion} onChange={(e) => setProfesion(e.target.value)} />
+                    <WhatsAppField
+                      prefix={whatsappPrefix}
+                      number={whatsapp.replace(/^\+\d+\s*/, "")}
+                      onPrefixChange={(p) => {
+                        const n = whatsapp.replace(/^\+\d+\s*/, "");
+                        setWhatsappPrefix(p);
+                        setWhatsapp(p + " " + n);
                       }}
-                      onMouseEnter={(e) => { if (!saving) e.currentTarget.style.opacity = "0.5"; }}
-                      onMouseLeave={(e) => { if (!saving) e.currentTarget.style.opacity = "1"; }}
-                    >
-                      {saving ? "GUARDANDO..." : "GUARDAR"}
-                    </button>
+                      onNumberChange={(n) => setWhatsapp(whatsappPrefix + " " + n)}
+                    />
+                    <FloatingTextarea label="Biografía *" value={bio} onChange={(e) => setBio(e.target.value)} />
                   </div>
 
-                  {msg && (
+                  <div style={{
+                    background: "#fff", borderRadius: 16, padding: "32px 40px",
+                    border: "1px solid #e8e4da", marginBottom: 32,
+                  }}>
                     <p style={{
-                      marginTop: 24,
-                      fontSize: 13,
-                      letterSpacing: "0.02em",
-                      color: msg.includes("Perfil") ? "#506441" : "#d32f2f",
+                      fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
+                      textTransform: "uppercase", color: "#863819", margin: "0 0 24px",
                     }}>
-                      {msg.includes("Perfil") ? "✓ " : "✗ "}{msg}
+                      Ubicación
                     </p>
-                  )}
+                    <CountryAutocomplete label="Nacionalidad *" value={nacionalidad} onChange={setNacionalidad} />
+                    <CountryAutocomplete label="País de residencia *" value={pais} onChange={setPais} />
+                    <RegionAutocomplete label="Provincia / Estado *" value={provincia} onChange={setProvincia} />
+                    <LocationAutocomplete
+                      label="Localidad *"
+                      value={localidad}
+                      onChange={setLocalidad}
+                      onLocationSelect={handleLocationSelect}
+                    />
+                  </div>
+
+                  <div style={{
+                    background: "#fff", borderRadius: 16, padding: "32px 40px",
+                    border: "1px solid #e8e4da", marginBottom: 32,
+                  }}>
+                    <p style={{
+                      fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
+                      textTransform: "uppercase", color: "#863819", margin: "0 0 24px",
+                    }}>
+                      Datos adicionales
+                    </p>
+                    <SexoCombobox label="Sexo *" value={sexo} onChange={setSexo} />
+                    <FloatingDate label="Fecha de nacimiento *" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 24, marginTop: 16, alignItems: "center" }}>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      style={{
+                        fontFamily: "inherit",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        letterSpacing: "0.06em",
+                        cursor: saving ? "wait" : "pointer",
+                        border: "none",
+                        background: "#863819",
+                        color: "#fff",
+                        padding: "14px 40px",
+                        borderRadius: 8,
+                        textTransform: "uppercase",
+                        transition: "opacity 0.25s ease",
+                        opacity: saving ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => { if (!saving) e.currentTarget.style.opacity = "0.85"; }}
+                      onMouseLeave={(e) => { if (!saving) e.currentTarget.style.opacity = "1"; }}
+                    >
+                      {saving ? "Guardando…" : "Guardar cambios"}
+                    </button>
+                    {msg && (
+                      <span style={{
+                        fontSize: 13,
+                        letterSpacing: "0.02em",
+                        color: msg.includes("Perfil") ? "#506441" : "#d32f2f",
+                      }}>
+                        {msg.includes("Perfil") ? "✓ " : "✗ "}{msg}
+                      </span>
+                    )}
+                  </div>
 
                   <div style={{ borderTop: "1px solid #e0dcd0", marginTop: 48, paddingTop: 32 }}>
                     <button
                       type="button"
                       onClick={() => { setDeleteConfirm(true); setDeleteEmail(""); }}
                       style={{
-                        fontFamily: "inherit", fontSize: 14, fontWeight: 600,
-                        cursor: "pointer", border: "2px solid #c62828",
+                        fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                        cursor: "pointer", border: "1px solid #c62828",
                         background: "transparent", color: "#c62828",
-                        padding: "12px 32px", borderRadius: 8,
+                        padding: "10px 24px", borderRadius: 8,
                         letterSpacing: "0.04em", transition: "all 0.2s ease",
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = "#c62828"; e.currentTarget.style.color = "#fff"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#c62828"; }}
                     >
-                      ELIMINAR CUENTA
+                      Eliminar cuenta
                     </button>
                   </div>
                 </form>
@@ -2323,10 +2358,10 @@ export const PerfilPage = () => {
                 ¿Eliminar cuenta?
               </h3>
               <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 8px" }}>
-                Esta acción es <strong style={{ color: "#c62828" }}>permanente e irreversible</strong>.
+                Tus entidades dejarán de mostrarse en el mapa.
               </p>
               <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7, margin: "0 0 24px" }}>
-                Se eliminarán todos tus datos, entidades y contenido asociado.
+                Tenés <strong style={{ color: "#c62828" }}>30 días</strong> para restaurar tu cuenta si te arrepentís. Te enviaremos un email con el link de recuperación.
               </p>
               <p style={{ color: "#555", fontSize: 13, margin: "0 0 8px", textAlign: "left" }}>
                 Escribí <strong>{perfil.email}</strong> para confirmar:

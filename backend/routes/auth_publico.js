@@ -6,35 +6,9 @@ import nodemailer from "nodemailer";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
-import cloudinary from "cloudinary";
-
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { cloudinary } from "../config/cloudinary.js";
 
 const SITE_URL = process.env.SITE_URL || "http://localhost:5173";
-
-function extractPublicId(url) {
-  try {
-    const u = new URL(url);
-    const segments = u.pathname.split("/");
-    let versionIdx = -1;
-    for (let i = 0; i < segments.length; i++) {
-      if (/^v\d+$/.test(segments[i])) {
-        versionIdx = i;
-        break;
-      }
-    }
-    if (versionIdx === -1) return null;
-    const publicIdWithExt = segments.slice(versionIdx + 1).join("/");
-    const dotIdx = publicIdWithExt.lastIndexOf(".");
-    return dotIdx > 0 ? publicIdWithExt.substring(0, dotIdx) : publicIdWithExt;
-  } catch {
-    return null;
-  }
-}
 
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,

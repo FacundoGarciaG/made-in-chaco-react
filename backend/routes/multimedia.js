@@ -1,13 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
-import cloudinary from "cloudinary";
-
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { cloudinary } from "../config/cloudinary.js";
 
 const router = Router();
 

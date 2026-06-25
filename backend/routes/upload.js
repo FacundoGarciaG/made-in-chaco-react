@@ -1,15 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
-import cloudinary from "cloudinary";
 import { authMiddleware } from "../middleware/auth.js";
+import { cloudinary } from "../config/cloudinary.js";
 
 const router = Router();
-
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const upload = multer({
   storage: multer.memoryStorage(),

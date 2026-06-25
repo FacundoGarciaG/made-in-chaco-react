@@ -6,6 +6,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { initSocket } from "./services/socket.js";
+import { logger } from "./config/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -106,7 +107,7 @@ app.use((_req, res) => {
 
 // Error handler
 app.use((err, _req, res, _next) => {
-  console.error("Unhandled error:", err);
+  logger.error("Unhandled error:", err);
   res.status(500).json({ error: "Error interno del servidor" });
 });
 
@@ -114,5 +115,5 @@ const httpServer = createServer(app);
 initSocket(httpServer);
 
 httpServer.listen(PORT, () => {
-  console.log(`✦ Made in Chaco API corriendo en http://localhost:${PORT}`);
+  logger.info(`✦ Made in Chaco API corriendo en http://localhost:${PORT}`);
 });

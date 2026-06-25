@@ -2,31 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
-import cloudinary from "cloudinary";
-
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-function extractPublicId(url) {
-  try {
-    const u = new URL(url);
-    const segments = u.pathname.split("/");
-    let versionIdx = -1;
-    for (let i = 0; i < segments.length; i++) {
-      if (/^v\d+$/.test(segments[i])) {
-        versionIdx = i;
-        break;
-      }
-    }
-    if (versionIdx === -1) return null;
-    return segments.slice(versionIdx + 1).join("/").replace(/\.[^.]+$/, "");
-  } catch {
-    return null;
-  }
-}
+import { cloudinary, publicIdDesdeUrl } from "../config/cloudinary.js";
 
 const router = Router();
 
@@ -197,7 +173,7 @@ router.post("/admin/perfiles/purge", authMiddleware, async (req, res) => {
       }
 
       if (ent.imagen) {
-        const publicId = extractPublicId(ent.imagen);
+        const publicId = publicIdDesdeUrl(ent.imagen);
         if (publicId) {
           try { await cloudinary.v2.uploader.destroy(publicId); } catch {}
         }

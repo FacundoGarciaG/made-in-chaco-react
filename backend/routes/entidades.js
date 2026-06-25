@@ -4,14 +4,8 @@ import pool from "../config/db.js";
 import { buildSetClause } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { crearNotificacion } from "./notificaciones.js";
-import cloudinary from "cloudinary";
+import { cloudinary, publicIdDesdeUrl } from "../config/cloudinary.js";
 import { getIO } from "../services/socket.js";
-
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const router = Router();
 
@@ -206,16 +200,10 @@ router.put("/entidades/:id", authMiddleware, async (req, res) => {
     if (icono) {
       const { rows: old } = await pool.query("SELECT icono FROM entidades WHERE id = $1", [req.params.id]);
       if (old[0]?.icono && old[0].icono !== icono) {
-        try {
-          const u = new URL(old[0].icono);
-          const segments = u.pathname.split("/");
-          let vi = -1;
-          for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-          if (vi !== -1) {
-            const pid = segments.slice(vi + 1).join("/");
-            await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-          }
-        } catch {}
+        const pid = publicIdDesdeUrl(old[0].icono);
+        if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+          console.warn("Cloudinary delete warning:", e.message);
+        }
       }
     }
 
@@ -260,28 +248,6 @@ router.put("/entidades/:id/detalles", authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/entidades/:id/detalles
-router.post("/entidades/:id/detalles", authMiddleware, async (req, res) => {
-  try {
-    const campos = { ...req.body };
-    delete campos.tipo;
-
-    const built = buildSetClause(campos, 1);
-    if (!built) return res.json({ ok: true });
-
-    await pool.query(
-      `UPDATE entidades SET ${built.clause} WHERE id = $${built.values.length + 1}`,
-      [...built.values, req.params.id],
-    );
-
-    getIO()?.emit("entidad:change");
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("Error POST /entidades/:id/detalles:", err);
-    res.status(500).json({ error: "Error al guardar detalles" });
-  }
-});
-
 // DELETE /api/entidades/:id
 router.delete("/entidades/:id", authMiddleware, async (req, res) => {
   try {
@@ -313,30 +279,18 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
 
     // Delete portada from Cloudinary
     if (ent[0]?.imagen) {
-      try {
-        const u = new URL(ent[0].imagen);
-        const segments = u.pathname.split("/");
-        let vi = -1;
-        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-        if (vi !== -1) {
-          const pid = segments.slice(vi + 1).join("/");
-          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-        }
-      } catch {}
+      const pid = publicIdDesdeUrl(ent[0].imagen);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     // Delete icono from Cloudinary
-    if (rows[0].icono) {
-      try {
-        const u = new URL(rows[0].icono);
-        const segments = u.pathname.split("/");
-        let vi = -1;
-        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-        if (vi !== -1) {
-          const pid = segments.slice(vi + 1).join("/");
-          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-        }
-      } catch {}
+    if (ent[0]?.icono) {
+      const pid = publicIdDesdeUrl(ent[0].icono);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     await pool.query("DELETE FROM entidades WHERE id = $1", [req.params.id]);
@@ -527,35 +481,25 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
       [id],
     );
     for (const m of mm) {
-      try { await cloudinary.v2.uploader.destroy(m.public_id); } catch {}
+      try { await cloudinary.v2.uploader.destroy(m.public_id); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     // Delete portada from Cloudinary
     if (entPre[0]?.imagen) {
-      try {
-        const u = new URL(entPre[0].imagen);
-        const segments = u.pathname.split("/");
-        let vi = -1;
-        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-        if (vi !== -1) {
-          const pid = segments.slice(vi + 1).join("/");
-          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-        }
-      } catch {}
+      const pid = publicIdDesdeUrl(entPre[0].imagen);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     // Delete icono from Cloudinary
     if (entPre[0]?.icono) {
-      try {
-        const u = new URL(entPre[0].icono);
-        const segments = u.pathname.split("/");
-        let vi = -1;
-        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-        if (vi !== -1) {
-          const pid = segments.slice(vi + 1).join("/");
-          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-        }
-      } catch {}
+      const pid = publicIdDesdeUrl(entPre[0].icono);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     const { rows: entProp } = await pool.query("SELECT perfil_id, nombre FROM entidades WHERE id = $1", [id]);
@@ -594,21 +538,17 @@ router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
       [req.params.id],
     );
     for (const m of mm) {
-      try { await cloudinary.v2.uploader.destroy(m.public_id); } catch {}
+      try { await cloudinary.v2.uploader.destroy(m.public_id); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     // Delete portada from Cloudinary
     if (rows[0].imagen) {
-      try {
-        const u = new URL(rows[0].imagen);
-        const segments = u.pathname.split("/");
-        let vi = -1;
-        for (let i = 0; i < segments.length; i++) { if (/^v\d+$/.test(segments[i])) { vi = i; break; } }
-        if (vi !== -1) {
-          const pid = segments.slice(vi + 1).join("/");
-          await cloudinary.v2.uploader.destroy(pid.substring(0, pid.lastIndexOf(".")));
-        }
-      } catch {}
+      const pid = publicIdDesdeUrl(rows[0].imagen);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
+      }
     }
 
     await pool.query("DELETE FROM entidades WHERE id = $1", [req.params.id]);

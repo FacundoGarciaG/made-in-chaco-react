@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { styles, colorMapAdmin, parseSocialList, authHeaders } from "./helpers";
 import { SOCIAL_PLATFORMS } from "./constants";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 export function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPendingDevoluciones, cargarEntidades, showPopup, showConfirm }) {
   const [devoluciones, setDevoluciones] = useState(null);
@@ -158,7 +159,7 @@ export function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPen
               </div>
 
               {e.imagen && (
-                <img src={e.imagen} alt="" style={{ width: "100%", height: "160px", borderRadius: 12, objectFit: "cover", marginBottom: 16, border: "1px solid #eee" }} />
+                <img src={optimizarUrlCloudinary(e.imagen)} alt="" loading="lazy" style={{ width: "100%", height: "160px", borderRadius: 12, objectFit: "cover", marginBottom: 16, border: "1px solid #eee" }} />
               )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>

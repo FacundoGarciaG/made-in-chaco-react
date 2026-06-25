@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { motion, useScroll, useSpring } from "motion/react";
 import { FavoritoButton } from "../components/FavoritoButton";
 import "../styles/RecorridoDetallePage.css";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0);
@@ -229,7 +230,7 @@ export const RecorridoDetallePage = () => {
         <div className="rd-hero-bg" />
         {recorrido.imagen && (
           <div className="rd-hero-bg-img">
-            <img src={recorrido.imagen} alt="" />
+            <img src={optimizarUrlCloudinary(recorrido.imagen)} alt="" />
           </div>
         )}
         <div className="rd-hero-pattern" />
@@ -371,7 +372,7 @@ export const RecorridoDetallePage = () => {
           >
             {paso.imagen && (
               <div className="rd-step-card-image">
-                <img src={paso.imagen} alt={paso.nombre} />
+                <img src={optimizarUrlCloudinary(paso.imagen)} alt={paso.nombre} loading="lazy" />
                 <div className="rd-step-card-image-overlay" />
                 <div className="rd-step-card-image-badge">
                   <img

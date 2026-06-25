@@ -9,6 +9,7 @@ import TagSelector from "../components/TagSelector";
 import { MiniMap } from "../components/MiniMap";
 import { useSocketEvent } from "../hooks/useSocket";
 import { getToken, authHeaders, authFetch, colorMapAdmin, parseSocialList, styles } from "./helpers";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS, QUE_INCLUYE_EXPERIENCIA, TIPOS_EXPERIENCIA, TIPOS_PRODUCTO, SERVICIOS_SUGERIDOS, ACTIVIDADES_SUGERIDAS, TIPOS_RELATO } from "./constants";
 import { DetailField, GastronomiaSelector, SocialMediaManager, LocalidadRow } from "./components";
 import { DashboardView } from "./DashboardView";
@@ -1186,7 +1187,7 @@ export const AdminPanel = () => {
               <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
                 {entidadesFiltradas.map((ent) => (
                   <div key={ent.id} style={styles.entityCard}>
-                    {ent.imagen && <img src={ent.imagen} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />}
+                    {ent.imagen && <img src={optimizarUrlCloudinary(ent.imagen)} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <span style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18" }}>{ent.nombre}</span>
@@ -1641,7 +1642,7 @@ export const AdminPanel = () => {
               {/* Lista de recorridos */}
               {recorridos.map((rec) => (
                 <div key={rec.id} style={styles.entityCard}>
-                  {rec.imagen && <img src={rec.imagen} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />}
+                  {rec.imagen && <img src={optimizarUrlCloudinary(rec.imagen)} alt="" loading="lazy" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 15, color: "#1c1c18" }}>{rec.nombre}</div>
                     <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>

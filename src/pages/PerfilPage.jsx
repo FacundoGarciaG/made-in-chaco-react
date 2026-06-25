@@ -4,6 +4,7 @@ import { useAuthPublico } from "../context/AuthPublicoContext";
 import { SelloModal } from "../components/SelloModal";
 import { useSocketEvent } from "../hooks/useSocket";
 import { useNotificationContext } from "../context/NotificationContext";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -565,7 +566,7 @@ const AvatarWithOverlay = ({ avatarUrl, nombre, uploadingAvatar, onChangeClick, 
     >
       {avatarUrl ? (
         <img
-          src={avatarUrl}
+          src={optimizarUrlCloudinary(avatarUrl)}
           alt="Avatar"
           style={{
             width: 120, height: 120, borderRadius: "50%", objectFit: "cover",

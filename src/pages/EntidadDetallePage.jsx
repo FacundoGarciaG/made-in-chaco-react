@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, useSpring } from "motion/react";
 import { MiniMap } from "../components/MiniMap";
 import { FavoritoButton } from "../components/FavoritoButton";
 import { track } from "../utils/tracking";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 import "../styles/EntidadDetallePage.css";
 import { useSocketEvent } from "../hooks/useSocket";
 
@@ -546,7 +547,7 @@ export const EntidadDetallePage = () => {
           style={{ scale: heroScale, y: heroY }}
         >
           {entidad.imagen && (
-            <img src={entidad.imagen} alt={entidad.nombre} />
+            <img src={optimizarUrlCloudinary(entidad.imagen)} alt={entidad.nombre} />
           )}
         </motion.div>
 
@@ -819,8 +820,9 @@ export const EntidadDetallePage = () => {
             style={{ paddingTop: 0, display: "flex", justifyContent: "center" }}
           >
             <img
-              src={entidad.foto_perfil_url}
+              src={optimizarUrlCloudinary(entidad.foto_perfil_url, 500)}
               alt={entidad.nombre}
+              loading="lazy"
               style={{
                 maxWidth: 500,
                 width: "100%",
@@ -863,7 +865,7 @@ export const EntidadDetallePage = () => {
                     ) : item.tipo_recurso === "audio" ? (
                       <div className="entidad-gallery-audio">
                         <img
-                          src={item.thumbnail_url || item.url_recurso}
+                          src={optimizarUrlCloudinary(item.thumbnail_url || item.url_recurso)}
                           alt={item.titulo_alternativo || ""}
                           className="entidad-gallery-audio-img"
                         />
@@ -872,7 +874,7 @@ export const EntidadDetallePage = () => {
                         </div>
                       </div>
                     ) : (
-                      <img src={item.url_recurso} alt={item.titulo_alternativo || ""} loading="lazy" />
+                      <img src={optimizarUrlCloudinary(item.url_recurso)} alt={item.titulo_alternativo || ""} loading="lazy" />
                     )}
                     {item.titulo_alternativo && (
                       <div className="entidad-gallery-caption">
@@ -1424,7 +1426,7 @@ export const EntidadDetallePage = () => {
                 </div>
               ) : (
                 <img
-                  src={multimedia[lightboxIndex].url_recurso}
+                  src={optimizarUrlCloudinary(multimedia[lightboxIndex].url_recurso)}
                   alt={multimedia[lightboxIndex].titulo_alternativo || ""}
                   className="entidad-lightbox-image"
                 />

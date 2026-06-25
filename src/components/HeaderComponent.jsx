@@ -6,6 +6,7 @@ import logoSymbol from "../assets/imagenes/logo-sintitulo.png";
 import { SelloModal } from "./SelloModal";
 import { useMapStore } from "../store/useMapStore";
 import { useAuthPublico } from "../context/AuthPublicoContext";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 export const HeaderComponent = () => {
   const location = useLocation();
   const isMapPage = location.pathname === "/descubre";
@@ -632,8 +633,9 @@ export const HeaderComponent = () => {
                 >
                   {r.imagen ? (
                     <img
-                      src={r.imagen}
+                      src={optimizarUrlCloudinary(r.imagen)}
                       alt=""
+                      loading="lazy"
                       style={{
                         width: "36px",
                         height: "36px",

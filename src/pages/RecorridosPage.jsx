@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, useScroll, useSpring } from "motion/react";
 import "../styles/RecorridosPage.css";
 import { useSocketEvent } from "../hooks/useSocket";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0);
@@ -267,7 +268,7 @@ export const RecorridosPage = () => {
                     >
                       <div className="recorridos-card-image">
                         {r.imagen ? (
-                          <img src={r.imagen} alt={r.nombre} loading="lazy" />
+                          <img src={optimizarUrlCloudinary(r.imagen)} alt={r.nombre} loading="lazy" />
                         ) : (
                           <div className="recorridos-card-image-fallback">🗺️</div>
                         )}

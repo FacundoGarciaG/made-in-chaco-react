@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { styles, colorMapAdmin } from "./helpers";
+import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, onEditEntity }) {
   const [perfiles, setPerfiles] = useState(null);
@@ -69,7 +70,7 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
           <div style={{ flex: 1, background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
               {perfil.avatar_url ? (
-                <img src={perfil.avatar_url} alt="" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "2px solid #f0ede8" }} />
+                <img src={optimizarUrlCloudinary(perfil.avatar_url)} alt="" loading="lazy" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "2px solid #f0ede8" }} />
               ) : (
                 <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "#999" }}>👤</div>
               )}
@@ -303,7 +304,7 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
               >
                 <div>
                   {p.avatar_url ? (
-                    <img src={p.avatar_url} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
+                    <img src={optimizarUrlCloudinary(p.avatar_url)} alt="" loading="lazy" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
                   ) : (
                     <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", color: "#999" }}>👤</div>
                   )}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getIO } from "../services/socket.js";
 import cloudinary from "cloudinary";
 
 cloudinary.v2.config({
@@ -145,6 +146,8 @@ router.put("/admin/perfiles/:id/ban", authMiddleware, async (req, res) => {
       `UPDATE entidades SET visible = $1 WHERE perfil_id = $2`,
       [baneado ? false : true, id],
     );
+
+    getIO()?.emit("entidad:change");
 
     const { rows: entidades } = await pool.query(
       `SELECT id, nombre, visible FROM entidades WHERE perfil_id = $1`,

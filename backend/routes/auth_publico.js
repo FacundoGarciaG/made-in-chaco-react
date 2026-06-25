@@ -5,6 +5,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getIO } from "../services/socket.js";
 import cloudinary from "cloudinary";
 
 cloudinary.v2.config({
@@ -370,15 +371,13 @@ router.delete("/auth/perfil", authMiddleware, async (req, res) => {
 
     const perfil = rows[0];
 
-    // Soft delete: oculta entidades y marca el perfil
-    await pool.query(
-      "UPDATE entidades SET visible = false WHERE perfil_id = $1",
-      [req.user.id],
-    );
+    // Soft delete: marca el perfil como eliminado
     await pool.query(
       "UPDATE perfiles SET deleted_at = NOW() WHERE id = $1",
       [req.user.id],
     );
+
+    getIO()?.emit("entidad:change");
 
     // Notificar al usuario por email
     const restoreLink = `${SITE_URL}/iniciar-sesion`;
@@ -455,10 +454,8 @@ router.post("/auth/restaurar", async (req, res) => {
       "UPDATE perfiles SET deleted_at = NULL WHERE id = $1",
       [perfil.id],
     );
-    await pool.query(
-      "UPDATE entidades SET visible = true WHERE perfil_id = $1",
-      [perfil.id],
-    );
+
+    getIO()?.emit("entidad:change");
 
     // Notificar al usuario por email
     try {
@@ -492,6 +489,125 @@ router.post("/auth/restaurar", async (req, res) => {
     res.json({ ok: true, message: "Cuenta restaurada exitosamente. Ya podés iniciar sesión." });
   } catch (err) {
     console.error("Restaurar perfil error:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// ============================================================
+// Restablecimiento de contraseña (Olvidé mi contraseña)
+// ============================================================
+
+// POST /auth/olvide-password — enviar email con link de restablecimiento
+router.post("/auth/olvide-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email requerido" });
+    }
+
+    // Siempre responder igual por seguridad (no revelar si el email existe)
+    const mensaje = "Si el email está registrado, vas a recibir un link para restablecer tu contraseña.";
+
+    // Verificar que el email exista y esté activo
+    const { rows } = await pool.query(
+      "SELECT id, nombre, deleted_at FROM perfiles WHERE email = $1",
+      [email],
+    );
+
+    if (rows.length === 0 || rows[0].deleted_at) {
+      return res.json({ ok: true, message: mensaje });
+    }
+
+    const perfil = rows[0];
+
+    // Rate limiting: evitar spam (1 token cada 5 minutos)
+    const { rows: tokensRecientes } = await pool.query(
+      "SELECT id FROM perfiles WHERE id = $1 AND reset_token_expires > NOW() - INTERVAL '5 minutes'",
+      [perfil.id],
+    );
+    if (tokensRecientes.length > 0) {
+      return res.json({ ok: true, message: mensaje });
+    }
+
+    // Generar token criptográficamente seguro (64 caracteres hex)
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await pool.query(
+      "UPDATE perfiles SET reset_token = $1, reset_token_expires = $2 WHERE id = $3",
+      [token, expires, perfil.id],
+    );
+
+    // Enviar email
+    const resetLink = `${SITE_URL}/reestablecer-contrasena/${token}`;
+    try {
+      await transporter.sendMail({
+        from: process.env.MAIL_FROM || "noreply@madeinchaco.com",
+        to: email,
+        subject: "Made in Chaco — Restablecer contraseña",
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+            <h2 style="color:#863819;margin:0 0 8px">Restablecé tu contraseña</h2>
+            <p style="color:#555;margin:0 0 16px;font-size:14px">
+              Hola ${perfil.nombre || ""}, recibimos una solicitud para restablecer la contraseña de tu cuenta en Made in Chaco.
+            </p>
+            <p style="color:#555;margin:0 0 20px;font-size:14px">
+              Hacé clic en el siguiente botón para crear una nueva contraseña. Este link es válido por <strong>1 hora</strong>.
+            </p>
+            <a href="${resetLink}" style="display:inline-block;padding:12px 28px;background:#863819;color:#fff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">Restablecer contraseña</a>
+            <p style="color:#888;font-size:12px;margin-top:20px">
+              Si no solicitaste este cambio, podés ignorar este mensaje.
+            </p>
+            <p style="color:#aaa;font-size:12px">O copiá este enlace:<br>${resetLink}</p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.warn("Email de restablecimiento no enviado:", mailErr.message);
+    }
+
+    res.json({ ok: true, message: mensaje });
+  } catch (err) {
+    console.error("Olvide password error:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// POST /auth/reestablecer-password — validar token y cambiar contraseña
+router.post("/auth/reestablecer-password", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token y contraseña requeridos" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    // Buscar perfil con token válido y no expirado
+    const { rows } = await pool.query(
+      "SELECT id FROM perfiles WHERE reset_token = $1 AND reset_token_expires > NOW() AND deleted_at IS NULL",
+      [token],
+    );
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "El link es inválido o expiró. Solicitá uno nuevo." });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    // Actualizar contraseña y limpiar token (single-use)
+    await pool.query(
+      "UPDATE perfiles SET password = $1, reset_token = NULL, reset_token_expires = NULL, updated_at = NOW() WHERE id = $2",
+      [hashed, rows[0].id],
+    );
+
+    res.json({ ok: true, message: "Contraseña actualizada exitosamente. Ya podés iniciar sesión." });
+  } catch (err) {
+    console.error("Reestablecer password error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });

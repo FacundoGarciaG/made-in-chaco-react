@@ -3,6 +3,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { initSocket } from "./services/socket.js";
 
@@ -30,6 +31,41 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Rate limiting para rutas sensibles
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Demasiados intentos. Intentá de nuevo en 15 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Demasiadas subidas. Intentá de nuevo en 1 hora." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: "Demasiados mensajes. Intentá de nuevo en 1 hora." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/registro", authLimiter);
+app.use("/api/auth/login-publico", authLimiter);
+app.use("/api/auth/olvide-password", authLimiter);
+app.use("/api/auth/reestablecer-password", authLimiter);
+app.use("/api/upload", uploadLimiter);
+app.use("/api/upload-public", uploadLimiter);
+app.use("/api/delete-public-image", uploadLimiter);
+app.use("/api/contacto", contactLimiter);
 
 // Routes
 app.use("/api", authRoutes);

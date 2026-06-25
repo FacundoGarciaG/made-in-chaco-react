@@ -16,13 +16,28 @@ cloudinary.v2.config({
 const router = Router();
 
 // GET /api/entidades
-router.get("/entidades", async (_req, res) => {
+router.get("/entidades", async (req, res) => {
   try {
+    let esAdmin = false;
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (token) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        esAdmin = decoded.tipo !== "publico";
+      }
+    } catch {}
+
     const { rows } = await pool.query(
-`SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
-        FROM entidades e
-        LEFT JOIN perfiles p ON e.perfil_id = p.id
-        ORDER BY e.nombre ASC`,
+      esAdmin
+        ? `SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
+           FROM entidades e
+           LEFT JOIN perfiles p ON e.perfil_id = p.id
+           ORDER BY e.nombre ASC`
+        : `SELECT e.*, p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
+           FROM entidades e
+           LEFT JOIN perfiles p ON e.perfil_id = p.id
+           WHERE p.deleted_at IS NULL OR e.perfil_id IS NULL
+           ORDER BY e.nombre ASC`,
     );
     res.json(rows);
   } catch (err) {
@@ -35,7 +50,9 @@ router.get("/entidades", async (_req, res) => {
 router.get("/entidad/:slug", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT * FROM entidades WHERE slug = $1",
+      `SELECT e.* FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       WHERE e.slug = $1 AND (p.deleted_at IS NULL OR e.perfil_id IS NULL)`,
       [req.params.slug],
     );
     if (rows.length === 0) {
@@ -342,8 +359,12 @@ router.get("/entidades/:id/conexiones", async (req, res) => {
         e_d.nombre AS nombre_destino, e_d.tipo AS tipo_destino, e_d.slug AS slug_destino
        FROM conexiones c
        JOIN entidades e_o ON c.entidad_origen_id = e_o.id
+       LEFT JOIN perfiles p_o ON e_o.perfil_id = p_o.id
        JOIN entidades e_d ON c.entidad_destino_id = e_d.id
-       WHERE c.entidad_origen_id = $1 OR c.entidad_destino_id = $1`,
+       LEFT JOIN perfiles p_d ON e_d.perfil_id = p_d.id
+       WHERE (c.entidad_origen_id = $1 OR c.entidad_destino_id = $1)
+         AND (p_o.deleted_at IS NULL OR e_o.perfil_id IS NULL)
+         AND (p_d.deleted_at IS NULL OR e_d.perfil_id IS NULL)`,
       [req.params.id],
     );
     res.json(rows);
@@ -409,16 +430,18 @@ router.get("/entidades/:id/recorridos", async (req, res) => {
 router.get("/mapa-puntos", async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, nombre, slug, tipo, latitud, longitud, imagen, resumen, icono,
-               horario_apertura, horario_cierre, dias_abierto,
-              fecha_evento, localidad_id
-       FROM entidades
-       WHERE visible = true AND latitud IS NOT NULL AND longitud IS NOT NULL
-         AND (tipo != 'comercio' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
-         AND (tipo != 'hospedaje' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
-         AND (tipo != 'productor' OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))
-         AND (tipo != 'evento' OR (fecha_evento IS NULL OR fecha_evento >= CURRENT_DATE))
-          AND (tipo != 'evento' OR perfil_id IS NULL OR ((estado_pago = 'al_dia' OR estado_pago = 'reembolso_solicitado') AND (fecha_fin_suscripcion IS NULL OR fecha_fin_suscripcion >= CURRENT_DATE) AND (fecha_inicio_suscripcion IS NULL OR fecha_inicio_suscripcion <= CURRENT_DATE)))`,
+      `SELECT e.id, e.nombre, e.slug, e.tipo, e.latitud, e.longitud, e.imagen, e.resumen, e.icono,
+               e.horario_apertura, e.horario_cierre, e.dias_abierto,
+              e.fecha_evento, e.localidad_id
+       FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       WHERE e.visible = true AND e.latitud IS NOT NULL AND e.longitud IS NOT NULL
+          AND (p.deleted_at IS NULL OR e.perfil_id IS NULL)
+          AND (e.tipo != 'comercio' OR ((e.estado_pago = 'al_dia' OR e.estado_pago = 'reembolso_solicitado') AND (e.fecha_fin_suscripcion IS NULL OR e.fecha_fin_suscripcion >= CURRENT_DATE) AND (e.fecha_inicio_suscripcion IS NULL OR e.fecha_inicio_suscripcion <= CURRENT_DATE)))
+          AND (e.tipo != 'hospedaje' OR ((e.estado_pago = 'al_dia' OR e.estado_pago = 'reembolso_solicitado') AND (e.fecha_fin_suscripcion IS NULL OR e.fecha_fin_suscripcion >= CURRENT_DATE) AND (e.fecha_inicio_suscripcion IS NULL OR e.fecha_inicio_suscripcion <= CURRENT_DATE)))
+          AND (e.tipo != 'productor' OR ((e.estado_pago = 'al_dia' OR e.estado_pago = 'reembolso_solicitado') AND (e.fecha_fin_suscripcion IS NULL OR e.fecha_fin_suscripcion >= CURRENT_DATE) AND (e.fecha_inicio_suscripcion IS NULL OR e.fecha_inicio_suscripcion <= CURRENT_DATE)))
+          AND (e.tipo != 'evento' OR (e.fecha_evento IS NULL OR e.fecha_evento >= CURRENT_DATE))
+           AND (e.tipo != 'evento' OR e.perfil_id IS NULL OR ((e.estado_pago = 'al_dia' OR e.estado_pago = 'reembolso_solicitado') AND (e.fecha_fin_suscripcion IS NULL OR e.fecha_fin_suscripcion >= CURRENT_DATE) AND (e.fecha_inicio_suscripcion IS NULL OR e.fecha_inicio_suscripcion <= CURRENT_DATE)))`,
     );
     res.json(rows);
   } catch (err) {

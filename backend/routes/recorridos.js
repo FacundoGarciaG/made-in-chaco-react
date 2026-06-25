@@ -40,7 +40,9 @@ router.get("/recorridos/:slug", async (req, res) => {
         e.latitud, e.longitud, e.resumen
        FROM pasos_recorrido p
        JOIN entidades e ON p.entidad_id = e.id
+       LEFT JOIN perfiles perf ON e.perfil_id = perf.id
        WHERE p.recorrido_id = $1
+         AND (perf.deleted_at IS NULL OR e.perfil_id IS NULL)
        ORDER BY p.paso_orden ASC`,
       [recorrido.id],
     );

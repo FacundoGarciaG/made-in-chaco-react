@@ -9,6 +9,7 @@ export const UserLoginPage = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [eliminada, setEliminada] = useState(null);
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
   const [restaurada, setRestaurada] = useState(false);
   const { login } = useAuthPublico();
@@ -118,12 +119,40 @@ export const UserLoginPage = () => {
 
           <div className="login-field">
             <label htmlFor="password">Contraseña</label>
-            <input id="password" type="password" placeholder="Ingresá tu contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div style={{ position: "relative" }}>
+              <input
+                id="password"
+                type={mostrarPassword ? "text" : "password"}
+                placeholder="Ingresá tu contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ width: "100%", paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPassword(!mostrarPassword)}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: 18,
+                  padding: 4, lineHeight: 1, color: "#1c1c18",
+                }}
+                tabIndex={-1}
+              >
+                <i className={`ri-${mostrarPassword ? "eye-off" : "eye"}-line`} style={{ fontSize: 20, color: "#1c1c18" }}></i>
+              </button>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} className="login-btn">
             {loading ? "INGRESANDO..." : "INGRESAR"}
           </button>
+
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <Link to="/olvide-contrasena" style={{ color: "#863819", fontSize: 13 }}>
+              Olvidé mi contraseña
+            </Link>
+          </div>
         </form>
 
         <p className="login-footer">

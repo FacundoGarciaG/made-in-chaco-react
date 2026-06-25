@@ -8,440 +8,17 @@ import { subirArchivo, subirImagen } from "./uploadService";
 import TagSelector from "../components/TagSelector";
 import { MiniMap } from "../components/MiniMap";
 import { useSocketEvent } from "../hooks/useSocket";
+import { getToken, authHeaders, authFetch, colorMapAdmin, parseSocialList, styles } from "./helpers";
+import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS, QUE_INCLUYE_EXPERIENCIA, TIPOS_EXPERIENCIA, TIPOS_PRODUCTO, SERVICIOS_SUGERIDOS, ACTIVIDADES_SUGERIDAS, TIPOS_RELATO } from "./constants";
+import { DetailField, GastronomiaSelector, SocialMediaManager, LocalidadRow } from "./components";
+import { DashboardView } from "./DashboardView";
+import { PalabrasView } from "./PalabrasView";
+import { DevolucionesView } from "./DevolucionesView";
+import { EdicionesView } from "./EdicionesView";
+import { UsuariosView } from "./UsuariosView";
+import { PlanesView } from "./PlanesView";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-
-const getToken = () => localStorage.getItem("made_in_chaco_token");
-const authHeaders = (extra = {}) => {
-  const token = getToken();
-  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
-};
-const authFetch = async (url, opts = {}) => {
-  const res = await fetch(url, opts);
-  if (res.status === 401) {
-    localStorage.removeItem("made_in_chaco_token");
-    localStorage.removeItem("made_in_chaco_user");
-    window.location.href = "/admin/login";
-    throw new Error("Sesión expirada");
-  }
-  return res;
-};
-
-const colorMapAdmin = {
-  artesano: "#ff5722",
-  gastronomia: "#4caf50",
-  comercio: "#2196f3",
-  evento: "#9c27b0",
-  patrimonio: "#795548",
-  personalidad: "#e91e63",
-  comunidad_indigena: "#8B4513",
-  lugar_natural: "#2E7D32",
-  hospedaje: "#FF6F00",
-  productor: "#00695C",
-  experiencia: "#6A1B9A",
-  relato: "#D84315",
-  espacio_cultural: "#37474F",
-};
-
-const DetailField = ({ field, fieldVal, onFieldChange, label, type = "text", options, placeholder }) => {
-  const val = fieldVal ?? "";
-  const onChange = (v) => onFieldChange(field, v);
-  return (
-    <div style={{ marginBottom: "10px" }}>
-      <label
-        style={{
-          fontSize: "11px",
-          fontWeight: 700,
-          color: "#863819",
-          display: "block",
-          marginBottom: "4px",
-          letterSpacing: "0.5px",
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </label>
-      {type === "textarea" ? (
-        <textarea
-          style={styles.input}
-          value={val}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder || ""}
-        />
-      ) : type === "select" ? (
-        <select
-          style={styles.input}
-          value={val}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {options?.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : type === "number" ? (
-        <input
-          style={styles.input}
-          type="number"
-          value={val}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder || ""}
-        />
-      ) : type === "date" ? (
-        <input
-          style={styles.input}
-          type="date"
-          value={val}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      ) : (
-        <input
-          style={styles.input}
-          value={val}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder || ""}
-        />
-      )}
-    </div>
-  );
-};
-
-const SOCIAL_PLATFORMS = [
-  { value: "instagram", label: "Instagram", url: (v) => `https://www.instagram.com/${v}/` },
-  { value: "youtube", label: "YouTube", url: (v) => v.startsWith("http") ? v : `https://www.youtube.com/${v.startsWith("@") ? v : "@" + v}` },
-  { value: "facebook", label: "Facebook", url: (v) => `https://www.facebook.com/${v}/` },
-  { value: "tiktok", label: "TikTok", url: (v) => `https://www.tiktok.com/@${v}` },
-  { value: "twitter", label: "X / Twitter", url: (v) => `https://x.com/${v}` },
-  { value: "whatsapp", label: "WhatsApp", url: (v) => `https://wa.me/${v.replace(/[^0-9]/g, "")}` },
-  { value: "telefono", label: "Teléfono", url: (v) => v },
-  { value: "email", label: "Email", url: (v) => `mailto:${v}` },
-  { value: "otro", label: "Otro", url: (v) => v },
-];
-
-const COMUNIDADES_ETNICAS = [
-  "", "Qom", "Wichí", "Moqoit", "Pilagá", "General",
-];
-
-const parseSocialList = (v) => {
-  if (!v) return [];
-  try { return JSON.parse(v); } catch { return v ? [{ type: "instagram", value: v }] : []; }
-};
-
-const GastronomiaSelector = ({ value, onChange, allEntities }) => {
-  const [inputVal, setInputVal] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  const comercios = useMemo(
-    () => allEntities.filter((e) => {
-      if (e.tipo !== "comercio") return false;
-      const activo = e.estado_pago === "al_dia";
-      const noVencido = !e.fecha_fin_suscripcion || new Date(e.fecha_fin_suscripcion) >= new Date(new Date().toDateString());
-      return activo && noVencido;
-    }),
-    [allEntities],
-  );
-
-  const selectedItems = useMemo(
-    () => value.split(",").map((s) => s.trim()).filter(Boolean),
-    [value],
-  );
-
-  const isSelected = (name) => selectedItems.some((s) => s.toLowerCase() === name.toLowerCase());
-
-  const filtered = useMemo(
-    () => comercios.filter(
-      (c) =>
-        !isSelected(c.nombre) &&
-        c.nombre.toLowerCase().includes(inputVal.toLowerCase()),
-    ),
-    [comercios, inputVal, selectedItems],
-  );
-
-  const addItem = (item) => {
-    const items = [...selectedItems, item];
-    onChange(items.join(", "));
-    setInputVal("");
-    setShowDropdown(false);
-  };
-
-  const removeItem = (item) => {
-    const items = selectedItems.filter(
-      (s) => s.toLowerCase() !== item.toLowerCase(),
-    );
-    onChange(items.join(", "));
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && inputVal.trim()) {
-      e.preventDefault();
-      const match = comercios.find(
-        (c) => c.nombre.toLowerCase() === inputVal.trim().toLowerCase(),
-      );
-      if (match && !isSelected(match.nombre)) {
-        addItem(match.nombre);
-      } else if (!isSelected(inputVal.trim())) {
-        addItem(inputVal.trim());
-      } else {
-        setInputVal("");
-      }
-    }
-    if (e.key === "Backspace" && !inputVal && selectedItems.length > 0) {
-      removeItem(selectedItems[selectedItems.length - 1]);
-    }
-  };
-
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div style={{ position: "relative" }} ref={dropdownRef}>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "6px",
-          padding: "8px 10px",
-          border: "1px solid #eee",
-          borderRadius: "12px",
-          background: "white",
-          cursor: "text",
-          minHeight: "44px",
-          alignItems: "center",
-          boxSizing: "border-box",
-          marginBottom: "12px",
-        }}
-        onClick={() => setShowDropdown(true)}
-      >
-        {selectedItems.map((item) => (
-          <span
-            key={item}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              background: "#863819",
-              color: "white",
-              fontSize: "12px",
-              fontWeight: 600,
-              padding: "4px 10px",
-              borderRadius: "20px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {item}
-            <span
-              style={{ cursor: "pointer", fontSize: "14px", lineHeight: 1 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                removeItem(item);
-              }}
-            >
-              ×
-            </span>
-          </span>
-        ))}
-        <input
-          style={{
-            border: "none",
-            outline: "none",
-            flex: 1,
-            minWidth: "100px",
-            fontSize: "14px",
-            padding: "4px 0",
-            background: "transparent",
-            color: "#1c1c18",
-          }}
-          placeholder={selectedItems.length === 0 ? "Buscá o escribí un comercio..." : ""}
-          value={inputVal}
-          onChange={(e) => {
-            setInputVal(e.target.value);
-            setShowDropdown(true);
-          }}
-          onFocus={() => setShowDropdown(true)}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      {showDropdown && (filtered.length > 0 || (inputVal.trim() && !isSelected(inputVal.trim()))) && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            background: "white",
-            border: "1px solid #eee",
-            borderRadius: "12px",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-            zIndex: 100,
-            maxHeight: "200px",
-            overflowY: "auto",
-          }}
-        >
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                padding: "10px 14px",
-                cursor: "pointer",
-                fontSize: "14px",
-                color: "#1c1c18",
-                borderBottom: "1px solid #f5f2eb",
-                transition: "background 0.1s",
-              }}
-              onClick={() => addItem(c.nombre)}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f2eb")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              {c.nombre}
-            </div>
-          ))}
-          {inputVal.trim() && !isSelected(inputVal.trim()) && !filtered.some((c) => c.nombre.toLowerCase() === inputVal.trim().toLowerCase()) && (
-            <div
-              style={{
-                padding: "10px 14px",
-                cursor: "pointer",
-                fontSize: "14px",
-                color: "#1c1c18",
-                borderBottom: "1px solid #f5f2eb",
-                fontStyle: "italic",
-                transition: "background 0.1s",
-              }}
-              onClick={() => addItem(inputVal.trim())}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f2eb")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              Agregar "{inputVal.trim()}"
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const QUE_INCLUYE_EXPERIENCIA = [
-  "Guía especializado", "Equipo de seguridad", "Refrigerio", "Almuerzo",
-  "Traslado ida y vuelta", "Entrada", "Seguro", "Hidratación",
-  "Fotografía profesional", "Material didáctico", "Certificado",
-  "Alquiler de equipo", "Degustación", "Clase práctica",
-];
-
-const TIPOS_EXPERIENCIA = [
-  "Avistaje de aves", "Cabalgata", "Caminata / Trekking", "Cata de alimentos",
-  "Excursión en lancha", "Festival", "Feria artesanal", "Gastronomía",
-  "Observación de fauna", "Paseo en bicicleta", "Pesca deportiva",
-  "Ruta gastronómica", "Taller artesanal", "Taller de cocina",
-  "Tour fotográfico", "Visita a comunidades", "Visita guiada",
-  "Yoga y bienestar", "Ecoturismo", "Astroturismo",
-];
-
-const TIPOS_PRODUCTO = [
-  "Alfajores artesanales", "Alimentos y bebidas", "Artesanías en cuero",
-  "Artesanías en madera", "Carnes y embutidos", "Cerveza artesanal",
-  "Cestería y fibras naturales", "Conservas y dulces", "Decoración artesanal",
-  "Hilados y tejidos", "Indumentaria textil", "Instrumentos musicales",
-  "Joyería y bijouterie", "Lácteos artesanales", "Miel y derivados",
-  "Muebles artesanales", "Orfebrería y platería", "Panificación artesanal",
-  "Plantas y vivero", "Productos regionales", "Quesos artesanales",
-  "Textiles y bordados", "Velas y jabones artesanales", "Hierbas medicinales",
-];
-
-const SERVICIOS_SUGERIDOS = [
-  "WiFi gratis", "Desayuno incluido", "Aire acondicionado", "Calefacción",
-  "Estacionamiento", "Pileta", "Jardín", "Parrilla", "Cocina compartida",
-  "Habitación privada", "Baño privado", "Ropa de cama", "Toallas",
-  "TV", "Heladera", "Microondas", "Ventilador", "Agua caliente",
-  "Mascotas bienvenidas", "Acceso discapacitados", "Transporte al aeropuerto",
-  "Excursiones", "Bicicletas", "Lavandería", "Room service",
-  "Restaurante", "Bar", "Salón de eventos", "Seguridad 24h",
-];
-
-const ACTIVIDADES_SUGERIDAS = [
-  "Feria", "Exposición", "Concierto", "Espectáculo", "Taller",
-  "Feria gastronómica", "Feria artesanal", "Muestra de arte",
-  "Feria de productores", "Charla / Conferencia", "Feria de emprendedores",
-  "Encuentro cultural", "Festival", "Desfile", "Fiesta popular",
-  "Ronda de negocios", "Feria de artesanos", "Exposición de arte",
-  "Feria de la economía social", "Feria de diseño",
-];
-
-const TIPOS_RELATO = [
-  "Leyenda", "Historia", "Memoria", "Testimonio",
-  "Tradición oral", "Mitología", "Anécdota", "Crónica",
-  "Poesía", "Narrativa", "Relato de viaje", "Saberes ancestrales",
-];
-
-
-function SocialMediaManager({ value, onChange, label = "Redes sociales y contacto" }) {
-  const list = parseSocialList(value);
-  const add = () => {
-    onChange(JSON.stringify([...list, { type: "instagram", value: "" }]));
-  };
-  const update = (i, field, val) => {
-    const next = list.map((item, idx) => idx === i ? { ...item, [field]: val } : item);
-    onChange(JSON.stringify(next));
-  };
-  const remove = (i) => {
-    onChange(JSON.stringify(list.filter((_, idx) => idx !== i)));
-  };
-  const whatsappError = (v) => {
-    const digits = v.replace(/[^0-9]/g, "");
-    return digits.length > 0 && (digits.length < 10 || digits.length > 15) ? "Número inválido (debe tener 10-15 dígitos)" : "";
-  };
-  const emailError = (v) => {
-    if (!v) return "";
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Email inválido";
-  };
-  const phoneError = (v) => {
-    if (!v) return "";
-    const digits = v.replace(/[^0-9]/g, "");
-    return digits.length > 0 && digits.length < 7 ? "Teléfono muy corto" : "";
-  };
-  const placeholder = (type) => {
-    if (type === "whatsapp") return "Código país + número, ej: 5491123456789";
-    if (type === "telefono") return "Ej: 3624123456";
-    if (type === "email") return "ejemplo@correo.com";
-    return "usuario / URL";
-  };
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>{label}</label>
-      {list.map((item, i) => (
-        <div key={i}>
-          <div style={{ display: "flex", gap: 6, marginBottom: 2, alignItems: "center" }}>
-            <select value={item.type} onChange={(e) => update(i, "type", e.target.value)}
-              style={{ flex: "0 0 130px", padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, color: "#1c1c18", background: "white" }}>
-              {SOCIAL_PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-            <input value={item.value} onChange={(e) => update(i, "value", e.target.value)} placeholder={placeholder(item.type)}
-              style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, color: "#1c1c18", background: "white" }} />
-            <button onClick={() => remove(i)}
-              style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16, padding: "4px 6px" }}>
-              ✕
-            </button>
-          </div>
-          {item.type === "whatsapp" && item.value && <div style={{ fontSize: 11, color: whatsappError(item.value) ? "#c62828" : "#2e7d32", margin: "0 0 4px 136px" }}>{whatsappError(item.value) || "Número válido"}</div>}
-          {item.type === "email" && item.value && emailError(item.value) && <div style={{ fontSize: 11, color: "#c62828", margin: "0 0 4px 136px" }}>{emailError(item.value)}</div>}
-          {item.type === "telefono" && item.value && phoneError(item.value) && <div style={{ fontSize: 11, color: "#c62828", margin: "0 0 4px 136px" }}>{phoneError(item.value)}</div>}
-        </div>
-      ))}
-      <button onClick={add}
-        style={{ padding: "6px 14px", background: "#f5f2eb", border: "1px dashed #ccc", borderRadius: 6, cursor: "pointer", color: "#555", fontSize: 13 }}>
-        + Agregar {label.toLowerCase()}
-      </button>
-    </div>
-  );
-}
 
 export const AdminPanel = () => {
   const { user, logout } = useAuth();
@@ -581,6 +158,7 @@ export const AdminPanel = () => {
   useSocketEvent("entidad:change", () => setSocketRefresh((t) => t + 1));
   useSocketEvent("recorrido:change", () => setSocketRefresh((t) => t + 1));
   useSocketEvent("localidad:change", () => setSocketRefresh((t) => t + 1));
+  useSocketEvent("perfil:change", () => setSocketRefresh((t) => t + 1));
 
   const [popup, setPopup] = useState(null);
   const [confirmEmailInput, setConfirmEmailInput] = useState("");
@@ -642,4876 +220,1683 @@ export const AdminPanel = () => {
     cargarRecorridos();
     (async () => {
       try {
-        const [solRes, edRes, devRes] = await Promise.all([
-          authFetch("/api/solicitudes", { headers: authHeaders() }),
-          authFetch("/api/solicitudes-edicion", { headers: authHeaders() }),
-          authFetch("/api/suscripciones/devoluciones", { headers: authHeaders() }),
-        ]);
-        if (solRes.ok) { const data = await solRes.json(); setPendingSolicitudes(data.length); }
-        if (edRes.ok) { const data = await edRes.json(); setPendingEdiciones(data.length); }
-        if (devRes.ok) { const data = await devRes.json(); setPendingDevoluciones(data.length); }
+        const res = await authFetch("/api/solicitudes-edicion/count", { headers: authHeaders() });
+        if (res.ok) { const data = await res.json(); setPendingEdiciones(data.count || 0); }
       } catch {}
     })();
-  }, [socketRefresh]);
+    (async () => {
+      try {
+        const res = await authFetch("/api/suscripciones/devoluciones/count", { headers: authHeaders() });
+        if (res.ok) { const data = await res.json(); setPendingDevoluciones(data.count || 0); }
+      } catch {}
+    })();
+    cargarSolicitudes();
+  }, []);
 
   useEffect(() => {
-    if (view === "solicitudes") cargarSolicitudes();
-  }, [view]);
-
-  const allEntitiesForConexiones = useMemo(
-    () => allEntities.filter((e) => e.id !== editingEntityId),
-    [allEntities, editingEntityId],
-  );
-
-  // --- MULTIMEDIA ---
-  const handleMultimediaChange = (index, field, value) => {
-    if (index === 0 && field === "tipo_recurso") return;
-    const updated = [...multimediaItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setMultimediaItems(updated);
-  };
-
-  const addMultimediaItem = () => {
-    setMultimediaItems([
-      ...multimediaItems,
-      {
-        url_recurso: "",
-        titulo_alternativo: "",
-        descripcion_recurso: "",
-        tipo_recurso: "foto",
-        es_principal: false,
-        thumbnail_url: "",
-        public_id: "",
-        entidades_etiquetadas: [],
-      },
-    ]);
-  };
-
-  const removeMultimediaItem = (index) => {
-    if (multimediaItems.length <= 1 || multimediaItems[index].es_principal)
-      return;
-    setMultimediaItems(multimediaItems.filter((_, i) => i !== index));
-  };
-
-  const handleFileSelect = async (index, file, thumbnailFile = null) => {
-    const item = multimediaItems[index];
-    const tipo = item.tipo_recurso;
-
-    const resultado = await validarArchivo(tipo, file);
-    if (!resultado.valido) {
-      setMultimediaError(resultado.error);
-      return;
+    if (socketRefresh > 0) {
+      cargarEntidades();
+      cargarRecorridos();
+      cargarLocalidades();
     }
+  }, [socketRefresh]);
 
-    setMultimediaError("");
-    setUploadingIndex(index);
-
-    try {
-      const data = await subirArchivo(file, tipo, thumbnailFile);
-      const updated = [...multimediaItems];
-      updated[index] = {
-        ...updated[index],
-        url_recurso: data.url,
-        public_id: data.public_id || "",
-        thumbnail_url: data.thumbnail_url || updated[index].thumbnail_url || "",
-      };
-      setMultimediaItems(updated);
-    } catch (err) {
-      setMultimediaError("Error al subir archivo: " + err.message);
-    } finally {
-      setUploadingIndex(null);
+  const entidadesFiltradas = useMemo(() => {
+    let items = [...allEntities];
+    if (entidadSearch) {
+      const q = entidadSearch.toLowerCase();
+      items = items.filter((e) => e.nombre.toLowerCase().includes(q) || e.tipo?.includes(q) || e.localidad_nombre?.toLowerCase().includes(q));
     }
-  };
-
-  const handleThumbnailUpload = async (index, file) => {
-    setUploadingIndex(index);
-    try {
-      const url = await subirImagen(file);
-      const updated = [...multimediaItems];
-      updated[index] = { ...updated[index], thumbnail_url: url };
-      setMultimediaItems(updated);
-    } catch (err) {
-      setMultimediaError("Error al subir imagen de portada: " + err.message);
-    } finally {
-      setUploadingIndex(null);
+    if (entidadFilterPerfil) {
+      items = items.filter((e) => {
+        const email = (e.perfil_email || "").toLowerCase();
+        const nombre = (e.perfil_nombre || "").toLowerCase();
+        return email.includes(entidadFilterPerfil.toLowerCase()) || nombre.includes(entidadFilterPerfil.toLowerCase());
+      });
     }
-  };
+    return items;
+  }, [allEntities, entidadSearch, entidadFilterPerfil]);
 
-  const handleFotoPerfil = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
+  const tipoCounts = useMemo(() => {
+    const counts = {};
+    allEntities.forEach((e) => { counts[e.tipo] = (counts[e.tipo] || 0) + 1; });
+    return counts;
+  }, [allEntities]);
 
-    const formato = validarFormato("foto", file);
-    if (!formato.valido) {
-      setMultimediaError(formato.error);
-      return;
-    }
-
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = async () => {
-      URL.revokeObjectURL(url);
-      if (img.width < 500 || img.height < 500) {
-        setMultimediaError(`Resolución muy baja: ${img.width}×${img.height}. Mínimo: 500×500 px.`);
-        return;
-      }
-      try {
-        const fotoUrl = await subirImagen(file);
-        onFieldChange("foto_perfil_url", fotoUrl);
-      } catch (err) {
-        setMultimediaError("Error al subir foto: " + err.message);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      setMultimediaError("No se pudo leer la imagen.");
-    };
-    img.src = url;
-  };
+  const tipos = Object.keys(tipoCounts);
+  const totalEntidades = allEntities.length;
 
   // --- MAPA ---
   useEffect(() => {
-    if (
-      !mapContainer.current ||
-      view !== "nuevo-editar" ||
-      step !== 1 ||
-      map.current
-    )
-      return;
-
-    const m = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v10",
-      center: [general.longitud, general.latitud],
-      zoom: 8,
-      attributionControl: false,
-    });
-    const mk = new mapboxgl.Marker({ draggable: true, color: "#863819" })
+    if (step === 1 || !mapContainer.current) return;
+    if (!map.current) {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [general.longitud, general.latitud],
+        zoom: 12,
+      });
+      map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    }
+    if (marker.current) marker.current.remove();
+    marker.current = new mapboxgl.Marker({ color: "#863819", draggable: true })
       .setLngLat([general.longitud, general.latitud])
-      .addTo(m);
-    mk.on("dragend", () => {
-      const ll = mk.getLngLat();
-      setGeneral((g) => ({ ...g, latitud: ll.lat, longitud: ll.lng }));
+      .addTo(map.current);
+    marker.current.on("dragend", () => {
+      const lngLat = marker.current.getLngLat();
+      setGeneral((prev) => ({ ...prev, latitud: lngLat.lat, longitud: lngLat.lng }));
     });
-    m.on("click", (e) => {
-      mk.setLngLat(e.lngLat);
-      setGeneral((g) => ({
-        ...g,
-        latitud: e.lngLat.lat,
-        longitud: e.lngLat.lng,
-      }));
-    });
-    map.current = m;
-    marker.current = mk;
     return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-        marker.current = null;
-      }
+      if (marker.current) { marker.current.remove(); marker.current = null; }
     };
-  }, [view, step]);
+  }, [step]);
 
-  // --- SLUG ---
   useEffect(() => {
-    const base = general.nombre
-      .toLowerCase()
-      .trim()
-      .replace(/[\s\W\s]+/g, "-");
-    setGeneral((g) => ({ ...g, slug: base ? `${base}-${general.tipo}` : "" }));
-  }, [general.nombre, general.tipo]);
+    if (marker.current && step > 1) {
+      marker.current.setLngLat([general.longitud, general.latitud]);
+    }
+  }, [general.latitud, general.longitud, step]);
 
-  // --- RECORRIDO SLUG ---
+  // --- BÚSQUEDA GEOGRÁFICA ---
   useEffect(() => {
-    if (editingRecorridoId === "new" || !editingRecorridoId) {
-      const base = recForm.nombre
-        .toLowerCase()
-        .trim()
-        .replace(/[\s\W\s]+/g, "-");
-      setRecForm((f) => ({ ...f, slug: base || "" }));
-    }
-  }, [recForm.nombre]);
+    if (!geoQuery.trim()) { setGeoResults([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json?country=AR&limit=6&types=place,locality,region&access_token=${mapboxgl.accessToken}`,
+        );
+        if (res.ok) { const data = await res.json(); setGeoResults(data.features || []); }
+      } catch {}
+    }, 300);
+    return () => clearTimeout(t);
+  }, [geoQuery]);
 
-  // --- RESET ---
-  const resetWizard = () => {
-    setStep(1);
-    setEditingEntityId(null);
-    setGeneral({
-      tipo: "",
-      nombre: "",
-      slug: "",
-      resumen: "",
-      localidad_id: "",
-      direccion_escrita: "",
-      latitud: -27.4511,
-      longitud: -58.9861,
-      visible: true,
-      icono: "",
-    });
-    setEspecifico({});
-    setMultimediaItems([
-      {
-        url_recurso: "",
-        titulo_alternativo: "",
-        descripcion_recurso: "",
-        tipo_recurso: "foto",
-        es_principal: true,
-        public_id: "",
-        entidades_etiquetadas: [],
-      },
-    ]);
-    setConexiones([]);
-    setGeoQuery("");
-    setGeoResults([]);
-    if (map.current) {
-      map.current.remove();
-      map.current = null;
-      marker.current = null;
-    }
-  };
-
-  // --- LOCALIDAD ---
-  const handleLocalidadChange = (e) => {
-    const id = parseInt(e.target.value);
-    const loc = localidades.find((l) => l.id === id);
-    setGeneral((g) => ({
-      ...g,
-      localidad_id: id,
-      latitud: loc?.latitud || g.latitud,
-      longitud: loc?.longitud || g.longitud,
+  const seleccionarGeo = (feature) => {
+    const [lng, lat] = feature.center;
+    const nombreLocalidad = feature.text;
+    const match = localidades.find(
+      (l) => l.nombre.toLowerCase() === nombreLocalidad.toLowerCase(),
+    );
+    setGeneral((prev) => ({
+      ...prev,
+      latitud: lat,
+      longitud: lng,
+      localidad_id: match ? match.id : prev.localidad_id,
+      direccion_escrita: feature.place_name,
     }));
-    if (loc?.latitud && loc?.longitud && map.current) {
-      map.current.flyTo({ center: [loc.longitud, loc.latitud], zoom: 10, speed: 1.2 });
-      marker.current?.setLngLat([loc.longitud, loc.latitud]);
+    setGeoQuery(feature.place_name);
+    setGeoResults([]);
+  };
+
+  const onFieldChange = (field, value) => {
+    if (field === "nombre" && !editingEntityId) {
+      const newSlug = value
+        .toLowerCase()
+        .replace(/[^a-z0-9áéíóúüñ\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+      setGeneral((prev) => ({ ...prev, nombre: value, slug: newSlug }));
+    } else {
+      setGeneral((prev) => ({ ...prev, [field]: value }));
     }
   };
 
-  // --- GUARDAR ---
+  const onSpecChange = (field, value) => {
+    setEspecifico((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // --- CARGAR ENTIDAD PARA EDITAR ---
+  const cargarEntidadParaEditar = async (id) => {
+    try {
+      const res = await authFetch(`/api/entidades/${id}`);
+      if (!res.ok) return;
+      const ent = await res.json();
+      setEditingEntityId(ent.id);
+      setStep(1);
+      setGeneral({
+        tipo: ent.tipo || "",
+        nombre: ent.nombre || "",
+        slug: ent.slug || "",
+        resumen: ent.resumen || "",
+        localidad_id: ent.localidad_id || "",
+        latitud: ent.latitud || -27.4511,
+        longitud: ent.longitud || -58.9861,
+        visible: ent.visible ?? true,
+        direccion_escrita: ent.direccion_escrita || "",
+      });
+      const spec = {};
+      const typeDefs = TIPO_DETALLES[ent.tipo];
+      if (typeDefs) typeDefs.forEach((def) => { spec[def.field] = ent[def.field] ?? ""; });
+      setEspecifico(spec);
+
+      // Multimedia existente
+      const multRes = await authFetch(`/api/entidades/${id}/multimedia`);
+      if (multRes.ok) {
+        const multimedia = await multRes.json();
+        setMultimediaItems(
+          multimedia.length > 0
+            ? multimedia.map((m) => ({
+                id: m.id,
+                url_recurso: m.url_recurso,
+                titulo_alternativo: m.titulo_alternativo || "",
+                descripcion_recurso: m.descripcion_recurso || "",
+                tipo_recurso: m.tipo_recurso || "foto",
+                es_principal: m.es_principal || false,
+                public_id: m.public_id || "",
+                entidades_etiquetadas: m.entidades_etiquetadas || [],
+              }))
+            : [{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }],
+        );
+      }
+      // Conexiones
+      const conexRes = await authFetch(`/api/entidades/${id}/conexiones`);
+      if (conexRes.ok) setConexiones(await conexRes.json());
+
+      setView("nuevo-editar");
+      window.scrollTo(0, 0);
+    } catch {}
+  };
+
+  // --- TIPOS DE ENTIDAD ---
+  const TIPO_OPTIONS = [
+    { value: "", label: "Seleccionar tipo..." },
+    { value: "artesano", label: "Artesano" },
+    { value: "gastronomia", label: "Gastronomía" },
+    { value: "comercio", label: "Comercio" },
+    { value: "evento", label: "Evento" },
+    { value: "patrimonio", label: "Patrimonio" },
+    { value: "personalidad", label: "Personalidad" },
+    { value: "comunidad_indigena", label: "Comunidad indígena" },
+    { value: "lugar_natural", label: "Lugar natural" },
+    { value: "hospedaje", label: "Hospedaje" },
+    { value: "productor", label: "Productor" },
+    { value: "experiencia", label: "Experiencia" },
+    { value: "relato", label: "Relato" },
+    { value: "espacio_cultural", label: "Espacio cultural" },
+  ];
+
+  const TIPO_DETALLES = {
+    artesano: [
+      { field: "biografia_larga", label: "Biografía", type: "textarea" },
+      { field: "tecnica_principal", label: "Técnica principal" },
+      { field: "materiales_usados", label: "Materiales" },
+      { field: "anios_experiencia", label: "Años de experiencia", type: "number" },
+      { field: "taller_abierto", label: "Taller abierto al público", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
+      { field: "fotos_galeria_url", label: "URLs de fotos (separadas por comas)" },
+      { field: "comunidad_etnica", label: "Comunidad étnica", type: "select", dynamic: true },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    gastronomia: [
+      { field: "historia_plato", label: "Historia del plato", type: "textarea" },
+      { field: "ingredientes_clave", label: "Ingredientes clave" },
+      { field: "receta_destacada", label: "Receta destacada", type: "textarea" },
+      { field: "establecimientos_donde_probar", label: "Establecimientos", type: "gastronomia" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    comercio: [
+      { field: "razon_social", label: "Razón social" },
+      { field: "cuit", label: "CUIT" },
+      { field: "email", label: "Email" },
+      { field: "rubro_especifico", label: "Rubro específico" },
+      { field: "horario_apertura", label: "Horario apertura" },
+      { field: "horario_cierre", label: "Horario cierre" },
+      { field: "dias_abierto", label: "Días abierto" },
+      { field: "acepta_tarjetas", label: "Acepta tarjetas", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
+      { field: "sitio_web", label: "Sitio web" },
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    evento: [
+      { field: "razon_social", label: "Razón social" },
+      { field: "cuit", label: "CUIT" },
+      { field: "fecha_evento", label: "Fecha del evento", type: "date" },
+      { field: "duracion_dias", label: "Duración (días)", type: "number" },
+      { field: "actividades_principales", label: "Actividades principales", type: "textarea" },
+      { field: "es_itinerante", label: "Evento itinerante", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
+      { field: "link_entradas", label: "Link a compra de entradas" },
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    patrimonio: [
+      { field: "año_referencia", label: "Año de referencia" },
+      { field: "estilo_arquitectonico", label: "Estilo arquitectónico" },
+      { field: "declaratoria_oficial", label: "Declaratoria oficial" },
+      { field: "estado_conservacion", label: "Estado de conservación" },
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    personalidad: [
+      { field: "nombre_completo", label: "Nombre completo" },
+      { field: "apodo", label: "Apodo / conocido como" },
+      { field: "biografia_resumida", label: "Biografía", type: "textarea" },
+      { field: "profesion", label: "Profesión" },
+      { field: "fecha_nacimiento", label: "Fecha de nacimiento", type: "date" },
+      { field: "biografia_larga", label: "Biografía detallada", type: "textarea" },
+      { field: "es_referente_comunidad", label: "Referente comunitario", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
+      { field: "comunidad_etnica", label: "Comunidad étnica", type: "select", dynamic: true },
+      { field: "contacto", label: "Contacto" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    comunidad_indigena: [
+      { field: "biografia_larga", label: "Historia / Descripción", type: "textarea" },
+      { field: "etnia", label: "Etnia", type: "select", dynamic: true },
+      { field: "lenguas", label: "Lenguas" },
+      { field: "territorio_tradicional", label: "Territorio tradicional", type: "textarea" },
+      { field: "cosmovision", label: "Cosmovisión", type: "textarea" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    lugar_natural: [
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "categoria_natural", label: "Categoría" },
+      { field: "actividades", label: "Actividades", type: "textarea" },
+      { field: "acceso", label: "Acceso", type: "textarea" },
+      { field: "flora_fauna_destacada", label: "Flora y fauna destacada", type: "textarea" },
+      { field: "mejor_epoca", label: "Mejor época para visitar" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    hospedaje: [
+      { field: "razon_social", label: "Razón social" },
+      { field: "cuit", label: "CUIT" },
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "categoria_hospedaje", label: "Categoría" },
+      { field: "servicios", label: "Servicios", type: "servicios" },
+      { field: "capacidad", label: "Capacidad" },
+      { field: "sitio_web", label: "Sitio web" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    productor: [
+      { field: "razon_social", label: "Razón social" },
+      { field: "cuit", label: "CUIT" },
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "tipo_producto", label: "Tipo de producto", type: "productos" },
+      { field: "metodos_produccion", label: "Métodos de producción", type: "textarea" },
+      { field: "certificaciones", label: "Certificaciones" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+      { field: "sitio_web", label: "Sitio web" },
+    ],
+    experiencia: [
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "tipo_experiencia", label: "Tipo de experiencia", type: "experiencias" },
+      { field: "duracion_experiencia", label: "Duración" },
+      { field: "que_incluye", label: "Qué incluye", type: "incluye" },
+      { field: "precio_referencia", label: "Precio de referencia" },
+      { field: "contacto_reserva", label: "Contacto / Reserva" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+      { field: "operador", label: "Operador / Guía" },
+    ],
+    relato: [
+      { field: "autor", label: "Autor del relato" },
+      { field: "fecha_relato", label: "Fecha del relato", type: "date" },
+      { field: "tipo_relato", label: "Tipo de relato", type: "select", options: TIPOS_RELATO.map((v) => ({ value: v, label: v })) },
+      { field: "contenido_completo", label: "Contenido completo", type: "textarea" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+    espacio_cultural: [
+      { field: "biografia_larga", label: "Descripción", type: "textarea" },
+      { field: "tipo_espacio", label: "Tipo de espacio" },
+      { field: "horarios", label: "Horarios" },
+      { field: "sitio_web", label: "Sitio web" },
+      { field: "redes_sociales", label: "Redes sociales", type: "social" },
+    ],
+  };
+
+  // Helper para renderizar el detalle específico según tipo y field
+  const renderSpecField = (fieldDef) => {
+    if (fieldDef.type === "social") {
+      return (
+        <SocialMediaManager
+          key={fieldDef.field}
+          value={especifico[fieldDef.field]}
+          onChange={(v) => onSpecChange(fieldDef.field, v)}
+          label={fieldDef.label}
+        />
+      );
+    }
+    if (fieldDef.type === "gastronomia") {
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {fieldDef.label}
+          </label>
+          <GastronomiaSelector
+            value={especifico[fieldDef.field]}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            allEntities={allEntities}
+          />
+        </div>
+      );
+    }
+    if (fieldDef.type === "servicios") {
+      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {fieldDef.label}
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {SERVICIOS_SUGERIDOS.map((sv) => {
+              const active = selected.includes(sv);
+              return (
+                <span
+                  key={sv}
+                  onClick={() => {
+                    const next = active ? selected.filter((s) => s !== sv) : [...selected, sv];
+                    onSpecChange(fieldDef.field, next.join(", "));
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: active ? "#863819" : "#f5f2eb",
+                    color: active ? "white" : "#555",
+                    fontWeight: active ? 600 : 400,
+                    border: active ? "none" : "1px solid #eee",
+                    transition: "0.15s",
+                  }}
+                >
+                  {sv}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    if (fieldDef.type === "productos") {
+      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {fieldDef.label}
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TIPOS_PRODUCTO.map((tp) => {
+              const active = selected.includes(tp);
+              return (
+                <span
+                  key={tp}
+                  onClick={() => {
+                    const next = active ? selected.filter((s) => s !== tp) : [...selected, tp];
+                    onSpecChange(fieldDef.field, next.join(", "));
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: active ? "#863819" : "#f5f2eb",
+                    color: active ? "white" : "#555",
+                    fontWeight: active ? 600 : 400,
+                    border: active ? "none" : "1px solid #eee",
+                    transition: "0.15s",
+                  }}
+                >
+                  {tp}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    if (fieldDef.type === "experiencias") {
+      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {fieldDef.label}
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TIPOS_EXPERIENCIA.map((tx) => {
+              const active = selected.includes(tx);
+              return (
+                <span
+                  key={tx}
+                  onClick={() => {
+                    const next = active ? selected.filter((s) => s !== tx) : [...selected, tx];
+                    onSpecChange(fieldDef.field, next.join(", "));
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: active ? "#863819" : "#f5f2eb",
+                    color: active ? "white" : "#555",
+                    fontWeight: active ? 600 : 400,
+                    border: active ? "none" : "1px solid #eee",
+                    transition: "0.15s",
+                  }}
+                >
+                  {tx}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    if (fieldDef.type === "incluye") {
+      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {fieldDef.label}
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {QUE_INCLUYE_EXPERIENCIA.map((incl) => {
+              const active = selected.includes(incl);
+              return (
+                <span
+                  key={incl}
+                  onClick={() => {
+                    const next = active ? selected.filter((s) => s !== incl) : [...selected, incl];
+                    onSpecChange(fieldDef.field, next.join(", "));
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: active ? "#863819" : "#f5f2eb",
+                    color: active ? "white" : "#555",
+                    fontWeight: active ? 600 : 400,
+                    border: active ? "none" : "1px solid #eee",
+                    transition: "0.15s",
+                  }}
+                >
+                  {incl}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    if (fieldDef.dynamic) {
+      return (
+        <DetailField
+          key={fieldDef.field}
+          field={fieldDef.field}
+          fieldVal={especifico[fieldDef.field]}
+          onFieldChange={onSpecChange}
+          label={fieldDef.label}
+          type="select"
+          options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))}
+        />
+      );
+    }
+    return (
+      <DetailField
+        key={fieldDef.field}
+        field={fieldDef.field}
+        fieldVal={especifico[fieldDef.field]}
+        onFieldChange={onSpecChange}
+        label={fieldDef.label}
+        type={fieldDef.type || "text"}
+        options={fieldDef.options}
+      />
+    );
+  };
+
+  // --- RENDER INPUTS DE TIPO ESPECÍFICO ---
+  const renderSpecInputs = () => {
+    const defs = TIPO_DETALLES[general.tipo];
+    if (!defs) return null;
+    return <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee", marginTop: 16 }}>
+      <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Detalles específicos</h3>
+      {defs.map(renderSpecField)}
+    </div>;
+  };
+
+  // --- CREAR / ACTUALIZAR ENTIDAD ---
   const guardarEntidad = async () => {
-    setMultimediaError("");
-    if (!multimediaItems[0]?.url_recurso) {
-      showPopup("Agregá una foto principal para el encabezado", "warning");
-      setStep(3);
+    if (!general.tipo || !general.nombre.trim()) {
+      showPopup("Completá tipo y nombre", "error");
       return;
     }
-
-    for (const item of multimediaItems) {
-      const hasUrl = item.url_recurso && item.url_recurso.trim();
-      const hasTitle = item.titulo_alternativo && item.titulo_alternativo.trim();
-      if (hasUrl && !hasTitle) {
-        showPopup("Completá el título del recurso multimedia", "warning");
-        setStep(3);
-        return;
-      }
-    }
-
     setLoading(true);
-    let createdEntityId = null;
     try {
-      const payload = { ...general, imagen: multimediaItems[0].url_recurso };
-      if (editingEntityId) {
-        const r1 = await authFetch(
-          `/api/entidades/${editingEntityId}`,
-          {
-            method: "PUT",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify(payload),
-          },
-        );
-        if (!r1.ok) {
-          const errBody = await r1.json().catch(() => ({}));
-          if (r1.status === 401) throw new Error("Sesión expirada. Iniciá sesión de nuevo.");
-          throw new Error(errBody.error || "Error al actualizar datos base");
-        }
-        const r2 = await authFetch(
-          `/api/entidades/${editingEntityId}/detalles`,
-          {
-            method: "PUT",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ tipo: general.tipo, ...especifico, direccion_escrita: general.direccion_escrita || "" }),
-          },
-        );
-        if (!r2.ok) {
-          const errBody2 = await r2.json().catch(() => ({}));
-          throw new Error(errBody2.error || "Error al actualizar detalles");
-        }
-        const multimediaExistentes = await authFetch(
-          `/api/entidades/${editingEntityId}/multimedia`,
-        );
-        const datosMulti = await multimediaExistentes.json();
-        if (multimediaExistentes.ok) {
-          for (const m of datosMulti) {
-            await authFetch(`/api/multimedia/${m.id}`, {
-              method: "DELETE",
-              headers: authHeaders(),
-            });
-          }
-        }
-        for (const item of multimediaItems) {
-          if (!item.url_recurso) continue;
-          const { entidades_etiquetadas, ...itemData } = item;
-          const resM = await authFetch(`/api/multimedia`, {
-            method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({
-              entidad_id: editingEntityId,
-              ...itemData,
-              descripcion_recurso: item.descripcion_recurso || "",
-            }),
-          });
-          if (entidades_etiquetadas?.length > 0) {
-            const mData = await resM.json();
-            const multimediaId = mData.id;
-            if (multimediaId) {
-              await authFetch(
-                `/api/multimedia/${multimediaId}/etiquetas`,
-                {
-                  method: "PUT",
-                  headers: authHeaders({ "Content-Type": "application/json" }),
-                  body: JSON.stringify(
-                    entidades_etiquetadas.map((e) => ({
-                      entidad_id: e.entidad_id,
-                      timestamp_inicio: e.timestamp_inicio || null,
-                      timestamp_fin: e.timestamp_fin || null,
-                    })),
-                  ),
-                },
-              );
+      const body = {
+        ...general,
+        ...especifico,
+        fecha_inicio_suscripcion: general.fecha_inicio_suscripcion || null,
+        fecha_fin_suscripcion: general.fecha_fin_suscripcion || null,
+        latitud: Number(general.latitud),
+        longitud: Number(general.longitud),
+      };
+      if (body.nombre_completo && !body.nombre) body.nombre = body.nombre_completo;
+      if (body.es_referente_comunidad === "true") body.es_referente_comunidad = true;
+      if (body.es_referente_comunidad === "false") body.es_referente_comunidad = false;
+
+      const method = editingEntityId ? "PUT" : "POST";
+      const url = editingEntityId ? `/api/entidades/${editingEntityId}` : "/api/entidades";
+      const res = await authFetch(url, {
+        method,
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        const entityId = saved.id || editingEntityId;
+
+        // Guardar multimedia
+        if (multimediaItems.length > 0 && multimediaItems[0].url_recurso) {
+          for (let i = 0; i < multimediaItems.length; i++) {
+            const m = multimediaItems[i];
+            if (m.id) {
+              // skip existing
+            } else if (m.url_recurso) {
+              await authFetch(`/api/multimedia`, {
+                method: "POST",
+                headers: authHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({
+                  entidad_id: entityId,
+                  url_recurso: m.url_recurso,
+                  titulo_alternativo: m.titulo_alternativo || "Multimedia",
+                  descripcion_recurso: m.descripcion_recurso || "",
+                  tipo_recurso: m.tipo_recurso || "foto",
+                  es_principal: i === 0,
+                  public_id: m.public_id || "",
+                  entidades_etiquetadas: m.entidades_etiquetadas || [],
+                }),
+              });
             }
           }
         }
-        await authFetch(`/api/entidades/${editingEntityId}/conexiones`, {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(conexiones),
-        });
-      } else {
-        const r1 = await authFetch("/api/entidades", {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(payload),
-        });
-        const d1 = await r1.json();
-        if (!r1.ok) throw new Error(d1.error);
-        const id = d1.id;
-        createdEntityId = id;
-        const r2 = await authFetch(
-            `/api/entidades/${id}/detalles`,
-            {
+
+        // Guardar conexiones
+        if (conexTempList.length > 0) {
+          for (const c of conexTempList) {
+            await authFetch(`/api/entidades/${entityId}/conexiones`, {
               method: "POST",
               headers: authHeaders({ "Content-Type": "application/json" }),
-              body: JSON.stringify({ tipo: general.tipo, ...especifico, direccion_escrita: general.direccion_escrita || "" }),
-            },
-          );
-          if (!r2.ok) {
-            const errBody2 = await r2.json().catch(() => ({}));
-            throw new Error(errBody2.error || "Error al guardar detalles");
+              body: JSON.stringify({
+                entidad_destino_id: c.entidad_destino_id,
+                tipo_relacion: c.tipo_relacion,
+                tipo_relacion_inversa: c.tipo_relacion_inversa,
+              }),
+            });
           }
-        for (const item of multimediaItems) {
-          if (!item.url_recurso) continue;
-          const { entidades_etiquetadas, ...itemData } = item;
-          const resM = await authFetch(`/api/multimedia`, {
-            method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({
-              entidad_id: id,
-              ...itemData,
-              descripcion_recurso: item.descripcion_recurso || "",
-            }),
-          });
-          if (entidades_etiquetadas?.length > 0) {
-            const mData = await resM.json();
-            const multimediaId = mData.id;
-            if (multimediaId) {
-              await authFetch(
-                `/api/multimedia/${multimediaId}/etiquetas`,
-                {
-                  method: "PUT",
-                  headers: authHeaders({ "Content-Type": "application/json" }),
-                  body: JSON.stringify(
-                    entidades_etiquetadas.map((e) => ({
-                      entidad_id: e.entidad_id,
-                      timestamp_inicio: e.timestamp_inicio || null,
-                      timestamp_fin: e.timestamp_fin || null,
-                    })),
-                  ),
-                },
-              );
-            }
-          }
+          setConexTempList([]);
         }
-        await authFetch(`/api/entidades/${id}/conexiones`, {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(conexiones),
-        });
+
+        showPopup(editingEntityId ? "Entidad actualizada" : "Entidad creada");
+        setView("entidades");
+        setEditingEntityId(null);
+        setStep(1);
+        setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "" });
+        setEspecifico({});
+        setMultimediaItems([{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }]);
+        setConexiones([]);
+        cargarEntidades();
+        cargarSolicitudes();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showPopup(err.error || "Error al guardar", "error");
       }
-      showPopup(editingEntityId ? "Entidad actualizada" : "Entidad creada");
-      resetWizard();
-      cargarEntidades();
-      setView("entidades");
     } catch (err) {
-      if (createdEntityId) {
-        await authFetch(`/api/entidades/${createdEntityId}`, {
-          method: "DELETE",
-          headers: authHeaders(),
-        }).catch(() => {});
-      }
-      showPopup("Error: " + err.message, "error");
+      showPopup("Error al guardar entidad", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- CARGAR PARA EDITAR ---
-  const cargarEntidadParaEditar = async (id) => {
-    try {
-      const res = await authFetch(`/api/entidades/${id}`);
-      if (!res.ok) throw new Error("No se pudo cargar");
-      const data = await res.json();
-      setEditingEntityId(data.id);
-      setGeneral({
-        tipo: data.tipo,
-        nombre: data.nombre,
-        slug: data.slug,
-        resumen: data.resumen || "",
-        localidad_id: data.localidad_id || "",
-        latitud: data.latitud || -27.4511,
-        longitud: data.longitud || -58.9861,
-        visible: data.visible !== false,
-        direccion_escrita: data.direccion_escrita || "",
-        icono: data.icono || "",
-      });
-      setGeoQuery(data.direccion_escrita || "");
-      const fieldsMap = {
-        artesano: [
-          "email", "biografia_larga", "tecnica_principal",
-          "materiales_usados", "anios_experiencia", "taller_abierto",
-          "fotos_galeria_url", "comunidad_etnica", "redes_sociales",
-        ],
-        gastronomia: [
-          "email", "historia_plato", "ingredientes_clave",
-          "receta_destacada", "establecimientos_donde_probar",
-        ],
-        comercio: [
-          "email", "razon_social", "cuit", "rubro_especifico",
-          "sitio_web",
-          "horario_apertura", "horario_cierre",
-          "dias_abierto", "redes_sociales",
-          "acepta_tarjetas", "fecha_inicio_suscripcion",
-          "fecha_fin_suscripcion", "estado_pago",
-        ],
-        personalidad: [
-          "email", "nombre_completo", "apodo", "biografia_resumida",
-          "profesion", "fecha_nacimiento", "foto_perfil_url",
-          "es_referente_comunidad", "comunidad_etnica",
-          "contacto", "redes_sociales",
-        ],
-        patrimonio: [
-          "email", "año_referencia", "estilo_arquitectonico",
-          "declaratoria_oficial", "estado_conservacion",
-        ],
-        evento: [
-          "email", "razon_social", "cuit", "fecha_evento", "duracion_dias",
-          "actividades_principales", "es_itinerante",
-          "link_entradas", "fecha_inicio_suscripcion",
-          "fecha_fin_suscripcion", "estado_pago",
-        ],
-        comunidad_indigena: [
-          "email", "biografia_larga", "etnia", "lenguas",
-          "territorio_tradicional", "cosmovision", "redes_sociales",
-        ],
-        lugar_natural: [
-          "email", "biografia_larga", "categoria_natural",
-          "actividades", "acceso",
-          "flora_fauna_destacada", "mejor_epoca",
-        ],
-        hospedaje: [
-          "email", "razon_social", "cuit", "biografia_larga", "categoria_hospedaje",
-          "servicios", "capacidad", "sitio_web",
-          "redes_sociales", "fecha_inicio_suscripcion",
-          "fecha_fin_suscripcion", "estado_pago",
-        ],
-        productor: [
-          "email", "razon_social", "cuit", "biografia_larga", "tipo_producto",
-          "metodos_produccion", "certificaciones",
-          "contacto_comercial", "sitio_web",
-          "redes_sociales", "fecha_inicio_suscripcion",
-          "fecha_fin_suscripcion", "estado_pago",
-        ],
-        experiencia: [
-          "email", "biografia_larga", "tipo_experiencia",
-          "duracion_experiencia", "que_incluye",
-          "precio_referencia", "redes_sociales", "operador",
-        ],
-        relato: [
-          "email", "autor", "fecha_relato", "tipo_relato",
-          "contenido_completo",
-        ],
-        espacio_cultural: [
-          "email", "biografia_larga", "tipo_espacio",
-          "horarios", "sitio_web", "redes_sociales",
-        ],
-      };
-      const esp = {};
-      (fieldsMap[data.tipo] || []).forEach((f) => {
-        let val = data[f];
-        if ((f === "fecha_inicio_suscripcion" || f === "fecha_fin_suscripcion" || f === "fecha_evento" || f === "fecha_nacimiento" || f === "fecha_relato") && val) {
-          const d = new Date(val);
-          if (!isNaN(d.getTime())) val = d.toISOString().split("T")[0];
-        }
-        if (val != null) esp[f] = val;
-      });
-      setEspecifico(esp);
-
-      try {
-        const resMulti = await authFetch(
-          `/api/entidades/${id}/multimedia`,
-        );
-        const dataMulti = await resMulti.json();
-        if (resMulti.ok && dataMulti.length > 0) {
-          const tagsMap = {};
-          const ids = dataMulti.map((m) => m.id).filter(Boolean);
-          if (ids.length > 0) {
-            try {
-              const resTags = await authFetch(
-                `/api/multimedia/etiquetas?multimedia_ids=${ids.join(",")}`,
-              );
-              if (resTags.ok) {
-                const dataTags = await resTags.json();
-                for (const mItem of dataMulti) {
-                  if (dataTags[mItem.id]) {
-                    tagsMap[mItem.id] = dataTags[mItem.id];
-                  }
-                }
-              }
-            } catch {}
-          }
-          setMultimediaItems(
-            dataMulti.map((m) => ({
-              url_recurso: m.url_recurso || "",
-              titulo_alternativo: m.titulo_alternativo || "",
-              descripcion_recurso: m.descripcion_recurso || "",
-              tipo_recurso: m.tipo_recurso || "foto",
-              es_principal: m.es_principal,
-              thumbnail_url: m.thumbnail_url || "",
-              public_id: m.public_id || "",
-              entidades_etiquetadas: tagsMap[m.id] || [],
-            })),
-          );
-        } else if (data.imagen) {
-          setMultimediaItems([
-            {
-              url_recurso: data.imagen,
-              titulo_alternativo: "",
-              descripcion_recurso: "",
-              tipo_recurso: "foto",
-              es_principal: true,
-              thumbnail_url: "",
-              public_id: "",
-              entidades_etiquetadas: [],
-            },
-          ]);
-        }
-      } catch {
-        if (data.imagen) {
-          setMultimediaItems([
-            {
-              url_recurso: data.imagen,
-              titulo_alternativo: "",
-              descripcion_recurso: "",
-              tipo_recurso: "foto",
-              es_principal: true,
-              thumbnail_url: "",
-              public_id: "",
-              entidades_etiquetadas: [],
-            },
-          ]);
-        } else {
-          setMultimediaItems([
-            {
-              url_recurso: "",
-              titulo_alternativo: "",
-              descripcion_recurso: "",
-              tipo_recurso: "foto",
-              es_principal: true,
-              thumbnail_url: "",
-              public_id: "",
-              entidades_etiquetadas: [],
-            },
-          ]);
-        }
-      }
-
-      // Cargar conexiones
-      try {
-        const resC = await authFetch(
-          `/api/entidades/${id}/conexiones`,
-        );
-        if (resC.ok) {
-          const dataC = await resC.json();
-          setConexiones(
-            dataC.map((c) => ({
-              entidad_destino_id:
-                c.entidad_origen_id === data.id
-                  ? c.entidad_destino_id
-                  : c.entidad_origen_id,
-              entidad_destino_nombre:
-                c.entidad_origen_id === data.id
-                  ? c.nombre_destino
-                  : c.nombre_origen,
-              tipo_relacion: c.tipo_relacion || "",
-            })),
-          );
-        }
-      } catch {}
-
-      setView("nuevo-editar");
-      setStep(1);
-    } catch (err) {
-      showPopup("Error al cargar: " + err.message, "error");
-    }
-  };
-
-  const buildMailtoUrl = (e) => {
-    const lines = [
-      `Hola ${e.perfil_nombre || e.nombre},`,
-      "",
-      `Recibimos correctamente tu solicitud para obtener el Sello Made in Chaco para ${e.nombre}.`,
-      "",
-      "Queremos contarte que tu solicitud ya está siendo revisada por nuestro equipo. En los próximos días vas a recibir una notificación a través de la plataforma informándote si fue aprobada o rechazada.",
-      "",
-      `Si tu solicitud es aprobada, el siguiente paso es adquirir un plan de suscripción desde tu perfil. Recién entonces tu ${e.tipo} aparecerá en el mapa de Made in Chaco y va a estar visible para toda la comunidad.`,
-      "",
-      "También queremos que sepas que, una vez que adquieras un plan y si en algún momento necesitás reclamar una devolución, podés hacerlo desde tu perfil siguiendo los términos y condiciones establecidos en nuestra política de devolución.",
-      "",
-      "Si tenés cualquier duda, respondé a este correo sin problema.",
-      "",
-      "Saludos,",
-      "Equipo Made in Chaco",
-      "https://madeinchaco.com",
-    ];
-    const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello recibida");
-    const body = encodeURIComponent(lines.join("\n"));
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.email)}&su=${subject}&body=${body}`;
-  };
-
-  // --- ELIMINAR ---
+  // --- ELIMINAR ENTIDAD ---
   const eliminarEntidad = async (id, nombre) => {
-    const confirmed = await showConfirm(
-      `¿Eliminar "${nombre}"? No se puede deshacer.`,
-      "ELIMINAR",
-    );
-    if (!confirmed) return;
+    const ok = await showConfirm(`¿Eliminar "${nombre}"?`, "ELIMINAR");
+    if (!ok) return;
     try {
-      const res = await authFetch(`/api/entidades/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
+      const res = await authFetch(`/api/entidades/${id}`, { method: "DELETE", headers: authHeaders({ "Content-Type": "application/json" }) });
+      if (res.ok) {
+        showPopup("Entidad eliminada");
+        cargarEntidades();
+      }
+    } catch {}
+  };
+
+  const toggleVisibilidad = async (id, visible) => {
+    const ok = await showConfirm(`¿${visible ? "Ocultar" : "Mostrar"} esta entidad?`, "CONFIRMAR");
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/entidades/${id}/visible`, {
+        method: "PATCH",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ visible: !visible }),
       });
-      if (!res.ok) throw new Error("Error al eliminar");
-      showPopup("Entidad eliminada");
-      cargarEntidades();
-    } catch (err) {
-      showPopup("Error: " + err.message, "error");
+      if (res.ok) cargarEntidades();
+    } catch {}
+  };
+
+  // --- SUBIR MULTIMEDIA ---
+  const handleUpload = async (index, file) => {
+    const tipo = multimediaItems[index]?.tipo_recurso || "foto";
+    const error = validarArchivo(file, tipo);
+    if (error) { setMultimediaError(error); return; }
+    setMultimediaError("");
+    setUploadingIndex(index);
+    try {
+      const result = await subirArchivo(file, tipo, "made-in-chaco");
+      setMultimediaItems((prev) => prev.map((item, i) => i === index ? { ...item, url_recurso: result.url, public_id: result.public_id } : item));
+    } catch {
+      setMultimediaError("Error al subir archivo");
+    } finally {
+      setUploadingIndex(null);
     }
   };
 
-  const abrirConexModal = async (entidad) => {
+  // --- CONEXIONES ---
+  const buscarConexiones = async (q) => {
+    if (!q.trim()) { setConexResults([]); return; }
+    try {
+      const res = await authFetch(`/api/entidades?search=${encodeURIComponent(q)}`);
+      if (res.ok) setConexResults(await res.json());
+    } catch {}
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => buscarConexiones(conexSearch), 300);
+    return () => clearTimeout(t);
+  }, [conexSearch]);
+
+  const agregarConexTemp = (entidad) => {
+    if (conexTempList.some((c) => c.entidad_destino_id === entidad.id)) return;
+    setConexTempList((prev) => [...prev, { entidad_destino_id: entidad.id, nombre: entidad.nombre, tipo_relacion: "", tipo_relacion_inversa: "" }]);
     setConexSearch("");
     setConexResults([]);
-    try {
-      const res = await authFetch(
-        `/api/entidades/${entidad.id}/conexiones`,
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setConexTempList(
-          data.map((c) => {
-            const isOrigin = c.entidad_origen_id === entidad.id;
-            return {
-              entidad_destino_id: isOrigin
-                ? c.entidad_destino_id
-                : c.entidad_origen_id,
-              nombre: isOrigin
-                ? c.nombre_destino
-                : c.nombre_origen,
-              tipo_relacion: isOrigin
-                ? (c.tipo_relacion || "")
-                : (c.tipo_relacion_inversa || ""),
-              tipo_relacion_inversa: isOrigin
-                ? (c.tipo_relacion_inversa || "")
-                : (c.tipo_relacion || ""),
-            };
-          }),
-        );
-      } else {
-        setConexTempList([]);
-      }
-    } catch {
-      setConexTempList([]);
-    }
-    setConexModal(entidad);
   };
 
-  const guardarConexModal = async () => {
-    if (!conexModal) return;
-    setConexSaving(true);
-    try {
-      const res = await authFetch(
-        `/api/entidades/${conexModal.id}/conexiones`,
-        {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(conexTempList),
-        },
-      );
-      if (!res.ok) throw new Error("Error al guardar conexiones");
-      showPopup("Conexiones actualizadas");
-      setConexModal(null);
-    } catch (err) {
-      showPopup("Error: " + err.message, "error");
-    } finally {
-      setConexSaving(false);
-    }
+  const quitarConexTemp = (id) => {
+    setConexTempList((prev) => prev.filter((c) => c.entidad_destino_id !== id));
   };
 
   // --- RECORRIDOS ---
+  const buscarPasos = async (q) => {
+    if (!q.trim()) { setPasoResults([]); return; }
+    try {
+      const res = await authFetch(`/api/entidades?search=${encodeURIComponent(q)}`);
+      if (res.ok) setPasoResults(await res.json());
+    } catch {}
+  };
 
-  const resetRecForm = () => {
-    setEditingRecorridoId(null);
-    setRecForm({ nombre: "", slug: "", descripcion: "", imagen: "" });
-    setRecPasos([]);
+  useEffect(() => {
+    const t = setTimeout(() => buscarPasos(pasoSearch), 300);
+    return () => clearTimeout(t);
+  }, [pasoSearch]);
+
+  const agregarPaso = (entidad) => {
+    if (recPasos.some((p) => p.entidad_id === entidad.id)) return;
+    setRecPasos((prev) => [...prev, { entidad_id: entidad.id, nombre: entidad.nombre, descripcion_paso: "", paso_orden: prev.length + 1 }]);
     setPasosearch("");
     setPasoResults([]);
   };
 
-  const cargarRecorridoParaEditar = async (r) => {
-    try {
-      const res = await authFetch(`/api/recorridos/${r.slug}`);
-      if (!res.ok) throw new Error("No se pudo cargar");
-      const data = await res.json();
-      setEditingRecorridoId(data.id);
-      setRecForm({ nombre: data.nombre, slug: data.slug, descripcion: data.descripcion || "", imagen: data.imagen || "" });
-      setRecPasos(
-        (data.pasos || []).map((p, i) => ({
-          entidad_id: p.entidad_id,
-          nombre: p.nombre,
-          tipo: p.tipo,
-          slug: p.slug,
-          descripcion_paso: p.descripcion_paso || "",
-          paso_orden: i + 1,
-        })),
-      );
-    } catch (err) {
-      showPopup("Error: " + err.message, "error");
-    }
+  const reordenarPasos = (index, direction) => {
+    const newPasos = [...recPasos];
+    const target = index + direction;
+    if (target < 0 || target >= newPasos.length) return;
+    [newPasos[index], newPasos[target]] = [newPasos[target], newPasos[index]];
+    newPasos.forEach((p, i) => { p.paso_orden = i + 1; });
+    setRecPasos(newPasos);
   };
 
   const guardarRecorrido = async () => {
-    if (!recForm.nombre.trim()) { showPopup("El nombre es obligatorio", "error"); return; }
+    if (!recForm.nombre.trim()) { showPopup("Falta el nombre del recorrido", "error"); return; }
     setRecSaving(true);
     try {
-      if (editingRecorridoId && editingRecorridoId !== "new") {
-        const r1 = await authFetch(`/api/recorridos/${editingRecorridoId}`, {
+      let imagenUrl = recForm.imagen;
+      if (recImagenRef.current?.files?.[0]) {
+        const uploaded = await subirImagen(recImagenRef.current.files[0]);
+        if (uploaded?.url) imagenUrl = uploaded.url;
+      }
+
+      if (editingRecorridoId) {
+        const res = await authFetch(`/api/recorridos/${editingRecorridoId}`, {
           method: "PUT",
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(recForm),
+          body: JSON.stringify({ ...recForm, imagen: imagenUrl }),
         });
-        if (!r1.ok) throw new Error("Error al actualizar");
-        await authFetch(`/api/recorridos/${editingRecorridoId}/pasos`, {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(recPasos.map((p, i) => ({
-            entidad_id: p.entidad_id,
-            descripcion_paso: p.descripcion_paso || "",
-            paso_orden: i + 1,
-          }))),
-        });
-        showPopup("Recorrido actualizado");
+        if (!res.ok) { showPopup("Error al actualizar", "error"); return; }
       } else {
-        const r1 = await authFetch("/api/recorridos", {
+        const res = await authFetch("/api/recorridos", {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(recForm),
+          body: JSON.stringify({ ...recForm, imagen: imagenUrl }),
         });
-        if (!r1.ok) throw new Error("Error al crear");
-        const data = await r1.json();
-        await authFetch(`/api/recorridos/${data.id}/pasos`, {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(recPasos.map((p, i) => ({
-            entidad_id: p.entidad_id,
-            descripcion_paso: p.descripcion_paso || "",
-            paso_orden: i + 1,
-          }))),
-        });
-        showPopup("Recorrido creado");
+        if (!res.ok) { showPopup("Error al crear", "error"); return; }
       }
-      resetRecForm();
+
+      for (const [i, paso] of recPasos.entries()) {
+        await authFetch("/api/recorridos/paso", {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            recorrido_id: editingRecorridoId || 0,
+            entidad_id: paso.entidad_id,
+            descripcion_paso: paso.descripcion_paso,
+            paso_orden: i + 1,
+          }),
+        });
+      }
+
+      showPopup(editingRecorridoId ? "Recorrido actualizado" : "Recorrido creado");
+      setEditingRecorridoId(null);
+      setRecForm({ nombre: "", slug: "", descripcion: "", imagen: "" });
+      setRecPasos([]);
       cargarRecorridos();
-    } catch (err) {
-      showPopup("Error: " + err.message, "error");
+    } catch {
+      showPopup("Error al guardar recorrido", "error");
     } finally {
       setRecSaving(false);
     }
+  };
+
+  const cargarRecorridoParaEditar = async (id) => {
+    try {
+      const res = await authFetch(`/api/recorridos/${id}`);
+      if (!res.ok) return;
+      const rec = await res.json();
+      setEditingRecorridoId(rec.id);
+      setRecForm({ nombre: rec.nombre, slug: rec.slug, descripcion: rec.descripcion, imagen: rec.imagen });
+      if (rec.pasos) setRecPasos(rec.pasos.map((p, i) => ({ entidad_id: p.entidad_id, nombre: p.entidad_nombre, descripcion_paso: p.descripcion_paso, paso_orden: i + 1 })));
+    } catch {}
   };
 
   const eliminarRecorrido = async (id, nombre) => {
     const ok = await showConfirm(`¿Eliminar el recorrido "${nombre}"?`, "ELIMINAR");
     if (!ok) return;
     try {
-      const res = await authFetch(`/api/recorridos/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
+      const res = await authFetch(`/api/recorridos/${id}`, { method: "DELETE", headers: authHeaders() });
+      if (res.ok) { showPopup("Recorrido eliminado"); cargarRecorridos(); }
+    } catch {}
+  };
+
+  // --- SOLICITUDES SELLO ---
+  const aprobarSolicitud = async (id, nombre, tipo) => {
+    const ok = await showConfirm(
+      `¿Aprobar solicitud de "${nombre}"? Se habilitarán suscripciones para esta entidad.`,
+      "APROBAR"
+    );
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/solicitudes/${id}/aprobar`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ tipo }),
       });
-      if (!res.ok) throw new Error("Error al eliminar");
-      showPopup("Recorrido eliminado");
-      cargarRecorridos();
-    } catch (err) {
-      showPopup("Error: " + err.message, "error");
-    }
-  };
-
-  const handleRecImagen = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-
-    const formato = validarFormato("foto", file);
-    if (!formato.valido) {
-      showPopup(formato.error, "error");
-      return;
-    }
-
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = async () => {
-      URL.revokeObjectURL(url);
-      if (img.width < 1920 || img.height < 1080) {
-        showPopup(`Resolución muy baja: ${img.width}×${img.height}. Mínimo: 1920×1080 px (16:9). Formatos: JPG, PNG, WebP.`, "error");
-        return;
+      if (res.ok) {
+        showPopup(`Solicitud de "${nombre}" aprobada`);
+        setApproveModal(null);
+        cargarSolicitudes();
+        cargarEntidades();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showPopup(d.error || "Error al aprobar", "error");
       }
-      try {
-        const imagenUrl = await subirImagen(file);
-        setRecForm((f) => ({ ...f, imagen: imagenUrl }));
-      } catch (err) {
-        showPopup("Error al subir imagen: " + err.message, "error");
+    } catch {}
+  };
+
+  const rechazarSolicitud = async (id, nombre) => {
+    const ok = await showConfirm(`¿Rechazar solicitud de "${nombre}"?`, "RECHAZAR");
+    if (!ok) return;
+    try {
+      const res = await authFetch(`/api/solicitudes/${id}/rechazar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
+      if (res.ok) {
+        showPopup(`Solicitud de "${nombre}" rechazada`);
+        setSolicitudDetalle(null);
+        cargarSolicitudes();
       }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      showPopup("No se pudo leer la imagen.", "error");
-    };
-    img.src = url;
+    } catch {}
   };
 
-  // --- FORM DETALLE ---
-  const onFieldChange = (field, value) => {
-    setEspecifico((e) => ({ ...e, [field]: value }));
-  };
-
-  const renderFormDetalle = () => {
-    const tipo = general.tipo;
-    if (!tipo) return <p style={{ color: "#999" }}>Seleccioná un tipo primero</p>;
-
-    const fields = {
-      artesano: () => (
-        <>
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Biografía" type="textarea" placeholder="Historia del artesano..." />
-          <DetailField field="tecnica_principal" fieldVal={especifico.tecnica_principal} onFieldChange={onFieldChange} label="Técnica principal" placeholder="Ej: alfarería, telar..." />
-          <DetailField field="materiales_usados" fieldVal={especifico.materiales_usados} onFieldChange={onFieldChange} label="Materiales" placeholder="Ej: barro, lana de oveja..." />
-          <DetailField field="anios_experiencia" fieldVal={especifico.anios_experiencia} onFieldChange={onFieldChange} label="Años de experiencia" type="number" placeholder="Ej: 15" />
-          <DetailField field="taller_abierto" fieldVal={especifico.taller_abierto} onFieldChange={onFieldChange} label="Taller abierto al público" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
-          <DetailField field="fotos_galeria_url" fieldVal={especifico.fotos_galeria_url} onFieldChange={onFieldChange} label="URLs de fotos (separadas por comas)" placeholder="https://..." />
-          <DetailField field="comunidad_etnica" fieldVal={especifico.comunidad_etnica} onFieldChange={onFieldChange} label="Comunidad étnica" type="select" options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))} />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-        </>
-      ),
-      gastronomia: () => (
-        <>
-          <DetailField field="historia_plato" fieldVal={especifico.historia_plato} onFieldChange={onFieldChange} label="Historia del plato" type="textarea" placeholder="Origen e historia..." />
-          <DetailField field="ingredientes_clave" fieldVal={especifico.ingredientes_clave} onFieldChange={onFieldChange} label="Ingredientes clave" placeholder="Ej: maíz, queso de campo..." />
-          <DetailField field="receta_destacada" fieldVal={especifico.receta_destacada} onFieldChange={onFieldChange} label="Receta destacada" type="textarea" placeholder="Preparación..." />
-          <div style={{ marginBottom: "10px" }}>
-            <label
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                color: "#863819",
-                display: "block",
-                marginBottom: "4px",
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-              }}
-            >
-              Dónde probarlo
-            </label>
-            <GastronomiaSelector
-              value={especifico.establecimientos_donde_probar || ""}
-              onChange={(v) => onFieldChange("establecimientos_donde_probar", v)}
-              allEntities={allEntities}
-            />
-          </div>
-        </>
-      ),
-      comercio: () => (
-        <>
-          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
-          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
-          <div style={{ marginBottom: "10px" }}>
-            <label
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                color: "#863819",
-                display: "block",
-                marginBottom: "4px",
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-              }}
-            >
-              Rubro específico
-            </label>
-            <select
-              style={styles.input}
-              value={especifico.rubro_especifico || ""}
-              onChange={(e) => onFieldChange("rubro_especifico", e.target.value)}
-            >
-              <option value="">Seleccionar rubro...</option>
-              <option value="Alfarería y cerámica">Alfarería y cerámica</option>
-              <option value="Alimentos y bebidas artesanales">Alimentos y bebidas artesanales</option>
-              <option value="Artesanías en cuero / Talabartería">Artesanías en cuero / Talabartería</option>
-              <option value="Artesanías en madera">Artesanías en madera</option>
-              <option value="Carnes y embutidos regionales">Carnes y embutidos regionales</option>
-              <option value="Cerveza artesanal">Cerveza artesanal</option>
-              <option value="Cestería y fibras naturales">Cestería y fibras naturales</option>
-              <option value="Comercio minorista">Comercio minorista</option>
-              <option value="Comercio mayorista">Comercio mayorista</option>
-              <option value="Conservas y dulces">Conservas y dulces</option>
-              <option value="Construcción y materiales">Construcción y materiales</option>
-              <option value="Consultoría y asesoría">Consultoría y asesoría</option>
-              <option value="Decoración artesanal">Decoración artesanal</option>
-              <option value="Educación y capacitación">Educación y capacitación</option>
-              <option value="Farmacia y perfumería">Farmacia y perfumería</option>
-              <option value="Ferias y eventos">Ferias y eventos</option>
-              <option value="Ferretería">Ferretería</option>
-              <option value="Gastronomía / Restaurante">Gastronomía / Restaurante</option>
-              <option value="Gastronomía típica regional">Gastronomía típica regional</option>
-              <option value="Herrería artesanal">Herrería artesanal</option>
-              <option value="Hierbas medicinales y aromáticas">Hierbas medicinales y aromáticas</option>
-              <option value="Hilados y tejidos artesanales">Hilados y tejidos artesanales</option>
-              <option value="Indumentaria textil">Indumentaria textil</option>
-              <option value="Indumentaria deportiva">Indumentaria deportiva</option>
-              <option value="Informática y tecnología">Informática y tecnología</option>
-              <option value="Instrumentos musicales">Instrumentos musicales</option>
-              <option value="Joyería y bijouterie artesanal">Joyería y bijouterie artesanal</option>
-              <option value="Juguetería y librería">Juguetería y librería</option>
-              <option value="Kiosco y almacén">Kiosco y almacén</option>
-              <option value="Lácteos artesanales">Lácteos artesanales</option>
-              <option value="Limpieza e higiene">Limpieza e higiene</option>
-              <option value="Mascotas y veterinaria">Mascotas y veterinaria</option>
-              <option value="Miel y derivados">Miel y derivados</option>
-              <option value="Muebles artesanales">Muebles artesanales</option>
-              <option value="Mueblería y decoración">Mueblería y decoración</option>
-              <option value="Orfebrería y platería">Orfebrería y platería</option>
-              <option value="Panadería y pastelería">Panadería y pastelería</option>
-              <option value="Panificación y pastelería artesanal">Panificación y pastelería artesanal</option>
-              <option value="Papelería e imprenta">Papelería e imprenta</option>
-              <option value="Pelquería y barbería">Peluquería y barbería</option>
-              <option value="Plantas y vivero">Plantas y vivero</option>
-              <option value="Productos regionales">Productos regionales</option>
-              <option value="Quesos artesanales">Quesos artesanales</option>
-              <option value="Reciclado y reutilización">Reciclado y reutilización</option>
-              <option value="Repostería artesanal">Repostería artesanal</option>
-              <option value="Salud y bienestar">Salud y bienestar</option>
-              <option value="Servicios culturales">Servicios culturales</option>
-              <option value="Servicios turísticos">Servicios turísticos</option>
-              <option value="Supermercado y autoservicio">Supermercado y autoservicio</option>
-              <option value="Textiles y bordados tradicionales">Textiles y bordados tradicionales</option>
-              <option value="Transporte y logística">Transporte y logística</option>
-              <option value="Velas y jabones artesanales">Velas y jabones artesanales</option>
-              <option value="Venta de combustibles">Venta de combustibles</option>
-              <option value="Vidriería y cristalería">Vidriería y cristalería</option>
-              <option value="Otros">Otros</option>
-            </select>
-          </div>
-          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
-          <div style={{ marginBottom: "10px" }}>
-            <label
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                color: "#863819",
-                display: "block",
-                marginBottom: "4px",
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-              }}
-            >
-              Días abierto
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].map((dia) => {
-                const dias = (especifico.dias_abierto || "").split(",").filter(Boolean);
-                const checked = dias.includes(dia);
-                return (
-                  <label
-                    key={dia}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      background: checked ? "#863819" : "#f6f3ec",
-                      color: checked ? "#fff" : "#555",
-                      border: checked ? "1px solid #863819" : "1px solid #ddd",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      style={{ display: "none" }}
-                      checked={checked}
-                      onChange={() => {
-                        const nuevos = checked
-                          ? dias.filter((d) => d !== dia)
-                          : [...dias, dia];
-                        onFieldChange("dias_abierto", nuevos.join(","));
-                      }}
-                    />
-                    {dia.slice(0, 3)}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <div style={{ flex: 1, marginBottom: "10px" }}>
-              <label
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#863819",
-                  display: "block",
-                  marginBottom: "4px",
-                  letterSpacing: "0.5px",
-                  textTransform: "uppercase",
-                }}
-              >
-                Horario apertura
-              </label>
-              <input
-                type="time"
-                style={styles.input}
-                value={especifico.horario_apertura || ""}
-                onChange={(e) => onFieldChange("horario_apertura", e.target.value)}
-              />
-            </div>
-            <div style={{ flex: 1, marginBottom: "10px" }}>
-              <label
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#863819",
-                  display: "block",
-                  marginBottom: "4px",
-                  letterSpacing: "0.5px",
-                  textTransform: "uppercase",
-                }}
-              >
-                Horario cierre
-              </label>
-              <input
-                type="time"
-                style={styles.input}
-                value={especifico.horario_cierre || ""}
-                onChange={(e) => onFieldChange("horario_cierre", e.target.value)}
-              />
-            </div>
-          </div>
-          <DetailField field="acepta_tarjetas" fieldVal={especifico.acepta_tarjetas} onFieldChange={onFieldChange} label="Acepta tarjetas" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-        </>
-      ),
-      personalidad: () => (
-        <>
-          <DetailField field="nombre_completo" fieldVal={especifico.nombre_completo} onFieldChange={onFieldChange} label="Nombre completo" placeholder="Nombre y apellido" />
-          <DetailField field="apodo" fieldVal={especifico.apodo} onFieldChange={onFieldChange} label="Apodo / conocido como" placeholder="..." />
-          <DetailField field="biografia_resumida" fieldVal={especifico.biografia_resumida} onFieldChange={onFieldChange} label="Biografía" type="textarea" placeholder="..." />
-          <DetailField field="profesion" fieldVal={especifico.profesion} onFieldChange={onFieldChange} label="Profesión" placeholder="..." />
-          <DetailField field="fecha_nacimiento" fieldVal={especifico.fecha_nacimiento} onFieldChange={onFieldChange} label="Fecha de nacimiento" type="date" />
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 4 }}>
-              Foto de perfil
-            </label>
-            {especifico.foto_perfil_url ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <img src={especifico.foto_perfil_url} alt="preview" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "2px solid #ddd" }} />
-                <button onClick={() => onFieldChange("foto_perfil_url", "")} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 13 }}>
-                  Eliminar
-                </button>
-              </div>
-            ) : (
-              <>
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden ref={fotoPerfilRef} onChange={handleFotoPerfil} />
-                <button onClick={() => fotoPerfilRef.current?.click()} style={{ padding: "10px 16px", background: "#f5f2eb", border: "1px dashed #ccc", borderRadius: 8, cursor: "pointer", color: "#1c1c18", fontSize: 14, width: "100%", textAlign: "center" }}>
-                  + Subir foto de perfil
-                </button>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Formatos: JPG, PNG, WebP • Mínimo 500×500 px</div>
-              </>
-            )}
-          </div>
-          <DetailField field="es_referente_comunidad" fieldVal={especifico.es_referente_comunidad} onFieldChange={onFieldChange} label="Referente comunitario" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
-          <DetailField field="comunidad_etnica" fieldVal={especifico.comunidad_etnica} onFieldChange={onFieldChange} label="Comunidad étnica" type="select" options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))} />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Redes sociales" />
-        </>
-      ),
-      patrimonio: () => (
-        <>
-          <DetailField field="año_referencia" fieldVal={especifico.año_referencia} onFieldChange={onFieldChange} label="Año de referencia" placeholder="Ej: 1920" />
-          <DetailField field="estilo_arquitectonico" fieldVal={especifico.estilo_arquitectonico} onFieldChange={onFieldChange} label="Estilo arquitectónico" placeholder="Ej: neoclásico" />
-          <DetailField field="declaratoria_oficial" fieldVal={especifico.declaratoria_oficial} onFieldChange={onFieldChange} label="Declaratoria oficial" placeholder="Ej: Patrimonio Provincial" />
-          <DetailField field="estado_conservacion" fieldVal={especifico.estado_conservacion} onFieldChange={onFieldChange} label="Estado de conservación" placeholder="Ej: bueno" />
-        </>
-      ),
-      evento: () => (
-        <>
-          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
-          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
-          <DetailField field="fecha_evento" fieldVal={especifico.fecha_evento} onFieldChange={onFieldChange} label="Fecha del evento" type="date" placeholder="" />
-          <DetailField field="duracion_dias" fieldVal={especifico.duracion_dias} onFieldChange={onFieldChange} label="Duración (días)" type="number" placeholder="Ej: 1" />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Actividades principales</label>
-          <TagSelector value={especifico.actividades_principales || ""} onChange={(v) => onFieldChange("actividades_principales", v)} suggestions={ACTIVIDADES_SUGERIDAS} placeholder="Escribí o seleccioná actividades..." />
-          <DetailField field="es_itinerante" fieldVal={especifico.es_itinerante} onFieldChange={onFieldChange} label="Evento itinerante" type="select" options={[{ value: "true", label: "Sí" }, { value: "false", label: "No" }]} />
-          <DetailField field="link_entradas" fieldVal={especifico.link_entradas} onFieldChange={onFieldChange} label="Link a compra de entradas" placeholder="https://..." />
-        </>
-      ),
-      comunidad_indigena: () => (
-        <>
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Historia / Descripción" type="textarea" placeholder="Historia, origen y contexto..." />
-          <DetailField field="etnia" fieldVal={especifico.etnia} onFieldChange={onFieldChange} label="Etnia" type="select" options={COMUNIDADES_ETNICAS.map((v) => ({ value: v, label: v || "Seleccionar..." }))} />
-          <DetailField field="lenguas" fieldVal={especifico.lenguas} onFieldChange={onFieldChange} label="Lenguas" placeholder="Ej: Qom, Castellano" />
-          <DetailField field="territorio_tradicional" fieldVal={especifico.territorio_tradicional} onFieldChange={onFieldChange} label="Territorio tradicional" type="textarea" placeholder="Ubicación y territorio..." />
-          <DetailField field="cosmovision" fieldVal={especifico.cosmovision} onFieldChange={onFieldChange} label="Cosmovisión" type="textarea" placeholder="Creencias, visión del mundo..." />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-        </>
-      ),
-      lugar_natural: () => (
-        <>
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del lugar..." />
-          <DetailField field="categoria_natural" fieldVal={especifico.categoria_natural} onFieldChange={onFieldChange} label="Categoría" placeholder="Ej: Parque, Reserva, Río, Laguna, Monte" />
-          <DetailField field="actividades" fieldVal={especifico.actividades} onFieldChange={onFieldChange} label="Actividades" type="textarea" placeholder="Ej: senderismo, avistaje de aves, pesca..." />
-          <DetailField field="acceso" fieldVal={especifico.acceso} onFieldChange={onFieldChange} label="Acceso" type="textarea" placeholder="Cómo llegar, rutas, accesos..." />
-          <DetailField field="flora_fauna_destacada" fieldVal={especifico.flora_fauna_destacada} onFieldChange={onFieldChange} label="Flora y fauna destacada" type="textarea" placeholder="Especies representativas..." />
-          <DetailField field="mejor_epoca" fieldVal={especifico.mejor_epoca} onFieldChange={onFieldChange} label="Mejor época para visitar" placeholder="Ej: Otoño, todo el año..." />
-        </>
-      ),
-      hospedaje: () => (
-        <>
-          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
-          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del alojamiento..." />
-          <DetailField field="categoria_hospedaje" fieldVal={especifico.categoria_hospedaje} onFieldChange={onFieldChange} label="Categoría" placeholder="Ej: Hotel, Cabaña, Hostel, Posada" />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Servicios</label>
-          <TagSelector value={especifico.servicios || ""} onChange={(v) => onFieldChange("servicios", v)} suggestions={SERVICIOS_SUGERIDOS} placeholder="Escribí o seleccioná servicios..." />
-          <DetailField field="capacidad" fieldVal={especifico.capacidad} onFieldChange={onFieldChange} label="Capacidad" placeholder="Ej: 20 personas, 5 habitaciones" />
-          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-        </>
-      ),
-      productor: () => (
-        <>
-          <DetailField field="razon_social" fieldVal={especifico.razon_social} onFieldChange={onFieldChange} label="Razón social" placeholder="Nombre legal..." />
-          <DetailField field="cuit" fieldVal={especifico.cuit} onFieldChange={onFieldChange} label="CUIT" placeholder="20-12345678-9" />
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Historia del productor..." />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de producto</label>
-          <TagSelector value={especifico.tipo_producto || ""} onChange={(v) => onFieldChange("tipo_producto", v)} suggestions={TIPOS_PRODUCTO} placeholder="Escribí o seleccioná tipo de producto..." />
-          <DetailField field="metodos_produccion" fieldVal={especifico.metodos_produccion} onFieldChange={onFieldChange} label="Métodos de producción" type="textarea" placeholder="Ej: artesanal, tradicional, orgánico..." />
-          <DetailField field="certificaciones" fieldVal={especifico.certificaciones} onFieldChange={onFieldChange} label="Certificaciones" placeholder="Ej: Orgánico, Comercio Justo" />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Redes sociales" />
-          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
-        </>
-      ),
-      experiencia: () => (
-        <>
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción de la experiencia..." />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de experiencia</label>
-          <TagSelector value={especifico.tipo_experiencia || ""} onChange={(v) => onFieldChange("tipo_experiencia", v)} suggestions={TIPOS_EXPERIENCIA} placeholder="Escribí o seleccioná tipo de experiencia..." />
-          <DetailField field="duracion_experiencia" fieldVal={especifico.duracion_experiencia} onFieldChange={onFieldChange} label="Duración" placeholder="Ej: 3 horas, 1 día completo" />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Qué incluye</label>
-          <TagSelector value={especifico.que_incluye || ""} onChange={(v) => onFieldChange("que_incluye", v)} suggestions={QUE_INCLUYE_EXPERIENCIA} placeholder="Escribí o seleccioná qué incluye..." />
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Precio de referencia</label>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-            <input
-              style={{ ...styles.input, flex: 1 }}
-              type="number"
-              placeholder="Ej: 5000"
-              value={(() => { const p = (especifico.precio_referencia || "").trim(); return p.includes(" ") ? p.split(" ")[0] : p })()}
-              onChange={(e) => {
-                const currency = (especifico.precio_referencia || "").includes("USD") ? "USD" : "ARS";
-                onFieldChange("precio_referencia", e.target.value ? `${e.target.value} ${currency}` : "");
-              }}
-            />
-            <select
-              style={{ ...styles.input, width: "120px", flexShrink: 0 }}
-              value={(especifico.precio_referencia || "").includes("USD") ? "USD" : "ARS"}
-              onChange={(e) => {
-                const amount = (especifico.precio_referencia || "").split(" ")[0];
-                onFieldChange("precio_referencia", amount ? `${amount} ${e.target.value}` : "");
-              }}
-            >
-              <option value="ARS">ARS $</option>
-              <option value="USD">USD</option>
-            </select>
-          </div>
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} label="Contacto / Reservas / Redes sociales" />
-          <DetailField field="operador" fieldVal={especifico.operador} onFieldChange={onFieldChange} label="Operador / Guía" placeholder="Nombre del operador o guía" />
-        </>
-      ),
-      relato: () => (
-        <>
-          <DetailField field="autor" fieldVal={especifico.autor} onFieldChange={onFieldChange} label="Autor del relato" placeholder="Nombre de quien narra" />
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fecha del relato</label>
-            <input type="date" style={styles.input} value={especifico.fecha_relato || ""} onChange={(e) => onFieldChange("fecha_relato", e.target.value)} />
-          </div>
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#863819", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Tipo de relato</label>
-          <TagSelector value={especifico.tipo_relato || ""} onChange={(v) => onFieldChange("tipo_relato", v)} suggestions={TIPOS_RELATO} placeholder="Escribí o seleccioná tipo de relato..." />
-          <DetailField field="contenido_completo" fieldVal={especifico.contenido_completo} onFieldChange={onFieldChange} label="Contenido completo" type="textarea" placeholder="El relato completo..." />
-        </>
-      ),
-      espacio_cultural: () => (
-        <>
-          <DetailField field="biografia_larga" fieldVal={especifico.biografia_larga} onFieldChange={onFieldChange} label="Descripción" type="textarea" placeholder="Descripción del espacio..." />
-          <DetailField field="tipo_espacio" fieldVal={especifico.tipo_espacio} onFieldChange={onFieldChange} label="Tipo de espacio" placeholder="Ej: Museo, Teatro, Centro Cultural, Biblioteca" />
-          <DetailField field="horarios" fieldVal={especifico.horarios} onFieldChange={onFieldChange} label="Horarios" placeholder="Ej: Lun–Vie 9–18, Sáb 10–13" />
-          <DetailField field="sitio_web" fieldVal={especifico.sitio_web} onFieldChange={onFieldChange} label="Sitio web" placeholder="https://..." />
-          <SocialMediaManager value={especifico.redes_sociales} onChange={(v) => onFieldChange("redes_sociales", v)} />
-        </>
-      ),
-    };
-
-    const render = fields[tipo];
-    return render ? (
-      <>
-        <DetailField field="email" fieldVal={especifico.email} onFieldChange={onFieldChange} label="Email" type="email" placeholder="correo@ejemplo.com" />
-        {render()}
-      </>
-    ) : <p style={{ color: "#999" }}>Sin campos específicos</p>;
-  };
+  // --- CONTEO DE SOLICITUDES PENDIENTES ---
+  const solicitudesPendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
 
   // --- RENDER ---
   return (
-    <div className="admin-container">
-      <div style={styles.mainLayout}>
-        {/* SIDEBAR */}
-        <div style={styles.sidebar}>
-          <div style={styles.sidebarHeader}>
-            <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" style={{ width: "100%", maxWidth: "180px", display: "block", marginBottom: "8px" }} />
-            <div style={{ fontSize: "15px", color: "#1c1c18", marginTop: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <img src="/icons/user.png" style={{ width: "18px", height: "18px" }} alt="" />
-              {user?.username || "Admin"}
-            </div>
+    <div style={styles.mainLayout}>
+      {/* Sidebar */}
+      <div style={styles.sidebar}>
+        <div style={styles.sidebarHeader}>
+          <div style={{ fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 700, color: "#863819", lineHeight: 1.2 }}>
+            Admin
           </div>
-          <div style={styles.sidebarNav}>
-            {(() => {
-              const isEntityActive = view === "entidades" || view === "nuevo-editar" || view === "solicitudes" || view === "ediciones";
-              const isRecorridoActive = view === "nuevo-recorrido" || view === "nuevo-recorrido-form";
-
-              const groups = [
-                {
-                  key: "entidades",
-                  label: "Entidades",
-                  icon: "/icons/book.png",
-                  viewId: "entidades",
-                  isActive: isEntityActive,
-                  children: [
-                    { id: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png", badge: pendingSolicitudes > 0 ? { color: "#d4a017" } : null },
-                    { id: "ediciones", label: "Ediciones", icon: "/icons/edit.png", badge: pendingEdiciones > 0 ? { color: "#d4a017" } : null },
-                    { id: "nuevo-editar", label: "Nueva Entidad", icon: "/icons/add.png" },
-                  ],
-                },
-                {
-                  key: "recorridos",
-                  label: "Recorridos",
-                  icon: "/icons/route.png",
-                  viewId: "nuevo-recorrido",
-                  isActive: isRecorridoActive,
-                  children: [
-                    { id: "nuevo-recorrido-form", label: "Nuevo Recorrido", icon: "/icons/add.png" },
-                  ],
-                },
-              ];
-
-              const flatItems = [
-                { id: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
-                { id: "localidades", label: "Localidades", icon: "/icons/location.png" },
-                { id: "palabras", label: "Palabras", icon: "/icons/edit.png" },
-                { id: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png", badge: pendingDevoluciones > 0 ? { color: "#e65100" } : null },
-                { id: "planes", label: "Planes", icon: "/icons/card.png" },
-                { id: "usuarios", label: "Usuarios", icon: "/icons/user.png" },
-              ];
-
-              const handleNavClick = (id) => {
-                if (id === "nuevo-editar") resetWizard();
-                if (id === "nuevo-recorrido") { resetRecForm(); setView(id); }
-                else if (id === "nuevo-recorrido-form") { resetRecForm(); setEditingRecorridoId("new"); setView("nuevo-recorrido"); }
-                else setView(id);
-              };
-
-              const isItemActive = (id) => {
-                if (id === "entidades") return isEntityActive;
-                if (id === "nuevo-recorrido") return isRecorridoActive;
-                if (id === "nuevo-editar") return view === "nuevo-editar" && !editingEntityId;
-                return view === id;
-              };
-
-              const items = [];
-
-              groups.forEach((group) => {
-                const expanded = expandedGroups[group.key];
-                items.push(
-                  <button
-                    key={group.key}
-                    className="admin-nav-btn"
-                    onClick={() => {
-                      if (group.key === "recorridos") resetRecForm();
-                      setView(group.viewId);
-                      setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }));
-                    }}
-                    style={{
-                      ...styles.navBtn,
-                      background: group.isActive ? "#f0ede8" : "transparent",
-                      color: "#1c1c18",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center" }}>
-                      <img src={group.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                      {group.label}
-                    </span>
-                    <span style={{
-                      fontSize: "10px",
-                      transition: "transform 0.2s",
-                      transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
-                    }}>
-                      ▶
-                    </span>
-                  </button>
-                );
-                if (expanded) {
-                  group.children.forEach((child) => {
-                    const active = view === child.id && !(child.id === "nuevo-editar" && editingEntityId);
-                    items.push(
-                      <button
-                        key={child.id}
-                        className="admin-nav-btn"
-                        onClick={() => handleNavClick(child.id)}
-                        style={{
-                          ...styles.navBtn,
-                          paddingLeft: "44px",
-                          background: active ? "#f0ede8" : "transparent",
-                          color: active ? "#863819" : "#1c1c18",
-                          fontSize: "13px",
-                        }}
-                      >
-                        <img src={child.icon} style={{ width: "16px", height: "16px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                        {child.label}
-                        {child.badge && (
-                          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: child.badge.color, marginLeft: 8, verticalAlign: "middle" }} />
-                        )}
-                      </button>
-                    );
-                  });
-                }
-              });
-
-              flatItems.forEach((item) => {
-                const active = isItemActive(item.id);
-                items.push(
-                  <button
-                    key={item.id}
-                    className="admin-nav-btn"
-                    onClick={() => handleNavClick(item.id)}
-                    style={{
-                      ...styles.navBtn,
-                      background: active ? "#f0ede8" : "transparent",
-                      color: active ? "#863819" : "#1c1c18",
-                    }}
-                  >
-                    <img src={item.icon} style={{ width: "18px", height: "18px", marginRight: "10px", verticalAlign: "middle", filter: item.id === "planes" ? "brightness(0)" : undefined }} alt="" />
-                    {item.label}
-                    {item.badge && (
-                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: item.badge.color, marginLeft: 8, verticalAlign: "middle" }} />
-                    )}
-                  </button>
-                );
-              });
-
-              return items;
-            })()}
-          </div>
-          <button onClick={logout} className="admin-logout-btn" style={styles.logoutBtn}>
-            <img src="/icons/logout.png" style={{ width: "16px", height: "16px", marginRight: "8px", verticalAlign: "middle" }} alt="" />
-            CERRAR SESIÓN
-          </button>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>{user?.username}</div>
         </div>
 
-        {/* CONTENT */}
-        <div style={styles.contentArea}>
-          <div style={styles.viewContainer}>
-            {view === "entidades" && (
-              <>
-                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h2 style={styles.sectionTitle}>
-                      <img src="/icons/book.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                      Entidades
-                    </h2>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={cargarEntidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-                        ACTUALIZAR
-                      </button>
-                      <button
-                        onClick={() => {
-                          resetWizard();
-                          setView("nuevo-editar");
-                        }}
-                        className="admin-btn"
-                        style={{ ...styles.btnPrimary, background: "#2e7d32" }}
-                      >
-                        + NUEVA
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <input
-                      placeholder="Buscar entidad por nombre..."
-                      value={entidadSearch}
-                      onChange={(e) => setEntidadSearch(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 14px",
-                        border: "1px solid #ddd",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        outline: "none",
-                        fontFamily: "inherit",
-                        background: "white",
-                      }}
-                    />
-                    <select
-                      value={entidadFilterPerfil}
-                      onChange={(e) => setEntidadFilterPerfil(e.target.value)}
-                      style={{
-                        padding: "10px 14px",
-                        border: "1px solid #ddd",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        outline: "none",
-                        fontFamily: "inherit",
-                        background: "white",
-                        minWidth: "220px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <option value="">Todos los propietarios</option>
-                      {(() => {
-                        const owners = {};
-                        for (const e of allEntities) {
-                          if (e.perfil_id && (e.perfil_nombre || e.perfil_email)) {
-                            const key = e.perfil_id;
-                            if (!owners[key]) owners[key] = { id: key, nombre: e.perfil_nombre, email: e.perfil_email };
-                          }
-                        }
-                        return Object.values(owners).sort((a, b) => (a.nombre || a.email || "").localeCompare(b.nombre || b.email || "")).map((o) => (
-                          <option key={o.id} value={o.id}>{o.nombre || o.email}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-                </div>
-                {(() => {
-                  const filtrados = allEntities.filter((e) => {
-                    const matchSearch = !entidadSearch || e.nombre.toLowerCase().includes(entidadSearch.toLowerCase());
-                    const matchPerfil = !entidadFilterPerfil || String(e.perfil_id) === entidadFilterPerfil;
-                    return matchSearch && matchPerfil;
-                  });
-                  if (filtrados.length === 0) {
-                    return (
-                      <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>
-                        {allEntities.length === 0 ? "No hay entidades todavía" : "No se encontraron entidades con los filtros actuales"}
-                      </div>
-                    );
-                  }
-                  const grupos = {};
-                  for (const e of filtrados) {
-                    if (!grupos[e.tipo]) grupos[e.tipo] = [];
-                    grupos[e.tipo].push(e);
-                  }
-                  const tipoLabels = {
-                    artesano: "Artesanos",
-                    gastronomia: "Gastronomía",
-                    comercio: "Comercios",
-                    evento: "Eventos",
-                    patrimonio: "Patrimonios",
-                    personalidad: "Personalidades",
-                    comunidad_indigena: "Comunidades Indígenas",
-                    lugar_natural: "Lugares Naturales",
-                    hospedaje: "Hospedajes",
-                    productor: "Productores",
-                    experiencia: "Experiencias",
-                    relato: "Relatos",
-                    espacio_cultural: "Espacios Culturales",
-                  };
-                  const tipoOrden = ["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"];
-                  return tipoOrden.map((tipo) => {
-                    const items = grupos[tipo];
-                    if (!items || items.length === 0) return null;
-                    return (
-                      <div key={tipo} style={{ marginBottom: "24px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", padding: "0 4px" }}>
-                          <img src={`/icons/${tipo}.png`} style={{ width: "20px", height: "20px" }} alt="" />
-                          <span style={{ fontWeight: 700, fontSize: "14px", color: colorMapAdmin[tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>
-                            {tipoLabels[tipo] || tipo}
-                          </span>
-                          <span style={{ fontSize: "12px", color: "#ccc" }}>({items.length})</span>
-                        </div>
-                        {items.map((e) => (
-                          <div key={e.id} style={styles.entityCard}>
-                            <div
-                              style={{
-                                width: "10px",
-                                height: "10px",
-                                borderRadius: "50%",
-                                background: colorMapAdmin[e.tipo] || "#ccc",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                <span style={{ fontWeight: 700, fontSize: "15px", color: "#1c1c18" }}>
-                                  {e.nombre}
-                                </span>
-                                {e.estado_sello === "pendiente" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PENDIENTE</span>}
-                                {e.estado_sello === "rechazado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>RECHAZADO</span>}
-                                {e.estado_sello === "aprobado" && e.visible && (e.latitud == null || e.longitud == null) && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e67e22", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>REVISAR MAPA</span>}
-                                {e.estado_pago === "atrasado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEUDA</span>}
-                                {e.estado_pago === "reembolso_solicitado" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#e65100", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>DEVOLUCIÓN</span>}
-                                {e.fecha_fin_suscripcion && (() => {
-                                  try {
-                                    const d = new Date();
-                                    const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                    const fin = e.fecha_fin_suscripcion.split('T')[0];
-                                    if (fin < hoy) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDA</span>;
-                                  } catch {}
-                                  return null;
-                                })()}
-                                {e.fecha_fin_suscripcion && e.estado_pago === "al_dia" && (() => {
-                                  try {
-                                    const d = new Date();
-                                    const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                    const fin = e.fecha_fin_suscripcion.split('T')[0];
-                                    const diff = Math.ceil((new Date(fin + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
-                                    if (diff >= 0 && diff <= 30) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
-                                  } catch {}
-                                  return null;
-                                })()}
-                                {e.tipo === "evento" && e.fecha_evento && (() => {
-                                  const d = new Date();
-                                  const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                  const fe = e.fecha_evento.split('T')[0];
-                                  if (fe < hoy) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>VENCIDO</span>;
-                                  const diff = Math.ceil((new Date(fe + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
-                                  if (diff <= 7) return <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>PRONTO ({diff}d)</span>;
-                                  return <span style={{ fontSize: "10px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>FALTAN {diff}d</span>;
-                                })()}
-                              </div>
-                              <div style={{ fontSize: "11px", color: "#999", textTransform: "capitalize" }}>
-                                {e.tipo}
-                              </div>
-                              {e.perfil_nombre && (
-                                <div style={{ fontSize: "11px", color: "#666", marginTop: 2 }}>
-                                  Dueño: {e.perfil_nombre}{e.perfil_email ? ` (${e.perfil_email})` : ""}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                              <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", fontSize: "10px", fontWeight: 600, color: e.visible ? "#2e7d32" : "#999", userSelect: "none" }}
-                                onClick={async (ev) => {
-                                  ev.stopPropagation();
-                                  const nuevo = !e.visible;
-                                  try {
-                                    const res = await authFetch(`/api/entidades/${e.id}/visible`, {
-                                      method: "PATCH",
-                                      headers: authHeaders({ "Content-Type": "application/json" }),
-                                      body: JSON.stringify({ visible: nuevo }),
-                                    });
-                                    if (res.ok) {
-                                      setAllEntities((prev) => prev.map((ent) => ent.id === e.id ? { ...ent, visible: nuevo } : ent));
-                                    }
-                                  } catch {}
-                                }}
-                              >
-                                <div style={{
-                                  width: 32, height: 18, borderRadius: 9, background: e.visible ? "#2e7d32" : "#ccc",
-                                  position: "relative", transition: "0.2s", cursor: "pointer",
-                                }}>
-                                  <div style={{
-                                    width: 14, height: 14, borderRadius: "50%", background: "white",
-                                    position: "absolute", top: 2, left: e.visible ? 16 : 2, transition: "0.2s",
-                                  }} />
-                                </div>
-                                MAPA
-                              </label>
-                            </div>
-                            {e.estado_sello !== "pendiente" && (
-                              <>
-                                {e.estado_sello !== "rechazado" && (
-                                  <>
-                                    <button
-                                      onClick={() => cargarEntidadParaEditar(e.id)}
-                                      className="admin-btn-ghost"
-                                      style={styles.smallBtn("#863819")}
-                                    >
-                                      <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                                      EDITAR
-                                    </button>
-                                    <button
-                                      onClick={() => abrirConexModal(e)}
-                                      className="admin-btn-ghost"
-                                      style={styles.smallBtn("#2e7d32")}
-                                    >
-                                      <img src="/icons/link.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                                      CONEXIÓN
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  onClick={() => eliminarEntidad(e.id, e.nombre)}
-                                  className="admin-btn-danger"
-                                  style={styles.smallBtn("#c0392b")}
-                                >
-                                  <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                                  ELIMINAR
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  });
-                })()}
-
-                {/* Modal conexiones */}
-                {conexModal && (
-                  <div style={{
-                    position: "fixed", inset: 0, zIndex: 1000,
-                    background: "rgba(0,0,0,0.4)", display: "flex",
-                    alignItems: "center", justifyContent: "center",
-                  }}>
-                    <div style={{
-                      background: "white", borderRadius: 16, padding: 28,
-                      width: "90%", maxWidth: 520, maxHeight: "80vh",
-                      overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: "#1c1c18" }}>
-                          <img src="/icons/link.png" style={{ width: "20px", height: "20px", verticalAlign: "middle", marginRight: 8 }} alt="" />
-                          Conexiones: {conexModal.nombre}
-                        </h3>
-                        <button onClick={() => setConexModal(null)}
-                          style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>
-                          ✕
-                        </button>
-                      </div>
-
-                      {/* Search */}
-                      <input
-                        placeholder="Buscar entidad para conectar..."
-                        value={conexSearch}
-                        onChange={(e) => {
-                          const q = e.target.value;
-                          setConexSearch(q);
-                          if (q.length < 2) { setConexResults([]); return; }
-                          const lower = q.toLowerCase();
-                          setConexResults(
-                            allEntities.filter(
-                              (ent) =>
-                                ent.id !== conexModal.id &&
-                                ent.nombre.toLowerCase().includes(lower) &&
-                                !conexTempList.find((c) => c.entidad_destino_id === ent.id),
-                            ),
-                          );
-                        }}
-                        style={{
-                          width: "100%", padding: "10px 14px", borderRadius: 10,
-                          border: "1px solid #ddd", fontSize: 14, color: "#1c1c18",
-                          background: "#f9f9f9", marginBottom: 8, boxSizing: "border-box",
-                        }}
-                      />
-
-                      {/* Search results */}
-                      {conexResults.length > 0 && (
-                        <div style={{ marginBottom: 12, border: "1px solid #eee", borderRadius: 10, maxHeight: 180, overflowY: "auto" }}>
-                          {conexResults.map((r) => (
-                            <div key={r.id}
-                              onClick={() => {
-                                setConexTempList((prev) => [...prev, { entidad_destino_id: r.id, nombre: r.nombre, tipo_relacion: "" }]);
-                                setConexResults([]);
-                                setConexSearch("");
-                              }}
-                              style={{
-                                padding: "10px 14px", cursor: "pointer", fontSize: 14, color: "#1c1c18",
-                                borderBottom: "1px solid #f5f2eb", display: "flex", justifyContent: "space-between", alignItems: "center",
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "#f5f2eb"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                            >
-                              <span style={{ color: "#1c1c18" }}>{r.nombre}</span>
-                              <span style={{ fontSize: 11, color: colorMapAdmin[r.tipo] || "#888", textTransform: "capitalize" }}>{r.tipo}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Current connections */}
-                      {conexTempList.length === 0 && (
-                        <p style={{ color: "#999", fontSize: 13, textAlign: "center", margin: "20px 0" }}>
-                          Sin conexiones aún
-                        </p>
-                      )}
-                      {conexTempList.map((c, i) => (
-                        <div key={c.entidad_destino_id} style={{
-                          display: "flex", gap: 6, alignItems: "center",
-                          padding: "10px 12px", marginBottom: 6,
-                          background: "#f5f2eb", borderRadius: 10, flexWrap: "wrap",
-                        }}>
-                          <span style={{ flex: "0 0 auto", fontSize: 14, fontWeight: 600, color: "#1c1c18", minWidth: 80 }}>{c.nombre}</span>
-                          <input
-                            placeholder="Relación (esta → destino)"
-                            value={c.tipo_relacion}
-                            onChange={(e) => {
-                              const next = [...conexTempList];
-                              next[i] = { ...next[i], tipo_relacion: e.target.value };
-                              setConexTempList(next);
-                            }}
-                            style={{
-                              flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6,
-                              border: "1px solid #ddd", fontSize: 11, color: "#1c1c18",
-                              background: "white",
-                            }}
-                            title="Relación desde la entidad actual hacia la entidad destino"
-                          />
-                          <input
-                            placeholder="Relación (destino → esta)"
-                            value={c.tipo_relacion_inversa || ""}
-                            onChange={(e) => {
-                              const next = [...conexTempList];
-                              next[i] = { ...next[i], tipo_relacion_inversa: e.target.value };
-                              setConexTempList(next);
-                            }}
-                            style={{
-                              flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6,
-                              border: "1px solid #ddd", fontSize: 11, color: "#1c1c18",
-                              background: "white",
-                            }}
-                            title="Relación desde la entidad destino hacia la entidad actual"
-                          />
-                          <button onClick={() => setConexTempList((prev) => prev.filter((_, idx) => idx !== i))}
-                            style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16, padding: 4 }}>
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-
-                      {/* Actions */}
-                      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                        <button onClick={() => setConexModal(null)}
-                          className="admin-btn-ghost"
-                          style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1px solid #ccc", background: "white", color: "#555", cursor: "pointer", fontSize: 14 }}>
-                          CANCELAR
-                        </button>
-                        <button onClick={guardarConexModal}
-                          disabled={conexSaving}
-                          className="admin-btn"
-                          style={{
-                            flex: 1, padding: "10px", borderRadius: 10, border: "none",
-                            background: conexSaving ? "#999" : "#2e7d32", color: "#fff",
-                            cursor: conexSaving ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 700,
-                          }}>
-                          {conexSaving ? "GUARDANDO…" : "GUARDAR"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {view === "nuevo-editar" && (
-              <div className="nueva-container">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                  <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-                    {editingEntityId ? (
-                      <><img src="/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Editar: {general.nombre || "..."}</>
-                    ) : (
-                      <><img src="/icons/add.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" /> Nueva Entidad</>
-                    )}
-                  </h2>
-                </div>
-
-                {/* Stepper */}
-                <div style={styles.stepperNav}>
-                  {["Datos", "Detalles", "Multimedia", "Suscripción"].map((label, idx) => {
-                    const stepNum = idx + 1;
-                    return (
-                      <div key={label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div
-                          style={{
-                            ...styles.dot,
-                            background: step === stepNum ? "#863819" : step > stepNum ? "#2e7d32" : "#ddd",
-                            cursor: stepNum < step ? "pointer" : "default",
-                          }}
-                          onClick={() => stepNum < step && setStep(stepNum)}
-                        >
-                          {step > stepNum ? "✓" : stepNum}
-                        </div>
-                        <span style={{ fontSize: "12px", fontWeight: step === stepNum ? 700 : 400, color: "#555" }}>
-                          {label}
-                        </span>
-                        {stepNum < 4 && (
-                          <span style={{ color: "#ddd", fontSize: "18px" }}>→</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* PASO 1 */}
-                {step === 1 && (
-                  <div className="fade-in" style={{ background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
-                    <h3 style={{ fontSize: "16px", color: "#863819", marginBottom: "16px", fontFamily: "Cinzel, serif" }}>
-                      Datos generales
-                    </h3>
-                    <select
-                      style={styles.input}
-                      value={general.tipo}
-                      onChange={(e) => setGeneral((g) => ({ ...g, tipo: e.target.value }))}
-                    >
-                      <option value="">Seleccionar tipo...</option>
-                      <option value="artesano">Artesano</option>
-                      <option value="gastronomia">Gastronomía</option>
-                      <option value="comercio">Comercio</option>
-                      <option value="evento">Evento</option>
-                      <option value="patrimonio">Patrimonio</option>
-                      <option value="personalidad">Personalidad</option>
-                      <option value="comunidad_indigena">Comunidad Indígena</option>
-                      <option value="lugar_natural">Lugar Natural</option>
-                      <option value="hospedaje">Hospedaje</option>
-                      <option value="productor">Productor</option>
-                      <option value="experiencia">Experiencia</option>
-                      <option value="relato">Relato</option>
-                      <option value="espacio_cultural">Espacio Cultural</option>
-                    </select>
-                    <input
-                      style={styles.input}
-                      placeholder="Nombre"
-                      value={general.nombre}
-                      onChange={(e) => setGeneral((g) => ({ ...g, nombre: e.target.value }))}
-                    />
-                    <input
-                      style={{ ...styles.input, color: "#863819", fontWeight: "bold" }}
-                      value={general.slug}
-                      readOnly
-                    />
-                    <textarea
-                      style={styles.input}
-                      placeholder="Resumen breve"
-                      value={general.resumen}
-                      onChange={(e) => setGeneral((g) => ({ ...g, resumen: e.target.value }))}
-                    />
-                    <select
-                      style={styles.input}
-                      onChange={handleLocalidadChange}
-                      value={general.localidad_id}
-                    >
-                      <option value="">Seleccionar Localidad...</option>
-                      {localidades.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    <div style={{ position: "relative", marginBottom: "12px" }}>
-                      <input
-                        style={styles.input}
-                        placeholder="Ej: San Martín 123, Resistencia..."
-                        value={geoQuery}
-                        onChange={(e) => {
-                          setGeoQuery(e.target.value);
-                          if (e.target.value.length < 3) { setGeoResults([]); return; }
-                          clearTimeout(geoTimeoutRef.current);
-                          geoTimeoutRef.current = setTimeout(async () => {
-                            try {
-                              const q = e.target.value.includes(",") ? e.target.value : `${e.target.value}, Chaco, Argentina`;
-                              const r = await authFetch(
-                                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=ar`,
-                                { headers: { "User-Agent": "MadeInChaco/1.0", "Accept-Language": "es" } },
-                              );
-                              if (!r.ok) return;
-                              const data = await r.json();
-                              setGeoResults(data);
-                            } catch {}
-                          }, 400);
-                        }}
-                        onFocus={() => geoResults.length > 0 && setGeoResults(geoResults)}
-                      />
-                      {geoResults.length > 0 && (
-                        <div style={{
-                          position: "absolute", top: "100%", left: 0, right: 0,
-                          background: "white", border: "1px solid #eee",
-                          borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                          zIndex: 100, maxHeight: "200px", overflowY: "auto",
-                        }}>
-                          {geoResults.map((r, i) => (
-                            <div key={i} style={{
-                              padding: "10px 14px", cursor: "pointer", fontSize: "14px",
-                              color: "#1c1c18", borderBottom: "1px solid #f5f2eb",
-                            }}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                clearTimeout(geoTimeoutRef.current);
-                                const lat = parseFloat(r.lat);
-                                const lon = parseFloat(r.lon);
-                                setGeneral((g) => ({ ...g, latitud: lat, longitud: lon, direccion_escrita: r.display_name }));
-                                if (map.current) {
-                                  map.current.flyTo({ center: [lon, lat], zoom: 14, speed: 1 });
-                                  marker.current?.setLngLat([lon, lat]);
-                                }
-                                setGeoQuery(r.display_name);
-                                setGeoResults([]);
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "#f5f2eb"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                            >
-                              {r.display_name}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ position: "relative", marginBottom: "12px" }}>
-                      <div
-                        ref={mapContainer}
-                        style={{
-                          height: "250px",
-                          borderRadius: "12px",
-                          overflow: "hidden",
-                        }}
-                      />
-                      <div style={{ position: "absolute", bottom: "10px", right: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                        <button
-                          onClick={() => map.current?.zoomIn()}
-                          className="admin-btn-ghost"
-                          style={{
-                            width: "36px", height: "36px", background: "white",
-                            border: "1px solid #e0ddd6", borderRadius: "8px",
-                            color: "#863819", fontSize: "18px", fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                        >+</button>
-                        <button
-                          onClick={() => map.current?.zoomOut()}
-                          className="admin-btn-ghost"
-                          style={{
-                            width: "36px", height: "36px", background: "white",
-                            border: "1px solid #e0ddd6", borderRadius: "8px",
-                            color: "#863819", fontSize: "18px", fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                        >−</button>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <label style={{ fontSize: "13px", color: "#555", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <input
-                          type="checkbox"
-                          checked={general.visible}
-                          onChange={(e) => setGeneral((g) => ({ ...g, visible: e.target.checked }))}
-                        />
-                        Visible en el mapa
-                      </label>
-                      <div style={{ marginTop: 12 }}>
-                        <label style={{ fontSize: "12px", fontWeight: 600, color: "#863819", display: "block", marginBottom: 6 }}>Icono personalizado (24×24 px, PNG)</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          {general.icono && (
-                            <img src={general.icono} alt="" style={{ width: 24, height: 24, borderRadius: 3, objectFit: "contain", border: "1px solid #eee" }} />
-                          )}
-                          <label style={{
-                            cursor: "pointer", fontSize: "12px", color: "#555",
-                            padding: "6px 14px", border: "1px solid #ccc", borderRadius: 6,
-                            background: "white",
-                          }}>
-                            {subiendoIconoAdm ? "Subiendo..." : general.icono ? "Cambiar" : "Subir icono"}
-                            <input type="file" accept="image/png" hidden disabled={subiendoIconoAdm} onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const img = new Image();
-                              const url = URL.createObjectURL(file);
-                              setSubiendoIconoAdm(true);
-                              img.onload = async () => {
-                                URL.revokeObjectURL(url);
-                                if (img.width !== 24 || img.height !== 24) {
-                                  showPopup("El icono debe ser exactamente 24×24 px", "warning");
-                                  setSubiendoIconoAdm(false);
-                                  e.target.value = "";
-                                  return;
-                                }
-                                const fd = new FormData();
-                                fd.append("archivo", file);
-                                try {
-                                  const r = await fetch("/api/upload-public", { method: "POST", body: fd });
-                                  const d = await r.json();
-                                  if (r.ok) setGeneral((g) => ({ ...g, icono: d.url }));
-                                  else showPopup(d.error || "Error al subir", "warning");
-                                } catch { showPopup("Error de conexión", "warning"); }
-                                setSubiendoIconoAdm(false);
-                                e.target.value = "";
-                              };
-                              img.onerror = () => { setSubiendoIconoAdm(false); e.target.value = ""; };
-                              img.src = url;
-                            }} />
-                          </label>
-                          {general.icono && (
-                            <button type="button" onClick={() => setGeneral((g) => ({ ...g, icono: "" }))}
-                              style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 13 }}
-                            >✕</button>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        style={general.nombre && general.tipo && !subiendoIconoAdm ? { ...styles.btnNext, background: "#2e7d32", width: "100%" } : { ...styles.btnNext, background: "#2e7d32", width: "100%", opacity: 0.5, cursor: "not-allowed" }}
-                        className="admin-btn"
-                        disabled={!general.nombre || !general.tipo || subiendoIconoAdm}
-                        onClick={() => setStep(2)}
-                      >
-                        {subiendoIconoAdm ? "SUBIENDO ICONO…" : "SIGUIENTE: DETALLES →"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* PASO 2 */}
-                {step === 2 && (
-                  <div
-                    className="fade-in"
-                    style={{
-                      background: "white",
-                      borderRadius: "12px",
-                      padding: "24px",
-                      border: "1px solid #eee",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        color: "#1c1c18",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      Detalles de {general.tipo}
-                    </h3>
-                    {renderFormDetalle()}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <button
-                      onClick={() => setStep(1)}
-                      className="admin-btn-ghost"
-                      style={styles.btnSecondary}
-                    >
-                      ← VOLVER
-                    </button>
-                    <button className="admin-btn" style={{ ...styles.btnNext, background: "#2e7d32", width: "100%" }} onClick={() => {
-                        setDetailError("");
-
-                        if (general.tipo === "comercio" || general.tipo === "evento") {
-                          const required = [
-                            ["razon_social", "Razón social"],
-                            ["cuit", "CUIT"],
-                          ];
-                          if (general.tipo === "comercio") {
-                            required.push(["rubro_especifico", "Rubro específico"], ["horario_apertura", "Horario apertura"], ["horario_cierre", "Horario cierre"]);
-                          }
-                          const missing = required.filter(([k]) => !especifico[k]?.trim());
-                          if (missing.length > 0) {
-                            showPopup("Completá los campos requeridos: " + missing.map(([,l]) => l).join(", "), "warning");
-                            return;
-                          }
-                        }
-
-                        setStep(3);
-                      }}>
-                        SIGUIENTE: MULTIMEDIA →
-                      </button>
-                    {detailError && <p style={{ color: "#e74c3c", fontSize: "12px", margin: 0 }}>{detailError}</p>}
-                    </div>
-                  </div>
-                )}
-
-                {/* PASO 3 */}
-                {step === 3 && (
-                  <div className="fade-in media-step-container">
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        color: "#1c1c18",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      Multimedia
-                    </h3>
-                    <div className="media-step-list">
-                      {multimediaItems.map((item, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            background: i === 0 ? "#fff" : "#f9f7f4",
-                            borderRadius: "12px",
-                            padding: "12px",
-                            marginBottom: "10px",
-                            border: i === 0
-                              ? "2px solid #863819"
-                              : item.es_principal
-                                ? "2px solid #863819"
-                                : "1px solid #eee",
-                            position: "relative",
-                          }}
-                        >
-                          {i === 0 ? (
-                            <span style={{ ...styles.principalBadge, background: "#2d1a12" }}>ENCABEZADO</span>
-                          ) : item.es_principal ? (
-                            <span style={styles.principalBadge}>PRINCIPAL</span>
-                          ) : null}
-                          {i === 0 ? (
-                            <div style={{ marginBottom: "8px" }}>
-                              <input
-                                style={styles.input}
-                                value="📷 Foto"
-                                disabled
-                              />
-                            </div>
-                          ) : (
-                            <select
-                              style={styles.input}
-                              value={item.tipo_recurso}
-                              disabled={item.es_principal}
-                              onChange={(e) =>
-                                handleMultimediaChange(i, "tipo_recurso", e.target.value)
-                              }
-                            >
-                              <option value="foto">📷 Foto</option>
-                              <option value="video">🎥 Video</option>
-                              <option value="audio">🎵 Audio</option>
-                            </select>
-                          )}
-
-                          <div className="media-upload-area">
-                            <div className="media-format-info">
-                              {i === 0
-                                ? "🖼️ JPEG, PNG, WebP — Mín. 1920×1080px (16:9)"
-                                : <>{INFO_FORMATOS[item.tipo_recurso].icono} {INFO_FORMATOS[item.tipo_recurso].formatos} — {INFO_FORMATOS[item.tipo_recurso].resolucion}</>
-                              }
-                            </div>
-
-                            <label className="media-upload-btn">
-                              {uploadingIndex === i ? (
-                                <>⏳ SUBIENDO…</>
-                              ) : item.url_recurso ? (
-                                <>✅ ARCHIVO SUBIDO</>
-                              ) : i === 0 ? (
-                                <>📷 SELECCIONAR FOTO PRINCIPAL</>
-                              ) : (
-                                <>📁 SELECCIONAR ARCHIVO</>
-                              )}
-                              <input
-                                type="file"
-                                className="media-file-input"
-                                accept={
-                                  item.tipo_recurso === "foto"
-                                    ? "image/jpeg,image/png,image/webp"
-                                    : item.tipo_recurso === "video"
-                                      ? "video/mp4,video/webm"
-                                      : "audio/mpeg,audio/wav,audio/ogg"
-                                }
-                                disabled={uploadingIndex !== null}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleFileSelect(i, file);
-                                  e.target.value = "";
-                                }}
-                              />
-                            </label>
-
-                          </div>
-
-                          {item.url_recurso && item.tipo_recurso === "foto" && (
-                            <div style={{ marginTop: 10, borderRadius: 8, overflow: "hidden", border: "1px solid #eee" }}>
-                              <img src={item.url_recurso} alt="Vista previa" style={{ width: "100%", maxHeight: 300, objectFit: "contain", display: "block", background: "#f5f2eb" }} />
-                            </div>
-                          )}
-
-                          {item.tipo_recurso === "audio" && (
-                            <div className="media-thumb-section">
-                              <div className="media-thumb-label">
-                                🖼️ Portada para el audio
-                              </div>
-                              {item.thumbnail_url ? (
-                                <div className="media-thumb-preview">
-                                  <img src={item.thumbnail_url} alt="Portada" />
-                                  <label className="media-thumb-change" style={{ cursor: "pointer" }}>
-                                    CAMBIAR
-                                    <input
-                                      type="file"
-                                      className="media-file-input"
-                                      accept="image/jpeg,image/png,image/webp"
-                                      disabled={uploadingIndex !== null}
-                                      onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) handleThumbnailUpload(i, f);
-                                        e.target.value = "";
-                                      }}
-                                    />
-                                  </label>
-                                </div>
-                              ) : (
-                                <label className="media-upload-btn media-thumb-btn">
-                                  {uploadingIndex === i ? "⏳ SUBIENDO…" : "📁 SELECCIONAR PORTADA"}
-                                  <input
-                                    type="file"
-                                    className="media-file-input"
-                                    accept="image/jpeg,image/png,image/webp"
-                                    disabled={uploadingIndex !== null}
-                                    onChange={(e) => {
-                                      const f = e.target.files?.[0];
-                                      if (f) handleThumbnailUpload(i, f);
-                                      e.target.value = "";
-                                    }}
-                                  />
-                                </label>
-                              )}
-                            </div>
-                          )}
-
-                          <input
-                            style={styles.input}
-                            placeholder="Título alternativo"
-                            value={item.titulo_alternativo}
-                            onChange={(e) =>
-                              handleMultimediaChange(i, "titulo_alternativo", e.target.value)
-                            }
-                          />
-                          <textarea
-                            style={{ ...styles.input, minHeight: "60px" }}
-                            placeholder="Descripción del recurso"
-                            value={item.descripcion_recurso}
-                            onChange={(e) =>
-                              handleMultimediaChange(i, "descripcion_recurso", e.target.value)
-                            }
-                          />
-
-                          {i > 0 && (
-                            <div className="media-tags-section">
-                              <div className="media-tags-header">
-                                <span>🏷️ Entidades etiquetadas</span>
-                                {(item.tipo_recurso === "video" || item.tipo_recurso === "audio") && (
-                                  <span className="media-tags-hint">Marcá el segundo en que aparecen</span>
-                                )}
-                              </div>
-                              {(item.entidades_etiquetadas || []).length > 0 && (
-                                <div className="media-tags-list">
-                                  {item.entidades_etiquetadas.map((tag, tagIdx) => (
-                                    <div key={tagIdx} className="media-tag-chip">
-                                      <span className="media-tag-chip-name">{tag.nombre}</span>
-                                      <span className="media-tag-chip-tipo" style={{ color: colorMapAdmin[tag.tipo] || "#863819" }}>
-                                        {tag.tipo}
-                                      </span>
-                                      {(item.tipo_recurso === "video" || item.tipo_recurso === "audio") && (
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          min="0"
-                                          placeholder="seg"
-                                          className="media-tag-timestamp"
-                                          value={tag.timestamp_inicio ?? ""}
-                                          onChange={(e) => {
-                                            const updated = [...multimediaItems];
-                                            const tags = [...(updated[i].entidades_etiquetadas || [])];
-                                            tags[tagIdx] = {
-                                              ...tags[tagIdx],
-                                              timestamp_inicio: e.target.value ? parseFloat(e.target.value) : null,
-                                            };
-                                            updated[i] = { ...updated[i], entidades_etiquetadas: tags };
-                                            setMultimediaItems(updated);
-                                          }}
-                                        />
-                                      )}
-                                      <button
-                                        className="media-tag-remove"
-                                        onClick={() => {
-                                          const updated = [...multimediaItems];
-                                          updated[i] = {
-                                            ...updated[i],
-                                            entidades_etiquetadas: (updated[i].entidades_etiquetadas || []).filter((_, ti) => ti !== tagIdx),
-                                          };
-                                          setMultimediaItems(updated);
-                                        }}
-                                        title="Quitar"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="media-tag-search">
-                                <div className="media-tag-filters">
-                                  <select
-                                    className="media-tag-type-select"
-                                    value={tagTypeFilters[i] || ""}
-                                    onChange={(e) => {
-                                      setTagTypeFilters((prev) => ({ ...prev, [i]: e.target.value }));
-                                    }}
-                                  >
-                                    <option value="">Todos los tipos</option>
-                                    {["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"].map((t) => (
-                                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                                    ))}
-                                  </select>
-                                  <input
-                                    type="text"
-                                    placeholder="Buscar entidad para etiquetar..."
-                                    className="media-tag-search-input"
-                                    value={tagSearchQueries[i] || ""}
-                                    onChange={(e) => {
-                                      setTagSearchQueries((prev) => ({ ...prev, [i]: e.target.value }));
-                                    }}
-                                  />
-                                </div>
-                                {(tagSearchQueries[i]?.trim() || tagTypeFilters[i]) && (
-                                  <div className="media-tag-results">
-                                    {(() => {
-                                      const filtered = allEntities.filter(
-                                        (e) =>
-                                          !(item.entidades_etiquetadas || []).some(
-                                            (t) => t.entidad_id === e.id,
-                                          ) &&
-                                          (!tagSearchQueries[i]?.trim() || e.nombre.toLowerCase().includes(tagSearchQueries[i].toLowerCase())) &&
-                                          (!tagTypeFilters[i] || e.tipo === tagTypeFilters[i]),
-                                      );
-                                      const grouped = {};
-                                      const typeOrder = ["artesano", "gastronomia", "comercio", "evento", "patrimonio", "personalidad", "comunidad_indigena", "lugar_natural", "hospedaje", "productor", "experiencia", "relato", "espacio_cultural"];
-                                      filtered.forEach((e) => {
-                                        if (!grouped[e.tipo]) grouped[e.tipo] = [];
-                                        grouped[e.tipo].push(e);
-                                      });
-                                      const hasResults = Object.keys(grouped).length > 0;
-                                      return hasResults ? (
-                                        typeOrder.filter((t) => grouped[t]).map((tipo) => (
-                                          <div key={tipo} className="media-tag-type-group">
-                                            <div className="media-tag-type-group-header">
-                                              <span style={{ color: colorMapAdmin[tipo] || "#863819" }}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</span>
-                                              <span className="media-tag-type-count">{grouped[tipo].length}</span>
-                                            </div>
-                                            {grouped[tipo].slice(0, 10).map((e) => (
-                                              <button
-                                                key={e.id}
-                                                className="media-tag-result"
-                                                onClick={() => {
-                                                  const updated = [...multimediaItems];
-                                                  const tags = [...(updated[i].entidades_etiquetadas || [])];
-                                                  tags.push({
-                                                    entidad_id: e.id,
-                                                    nombre: e.nombre,
-                                                    tipo: e.tipo,
-                                                    timestamp_inicio: null,
-                                                    timestamp_fin: null,
-                                                  });
-                                                  updated[i] = { ...updated[i], entidades_etiquetadas: tags };
-                                                  setMultimediaItems(updated);
-                                                  setTagSearchQueries((prev) => ({ ...prev, [i]: "" }));
-                                                  setTagTypeFilters((prev) => ({ ...prev, [i]: "" }));
-                                                }}
-                                              >
-                                                <span>{e.nombre}</span>
-                                                <span className="media-tag-result-tipo" style={{ color: colorMapAdmin[e.tipo] || "#863819" }}>
-                                                  {e.tipo}
-                                                </span>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <div className="media-tag-no-results">Sin resultados</div>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {multimediaItems.length > 1 && !item.es_principal && (
-                            <button
-                              onClick={() => removeMultimediaItem(i)}
-                              className="admin-btn-danger"
-                              style={{
-                                background: "none",
-                                border: "1px solid #e74c3c",
-                                color: "#e74c3c",
-                                padding: "4px 10px",
-                                borderRadius: "8px",
-                                cursor: "pointer",
-                                fontSize: "11px",
-                              }}
-                            >
-                              ✕ ELIMINAR
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <button onClick={addMultimediaItem} className="admin-btn-ghost" style={styles.btnSecondary}>
-                      + AGREGAR OTRO ARCHIVO
-                    </button>
-
-                    {multimediaError && (
-                      <div style={{ color: "#e74c3c", fontSize: "13px", marginTop: "8px" }}>
-                        {multimediaError}
-                      </div>
-                    )}
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "16px" }}>
-                      <button onClick={() => setStep(2)} className="admin-btn-ghost" style={{ ...styles.btnSecondary, width: "100%" }}>
-                        ← VOLVER
-                      </button>
-                      <button
-                        onClick={() => setStep(4)}
-                        disabled={uploadingIndex !== null}
-                        className="admin-btn"
-                        style={{
-                          ...styles.btnNext,
-                          background: "#2e7d32",
-                          width: "100%",
-                          opacity: uploadingIndex !== null ? 0.6 : 1,
-                          cursor: uploadingIndex !== null ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        SIGUIENTE: SUSCRIPCIÓN →
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* PASO 4 */}
-                {step === 4 && (
-                  <div className="fade-in" style={{ background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
-                    <h3 style={{ fontSize: "18px", color: "#1c1c18", marginBottom: "16px" }}>
-                      Suscripción de {general.tipo}
-                    </h3>
-                    {(general.tipo === "comercio" || general.tipo === "evento") && (
-                      <p style={{ fontSize: "12px", color: "#666", marginBottom: "12px" }}>
-                        Membresía opcional para {general.tipo === "comercio" ? "comercios" : "eventos privados/comerciales"}.
-                      </p>
-                    )}
-                    {(general.tipo === "hospedaje" || general.tipo === "productor") && (
-                      <p style={{ fontSize: "12px", color: "#b85c2a", marginBottom: "12px" }}>
-                        Suscripción obligatoria para {general.tipo === "hospedaje" ? "hospedajes" : "productores"}.
-                      </p>
-                    )}
-                    {![ "comercio", "evento", "hospedaje", "productor" ].includes(general.tipo) && (
-                      <p style={{ fontSize: "12px", color: "#999", marginBottom: "12px", fontStyle: "italic" }}>
-                        Este tipo de entidad no requiere suscripción.
-                      </p>
-                    )}
-                    {[ "comercio", "evento", "hospedaje", "productor" ].includes(general.tipo) && (
-                      <>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <div style={{ flex: 1, marginBottom: "10px" }}>
-                            <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Inicio suscripción</label>
-                            <input type="date" style={styles.input} value={especifico.fecha_inicio_suscripcion || ""} onChange={(e) => onFieldChange("fecha_inicio_suscripcion", e.target.value)} />
-                          </div>
-                          <div style={{ flex: 1, marginBottom: "10px" }}>
-                            <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Fin suscripción</label>
-                            <input type="date" style={styles.input} value={especifico.fecha_fin_suscripcion || ""} onChange={(e) => onFieldChange("fecha_fin_suscripcion", e.target.value)} />
-                          </div>
-                        </div>
-                        <div style={{ marginBottom: "10px" }}>
-                          <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Estado de suscripción</label>
-                          <select style={styles.input} value={especifico.estado_pago || ""} onChange={(e) => onFieldChange("estado_pago", e.target.value)}>
-                            <option value="">{general.tipo === "evento" ? "Sin membresía (evento libre)" : "Seleccionar..."}</option>
-                            <option value="al_dia">Al día</option>
-                            <option value="atrasado">Atrasado</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "16px" }}>
-                      <button onClick={() => setStep(3)} className="admin-btn-ghost" style={{ ...styles.btnSecondary, width: "100%" }}>
-                        ← VOLVER
-                      </button>
-                      <button
-                        onClick={guardarEntidad}
-                        disabled={loading || uploadingIndex !== null || subiendoIconoAdm}
-                        className="admin-btn"
-                        style={{
-                          ...styles.btnPrimary,
-                          opacity: loading || uploadingIndex !== null || subiendoIconoAdm ? 0.6 : 1,
-                          cursor: loading || uploadingIndex !== null || subiendoIconoAdm ? "not-allowed" : "pointer",
-                          background: "#2e7d32",
-                          width: "100%",
-                        }}
-                      >
-                        {loading ? "GUARDANDO…" : subiendoIconoAdm ? "SUBIENDO ICONO…" : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SOLICITUDES */}
-            {/* EDICIONES */}
-            {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} showConfirm={showConfirm} showPopup={showPopup} />}
-
-            {view === "solicitudes" && (
-              <>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <h2 style={styles.sectionTitle}>
-                      <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                      Solicitudes
-                    </h2>
-                  <button onClick={cargarSolicitudes} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-                    ACTUALIZAR
-                  </button>
-                </div>
-
-                {solicitudesLoading ? (
-                  <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>Cargando solicitudes…</div>
-                ) : solicitudes.length === 0 ? (
-                  <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>No hay solicitudes pendientes</div>
-                ) : (
-                  (() => {
-                    const grouped = solicitudes.reduce((acc, sol) => {
-                      const key = sol.perfil_email || sol.email || "Sin email";
-                      if (!acc[key]) acc[key] = [];
-                      acc[key].push(sol);
-                      return acc;
-                    }, {});
-                    return Object.entries(grouped).map(([email, sols]) => (
-                      <div key={email} style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#555", marginBottom: 8, padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 6 }}>
-                          <img src="/icons/user.png" style={{ width: 16, height: 16 }} alt="" />
-                          {sols[0].perfil_nombre || email}
-                        </div>
-                        {sols.map((sol) => {
-                          return (
-                            <div key={sol.id} style={{ background: "white", borderRadius: "12px", padding: "14px 18px", marginBottom: "8px", border: "1px solid #eee", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", color: "#000" }}>
-                              <img src={sol.icono || `/icons/${sol.tipo}.png`} style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: 4, objectFit: "contain" }} alt="" />
-                              <div style={{ flex: 1, color: "#000" }}>
-                                <div style={{ fontWeight: 700, fontSize: "15px", color: "#000" }}>{sol.nombre}</div>
-                                <div style={{ fontSize: "11px", color: "#666", textTransform: "capitalize", marginTop: "2px" }}>{sol.tipo}</div>
-                                <div style={{ fontSize: "12px", marginTop: "4px", lineHeight: 1.5, color: "#000" }}>
-                                  <div style={{ color: "#000" }}>{sol.email || "—"}</div>
-                                  <div style={{ color: "#000" }}>{sol.razon_social || "—"}</div>
-                                  <div style={{ color: "#000" }}>{sol.cuit ? "CUIT: " + sol.cuit : "—"}</div>
-                                  <div style={{ color: "#000" }}>{sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR") : "—"}</div>
-                                </div>
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                <button
-                                  onClick={() => setSolicitudDetalle(sol)}
-                                  className="admin-btn-ghost"
-                                  style={{ ...styles.smallBtn("#863819"), display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
-                                >
-                                  👁 VER DETALLE
-                                </button>
-                                {sol.email && (
-                                  <a
-                                    href={buildMailtoUrl(sol)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="admin-btn-ghost"
-                                    style={{ ...styles.smallBtn("#2980b9"), textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px" }}
-                                  >
-                                    <img src="/icons/mail.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                                    MAIL
-                                  </a>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    setApproveModal({ id: sol.id, tipo: sol.tipo, nombre: sol.nombre });
-                                  }}
-                                  className="admin-btn"
-                                  style={{ background: "#2e7d32", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
-                                >
-                                  ✓ APROBAR
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    const ok = await showConfirm(`¿Rechazar "${sol.nombre}"?`, "RECHAZAR");
-                                    if (!ok) return;
-                                    try {
-                                      const res = await authFetch(`/api/solicitudes/${sol.id}/rechazar`, {
-                                        method: "POST",
-                                        headers: authHeaders({ "Content-Type": "application/json" }),
-                                      });
-                                      if (res.ok) {
-                                        showPopup("Solicitud rechazada", "success");
-                                        cargarSolicitudes();
-                                        if (sol.email) {
-                                          const lines = [
-                                            `Hola ${sol.nombre},`,
-                                            "",
-                                            "Lamentamos informarte que tu solicitud para el Sello Made in Chaco no ha sido aprobada en esta instancia.",
-                                            "",
-                                            "Cualquier consulta podés responder a este correo.",
-                                            "",
-                                            "Saludos,",
-                                            "Equipo Made in Chaco",
-                                          ];
-                                          const subject = encodeURIComponent("Made in Chaco — Solicitud de Sello");
-                                          const body = encodeURIComponent(lines.join("\n"));
-                                          const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sol.email)}&su=${subject}&body=${body}`;
-                                          window.open(url, "_blank", "noopener,noreferrer");
-                                        }
-                                      } else {
-                                        const data = await res.json();
-                                        showPopup(data.error || "Error al rechazar", "warning");
-                                      }
-                                    } catch {
-                                      showPopup("Error de conexión", "warning");
-                                    }
-                                  }}
-                                  className="admin-btn"
-                                  style={{ background: "#c62828", color: "white", border: "none", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
-                                >
-                                  ✕ RECHAZAR
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ));
-                  })()
-                )}
-
-                {/* Modal aprobar */}
-                {approveModal && (() => {
-                  return (
-                    <div style={{
-                      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
-                      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
-                    }}
-                      onClick={() => setApproveModal(null)}
-                    >
-                      <div style={{
-                        background: "white", borderRadius: "16px", padding: "28px", maxWidth: "440px",
-                        width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.15)",
-                      }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 8px", fontSize: "18px" }}>
-                          Aprobar solicitud
-                        </h3>
-                        <p style={{ fontSize: "14px", color: "#555", marginBottom: "16px" }}>
-                          {approveModal.nombre} ({approveModal.tipo})
-                        </p>
-                        <div style={{ background: "#fff3e0", border: "1px solid #ffcc80", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
-                            <p style={{ fontSize: "12px", color: "#e65100", margin: 0, lineHeight: 1.4 }}>
-                              ⚠ Esta entidad no se mostrará en el mapa hasta que la revises en la sección <strong style={{ color: "#e65100" }}>Entidades</strong> y actives manualmente "MAPA". Recordá revisar sus datos y ubicación primero.
-                            </p>
-                          </div>
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                          <button onClick={() => setApproveModal(null)} className="admin-btn" style={{ background: "white", color: "#555", border: "1px solid #ccc", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
-                            CANCELAR
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const res = await authFetch(`/api/solicitudes/${approveModal.id}/aprobar`, {
-                                  method: "POST",
-                                  headers: authHeaders({ "Content-Type": "application/json" }),
-                                });
-                                if (res.ok) {
-                                  showPopup(`"${approveModal.nombre}" aprobada — revisá sus datos y activá "MAPA" en Entidades`, "success");
-                                  setApproveModal(null);
-                                  cargarSolicitudes();
-                                  cargarEntidades();
-                                } else {
-                                  const data = await res.json();
-                                  showPopup(data.error || "Error al aprobar", "warning");
-                                }
-                              } catch {
-                                showPopup("Error de conexión", "warning");
-                              }
-                            }}
-                            className="admin-btn"
-                            style={{ background: "#2e7d32", color: "white", border: "none", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
-                          >
-                            ✓ APROBAR
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Modal detalle solicitud */}
-                {solicitudDetalle && (() => {
-                  const sol = solicitudDetalle;
-                  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
-                  return (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
-                      onClick={() => setSolicitudDetalle(null)}
-                    >
-                      <div className="admin-modal" style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "640px", width: "100%", maxHeight: "96vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                          <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: "20px" }}>
-                            Detalle de Solicitud
-                          </h3>
-                          <button onClick={() => setSolicitudDetalle(null)}
-                            style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", padding: "4px 8px", borderRadius: "6px" }}
-                          >✕</button>
-                        </div>
-
-                        <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
-                          {sol.imagen && (
-                            <img src={sol.imagen} alt="" style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", flexShrink: 0, border: "1px solid #eee" }} />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                              {sol.icono && (
-                                <img src={sol.icono} alt="" style={{ width: 20, height: 20, borderRadius: 3, objectFit: "contain" }} />
-                              )}
-                              <div style={{ fontSize: "18px", fontWeight: 700, color: "#1c1c18" }}>{sol.nombre}</div>
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#863819", textTransform: "capitalize", fontWeight: 600, marginTop: "4px" }}>{sol.tipo}</div>
-                            <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>#{sol.id} — {sol.created_at ? new Date(sol.created_at).toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
-                          </div>
-                        </div>
-
-                        {[
-                          { label: "Contacto", fields: ["email", "sitio_web"] },
-                          { label: "Información legal", fields: ["localidad_id", "razon_social", "cuit", "resumen", "direccion_escrita"] },
-                          ...(sol.tipo === "comercio" ? [{ label: "Comercio", fields: ["rubro_especifico", "horario_apertura", "horario_cierre", "dias_abierto", "acepta_tarjetas"] }] : []),
-                          ...(sol.tipo === "hospedaje" ? [{ label: "Hospedaje", fields: ["categoria_hospedaje", "servicios", "capacidad"] }] : []),
-                          ...(sol.tipo === "productor" ? [{ label: "Productor", fields: ["tipo_producto", "metodos_produccion", "certificaciones", "biografia_larga"] }] : []),
-                          ...(sol.tipo === "evento" ? [{ label: "Evento", fields: ["fecha_evento", "duracion_dias", "actividades_principales", "link_entradas"] }] : []),
-                        ].map((section) => (
-                          <div key={section.label} style={{ marginBottom: "16px" }}>
-                            <div style={{ fontSize: "12px", fontWeight: 700, color: "#863819", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}>{section.label}</div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                              {section.fields.map((field) => {
-                                let val = sol[field];
-                                let fieldLabel = label(field);
-                                if (field === "localidad_id") {
-                                  const loc = localidades.find((l) => l.id === Number(val));
-                                  val = loc ? loc.nombre : (val || "—");
-                                  fieldLabel = "Localidad";
-                                }
-                                if (field === "acepta_tarjetas") val = val ? "Sí" : "No";
-                                if (field === "fecha_evento" && val) val = new Date(val).toLocaleDateString("es-AR");
-                                if (field === "capacidad" && val) val = `${val} personas`;
-                                return (
-                                  <div key={field}>
-                                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{fieldLabel}</div>
-                                    <div style={{ fontSize: "13px", color: "#000", wordBreak: "break-word" }}>{val || "—"}</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {sol.redes_sociales && section.label === "Contacto" && (
-                              <div style={{ marginTop: "8px" }}>
-                                <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "4px" }}>Redes sociales</div>
-                                {(() => {
-                                  const items = parseSocialList(sol.redes_sociales);
-                                  if (items.length === 0) return <div style={{ fontSize: "13px", color: "#000" }}>—</div>;
-                                  return items.map((item, i) => {
-                                    const platform = SOCIAL_PLATFORMS.find((p) => p.value === item.type) || SOCIAL_PLATFORMS.find((p) => p.value === "otro");
-                                    return (
-                                      <div key={i} style={{ fontSize: "13px", color: "#000", marginBottom: "2px" }}>
-                                        <span style={{ fontWeight: 600, color: "#555" }}>{platform ? platform.label : item.type}: </span>
-                                        <span style={{ color: "#000" }}>{item.value}</span>
-                                      </div>
-                                    );
-                                  });
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      {sol.latitud && sol.longitud && (
-                        <div style={{ marginTop: "16px" }}>
-                          <div style={{ fontSize: "12px", fontWeight: 700, color: "#863819", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}>Ubicación</div>
-                          <MiniMap lat={Number(sol.latitud)} lng={Number(sol.longitud)} nombre={sol.nombre} tipo={sol.tipo} icono={sol.icono} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  );
-                })()}
-              </div>
-              </>
-            )}
-
-            {/* RECORRIDOS */}
-            {view === "nuevo-recorrido" && (
-              <div>
-                <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f5f2eb", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h2 style={styles.sectionTitle}>
-                    <img src="/icons/route.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                    Recorridos
-                  </h2>
-                  {!editingRecorridoId && (
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={cargarRecorridos} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-                        ACTUALIZAR
-                      </button>
-                      <button
-                        onClick={() => setEditingRecorridoId("new")}
-                        className="admin-btn"
-                        style={{ ...styles.btnPrimary, background: "#2e7d32" }}
-                      >
-                        + NUEVO
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {editingRecorridoId !== null ? (
-                  /* --- FORM --- */
-                  <div style={{ background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
-                    <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                      <div style={{ flex: "1 1 300px" }}>
-                        <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                          Nombre
-                        </label>
-                        <input
-                          style={styles.input}
-                          value={recForm.nombre}
-                          onChange={(e) => setRecForm((f) => ({ ...f, nombre: e.target.value }))}
-                          placeholder="Nombre del recorrido"
-                        />
-                      </div>
-                      <div style={{ flex: "1 1 200px" }}>
-                        <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                          Slug
-                        </label>
-                        <input
-                          style={{ ...styles.input, color: "#863819", fontWeight: "bold" }}
-                          value={recForm.slug}
-                          readOnly
-                          placeholder="url-amigable"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                        Descripción
-                      </label>
-                      <textarea
-                        style={{ ...styles.input, minHeight: "80px" }}
-                        value={recForm.descripcion}
-                        onChange={(e) => setRecForm((f) => ({ ...f, descripcion: e.target.value }))}
-                        placeholder="Descripción del recorrido"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "11px", fontWeight: 700, color: "#863819", display: "block", marginBottom: "4px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                        Imagen de portada
-                      </label>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" hidden ref={recImagenRef} onChange={handleRecImagen} />
-                        <button onClick={() => recImagenRef.current?.click()}
-                          style={{ padding: "10px 16px", background: "#f5f2eb", border: "1px dashed #ccc", borderRadius: 8, cursor: "pointer", color: "#1c1c18", fontSize: 14, textAlign: "center" }}>
-                          {recForm.imagen ? "CAMBIAR IMAGEN" : "SELECCIONAR IMAGEN"}
-                        </button>
-                        {recForm.imagen && (
-                          <button onClick={() => setRecForm((f) => ({ ...f, imagen: "" }))}
-                            style={{ padding: "6px 12px", background: "white", border: "1px solid #c0392b", borderRadius: 8, cursor: "pointer", color: "#c0392b", fontSize: 12, fontWeight: 600 }}>
-                            QUITAR
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>
-                        Formatos: JPG, PNG, WebP — Resolución mínima: 800×600 px
-                      </div>
-                      {recForm.imagen && (
-                        <div style={{ width: 240, height: 135, borderRadius: 8, overflow: "hidden", border: "1px solid #eee" }}>
-                          <img src={recForm.imagen} alt="portada" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Pasos */}
-                    <div style={{ marginTop: "24px" }}>
-                      <h3 style={{ fontSize: "16px", color: "#1c1c18", marginBottom: "12px" }}>Pasos del recorrido</h3>
-
-                      {/* Search entities */}
-                      <div style={{ position: "relative", marginBottom: "12px" }}>
-                        <input
-                          style={styles.input}
-                          placeholder="Buscar entidad para agregar como paso..."
-                          value={pasoSearch}
-                          onChange={(e) => {
-                            const q = e.target.value;
-                            setPasosearch(q);
-                            if (q.length < 2) { setPasoResults([]); return; }
-                            const lower = q.toLowerCase();
-                            setPasoResults(
-                              allEntities.filter(
-                                (ent) =>
-                                  ent.nombre.toLowerCase().includes(lower) &&
-                                  !recPasos.find((p) => p.entidad_id === ent.id),
-                              ),
-                            );
-                          }}
-                        />
-                        {pasoResults.length > 0 && (
-                          <div style={{
-                            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
-                            background: "white", border: "1px solid #eee", borderRadius: "12px",
-                            boxShadow: "0 4px 20px rgba(0,0,0,0.08)", maxHeight: 200, overflowY: "auto",
-                          }}>
-                            {pasoResults.map((r) => (
-                              <div
-                                key={r.id}
-                                onClick={() => {
-                                  setRecPasos((prev) => [...prev, {
-                                    entidad_id: r.id, nombre: r.nombre, tipo: r.tipo, slug: r.slug,
-                                    descripcion_paso: "", paso_orden: prev.length + 1,
-                                  }]);
-                                  setPasosearch("");
-                                  setPasoResults([]);
-                                }}
-                                style={{
-                                  padding: "10px 14px", cursor: "pointer", fontSize: 14, color: "#1c1c18",
-                                  borderBottom: "1px solid #f5f2eb", display: "flex", justifyContent: "space-between", alignItems: "center",
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = "#f5f2eb"}
-                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                              >
-                                <span style={{ color: "#1c1c18" }}>{r.nombre}</span>
-                                <span style={{ fontSize: 11, color: colorMapAdmin[r.tipo] || "#888", textTransform: "capitalize" }}>{r.tipo}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Pasos list */}
-                      {recPasos.length === 0 && (
-                        <p style={{ color: "#999", fontSize: 13, textAlign: "center", margin: "20px 0" }}>
-                          Sin pasos todavía. Buscá una entidad arriba para agregarla.
-                        </p>
-                      )}
-                      {recPasos.map((p, i) => (
-                        <div key={p.entidad_id} style={{
-                          display: "flex", gap: 8, alignItems: "center",
-                          padding: "10px 12px", marginBottom: 6,
-                          background: "#f5f2eb", borderRadius: 10,
-                        }}>
-                          <span style={{
-                            width: 24, height: 24, borderRadius: "50%",
-                            background: colorMapAdmin[p.tipo] || "#863819",
-                            color: "white", display: "flex", alignItems: "center",
-                            justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            {i + 1}
-                          </span>
-                          <span style={{ flex: "0 0 auto", fontSize: 14, fontWeight: 600, color: "#1c1c18", minWidth: 80 }}>{p.nombre}</span>
-                          <input
-                            placeholder="descripción del paso"
-                            value={p.descripcion_paso}
-                            onChange={(e) => {
-                              const next = [...recPasos];
-                              next[i] = { ...next[i], descripcion_paso: e.target.value };
-                              setRecPasos(next);
-                            }}
-                            style={{
-                              flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6,
-                              border: "1px solid #ddd", fontSize: 12, color: "#1c1c18",
-                              background: "white",
-                            }}
-                          />
-                          {i > 0 && (
-                            <button
-                              onClick={() => {
-                                const next = [...recPasos];
-                                [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                                next.forEach((n, idx) => { n.paso_orden = idx + 1; });
-                                setRecPasos(next);
-                              }}
-                              style={{ background: "none", border: "none", color: "#863819", cursor: "pointer", fontSize: 16, padding: 4 }}
-                              title="Subir"
-                            >
-                              ↑
-                            </button>
-                          )}
-                          {i < recPasos.length - 1 && (
-                            <button
-                              onClick={() => {
-                                const next = [...recPasos];
-                                [next[i], next[i + 1]] = [next[i + 1], next[i]];
-                                next.forEach((n, idx) => { n.paso_orden = idx + 1; });
-                                setRecPasos(next);
-                              }}
-                              style={{ background: "none", border: "none", color: "#863819", cursor: "pointer", fontSize: 16, padding: 4 }}
-                              title="Bajar"
-                            >
-                              ↓
-                            </button>
-                          )}
-                          <button onClick={() => setRecPasos((prev) => prev.filter((_, idx) => idx !== i))}
-                            style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16, padding: 4 }}>
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-
-                      {/* Buttons */}
-                      <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
-                        <button onClick={() => { resetRecForm(); }}
-                          className="admin-btn-ghost"
-                          style={{ ...styles.btnSecondary }}>
-                          CANCELAR
-                        </button>
-                        <button onClick={guardarRecorrido}
-                          disabled={recSaving}
-                          className="admin-btn"
-                          style={{
-                            ...styles.btnPrimary,
-                            background: recSaving ? "#999" : "#2e7d32",
-                            cursor: recSaving ? "not-allowed" : "pointer",
-                          }}>
-                          {recSaving ? "GUARDANDO…" : editingRecorridoId && editingRecorridoId !== "new" ? "ACTUALIZAR RECORRIDO" : "CREAR RECORRIDO"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* --- LIST --- */
-                  <>
-                    {recorridos.length === 0 && (
-                      <div style={{ color: "#888", fontSize: "14px", padding: "40px", textAlign: "center" }}>
-                        No hay recorridos todavía
-                      </div>
-                    )}
-                    {recorridos.map((r) => (
-                      <div key={r.id} style={styles.entityCard}>
-                        <div style={{
-                          width: "10px", height: "10px", borderRadius: "50%",
-                          background: "#863819", flexShrink: 0,
-                        }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: "15px", color: "#1c1c18" }}>
-                            {r.nombre}
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#999" }}>
-                            {r.total_pasos || 0} paso{(r.total_pasos || 0) !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => cargarRecorridoParaEditar(r)}
-                          className="admin-btn-ghost"
-                          style={styles.smallBtn("#863819")}
-                        >
-                          <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                          EDITAR
-                        </button>
-                        <button
-                          onClick={() => eliminarRecorrido(r.id, r.nombre)}
-                          className="admin-btn-danger"
-                          style={styles.smallBtn("#c0392b")}
-                        >
-                          <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                          ELIMINAR
-                        </button>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* PALABRAS */}
-            {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
-
-            {/* PLANES */}
-            {view === "planes" && <PlanesView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
-
-            {/* USUARIOS */}
-            {view === "usuarios" && (
-              <UsuariosView
-                authFetch={authFetch}
-                authHeaders={authHeaders}
-                showConfirm={showConfirm}
-                showPopup={showPopup}
-                onEditEntity={(id) => { cargarEntidadParaEditar(id); setView("nuevo-editar"); }}
-              />
-            )}
-
-            {/* DEVOLUCIONES */}
-            {view === "devoluciones" && (
-              <DevolucionesView
-                authFetch={authFetch}
-                authHeaders={authHeaders}
-                colorMapAdmin={colorMapAdmin}
-                setPendingDevoluciones={setPendingDevoluciones}
-                cargarEntidades={cargarEntidades}
-                showPopup={showPopup}
-                showConfirm={showConfirm}
-              />
-            )}
-
-            {/* DASHBOARD */}
-            {view === "dashboard" && (
-              <DashboardView authFetch={authFetch} />
-            )}
-
-            {/* LOCALIDADES */}
-            {view === "localidades" && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-                    <img src="/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-                    Localidades
-                  </h2>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={cargarLocalidades} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                      <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-                      ACTUALIZAR
-                    </button>
-                    <button
-                      onClick={guardarLocalidades}
-                      disabled={dirtyCount === 0}
-                      className="admin-btn"
-                      style={{
-                        ...styles.btnPrimary,
-                        opacity: dirtyCount === 0 ? 0.4 : 1,
-                        fontSize: "13px",
-                        padding: "10px 20px",
-                      }}
-                    >
-                      GUARDAR CAMBIOS{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                    </button>
-                  </div>
-                </div>
-                <div style={{ background: "white", borderRadius: "12px", border: "1px solid #eee", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 160px 160px 80px", gap: "40px", padding: "16px 16px 9px", fontWeight: 800, fontSize: "13px", textTransform: "uppercase", borderBottom: "1px solid #d4cfc4", background: "#f0ede8", borderRadius: "8px 8px 0 0" }}>
-                    <div style={{ color: "#1c1c18" }}>Ciudad</div>
-                    <div style={{ color: "#1c1c18" }}>Habitantes</div>
-                    <div style={{ color: "#1c1c18" }}>Fecha Fundación</div>
-                    <div style={{ color: "#1c1c18" }}>Gentilicio</div>
-                    <div style={{ color: "#1c1c18" }}>Cabecera</div>
-                  </div>
-                  <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "8px 16px 16px" }}>
-                    {localidades.map((loc) => (
-                      <LocalidadRow
-                        key={loc.id}
-                        loc={loc}
-                        values={editValues[loc.id]}
-                        onChange={(field, val) => handleEditChange(loc.id, field, val)}
-                      />
-                    ))}
-                    {localidades.length === 0 && (
-                      <div style={{ color: "#888", fontSize: "14px", padding: "20px", textAlign: "center" }}>
-                        No hay localidades cargadas.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Popup */}
-      {popup && popup.isConfirm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => { pendingConfirm.current?.(false); setPopup(null); pendingConfirm.current = null; }}>
-          <div
-            style={{
-              background: "white",
-              padding: "32px",
-              borderRadius: "14px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-              minWidth: "380px",
-              maxWidth: "440px",
-              textAlign: "center",
-              fontFamily: "Merriweather, serif",
-              fontSize: "14px",
-              fontWeight: 500,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p style={{ margin: "0 0 20px", fontSize: "15px", lineHeight: 1.5, color: "#000" }}>
-              {popup.message}
-            </p>
-            {popup.confirmEmail && (
-              <div style={{ marginBottom: "20px", textAlign: "left" }}>
-                <label style={{ fontSize: "12px", fontWeight: 700, color: "#c62828", display: "block", marginBottom: "6px" }}>
-                  Escribí el email del usuario para confirmar:
-                </label>
-                <input
-                  autoFocus
-                  type="email"
-                  value={confirmEmailInput}
-                  onChange={(e) => setConfirmEmailInput(e.target.value)}
-                  placeholder={popup.confirmEmail}
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    border: `2px solid ${confirmEmailInput && confirmEmailInput !== popup.confirmEmail ? "#c62828" : "#ddd"}`,
-                    borderRadius: "10px",
-                    fontSize: "14px",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    fontFamily: "inherit",
-                  }}
-                />
-                {confirmEmailInput && confirmEmailInput !== popup.confirmEmail && (
-                  <p style={{ fontSize: "12px", color: "#c62828", margin: "4px 0 0" }}>El email no coincide</p>
-                )}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-              <button
-                className="admin-btn"
-                onClick={() => {
-                  pendingConfirm.current?.(true);
-                  setPopup(null);
-                  pendingConfirm.current = null;
-                }}
-                disabled={popup.confirmEmail ? confirmEmailInput !== popup.confirmEmail : false}
-                style={{
-                  padding: "10px 28px",
-                  background: popup.confirmEmail
-                    ? (confirmEmailInput === popup.confirmEmail ? "#c62828" : "#ccc")
-                    : (popup.confirmLabel === "ELIMINAR" ? "#863819" : "#2e7d32"),
-                  color: "white",
-                  border: "none",
-                  borderRadius: "10px",
-                  fontWeight: 700,
-                  fontSize: "14px",
-                  cursor: popup.confirmEmail ? (confirmEmailInput === popup.confirmEmail ? "pointer" : "not-allowed") : "pointer",
-                  opacity: popup.confirmEmail && confirmEmailInput !== popup.confirmEmail ? 0.5 : 1,
-                }}
-              >
-                {popup.confirmLabel || "ELIMINAR"}
-              </button>
-              <button
-                className="admin-btn-ghost"
-                onClick={() => {
-                  pendingConfirm.current?.(false);
-                  setPopup(null);
-                  pendingConfirm.current = null;
-                }}
-                style={{
-                  padding: "10px 28px",
-                  background: "#f0ede8",
-                  color: "#555",
-                  border: "none",
-                  borderRadius: "10px",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              >
-                CANCELAR
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {popup && !popup.isConfirm && (
-        <div
-          style={{
-            position: "fixed",
-            top: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10000,
-            background: popup.type === "error"
-              ? "#fdecea"
-              : popup.type === "warning"
-                ? "#fff3e0"
-                : "#e8f5e9",
-            color: "#1c1c18",
-            padding: "14px 24px",
-            borderRadius: "14px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-            textAlign: "center",
-            fontFamily: "Merriweather, serif",
-            fontSize: "14px",
-            fontWeight: 500,
-          }}
-        >
-          {popup.message}
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ─── Dashboard View ─── */
-function DashboardView({ authFetch }) {
-  const [resumen, setResumen] = useState(null);
-  const [diario, setDiario] = useState(null);
-  const [cargando, setCargando] = useState(false);
-  const [hoverIdx, setHoverIdx] = useState(null);
-
-  const cargarDatos = useCallback(async () => {
-    setCargando(true);
-    try {
-      const [r, d] = await Promise.all([
-        authFetch("/api/analytics/resumen", { headers: authHeaders() }),
-        authFetch("/api/analytics/diario?dias=30", { headers: authHeaders() }),
-      ]);
-      if (r.ok) setResumen(await r.json());
-      if (d.ok) setDiario(await d.json());
-    } catch { /* ignore */ }
-    setCargando(false);
-  }, [authFetch]);
-
-  useEffect(() => {
-    cargarDatos();
-    const timeout = setTimeout(() => {
-      setResumen((prev) => prev ?? { totales: 0, hoy: 0, semana: 0, mes: 0, porTipo: [], top10: [] });
-      setDiario((prev) => prev ?? []);
-    }, 8000);
-    return () => clearTimeout(timeout);
-  }, [cargarDatos]);
-
-  if (!resumen) {
-    return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando dashboard…</div>;
-  }
-
-  const maxVisitas = Math.max(...(resumen.top10?.map((e) => e.visitas) || [1]));
-  const maxDiario = Math.max(...(diario?.map((d) => d.total) || [1]));
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-          <img src="/icons/todos.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
-          Dashboard
-        </h2>
-        <button onClick={cargarDatos} disabled={cargando} className="admin-btn" style={{
-          background: "#d4a017", color: "white", border: "none", padding: "8px 16px",
-          borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
-          display: "flex", alignItems: "center", gap: "6px", opacity: cargando ? 0.5 : 1,
-        }}>
-          <img src="/icons/refresh.png" style={{ width: 14, height: 14 }} alt="" />
-          {cargando ? "ACTUALIZANDO…" : "ACTUALIZAR"}
-        </button>
-      </div>
-
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
-        {[
-          { label: "Visitas totales", value: resumen.totales },
-          { label: "Hoy", value: resumen.hoy },
-          { label: "Última semana", value: resumen.semana },
-          { label: "Último mes", value: resumen.mes },
-        ].map((s) => (
-          <div key={s.label} style={{
-            background: "white", borderRadius: 12, border: "1px solid #eee",
-            padding: "20px 24px",
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#863819", marginBottom: 8, letterSpacing: "0.5px" }}>
-              {s.label}
-            </div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: "#1c1c18" }}>
-              {s.value.toLocaleString()}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
-        {/* Top 10 entidades */}
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
-            Top 10 entidades más visitadas
-          </h3>
-          {resumen.top10?.length === 0 ? (
-            <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {resumen.top10?.map((e) => (
-                <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{
-                    width: 22, height: 22, borderRadius: 6, fontSize: 10, fontWeight: 700,
-                    color: "white", display: "flex", alignItems: "center", justifyContent: "center",
-                    background: colorMapAdmin[e.tipo] || "#888",
-                  }}>
-                    {e.visitas}
-                  </div>
-                  <div style={{ flex: 1, fontSize: 13, color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {e.nombre}
-                  </div>
-                  <div style={{ width: "60%", background: "#f0ede8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: 6,
-                      background: colorMapAdmin[e.tipo] || "#888",
-                      width: `${(e.visitas / maxVisitas) * 100}%`,
-                      transition: "width 0.5s ease",
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Eventos por tipo */}
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
-            Eventos por tipo
-          </h3>
-          {resumen.porTipo?.length === 0 ? (
-            <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {resumen.porTipo?.map((t, i) => {
-                const colors = ["#863819", "#d4a017", "#4caf50", "#2196f3", "#9c27b0", "#e91e63", "#ff5722", "#795548"];
-                const max = Math.max(...resumen.porTipo.map((x) => x.cantidad));
-                return (
-                  <div key={t.tipo} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 14, height: 14, borderRadius: "50%", background: colors[i % colors.length], flexShrink: 0 }} />
-                    <div style={{ flex: 1, fontSize: 13, color: "#333" }}>{t.tipo.replace(/_/g, " ")}</div>
-                    <div style={{ width: "50%", background: "#f0ede8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: 6,
-                        background: colors[i % colors.length],
-                        width: `${(t.cantidad / max) * 100}%`,
-                        transition: "width 0.5s ease",
-                      }} />
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#555", minWidth: 32, textAlign: "right" }}>
-                      {t.cantidad}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Daily chart */}
-      <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20, marginBottom: 32 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
-          Visitas diarias (últimos 30 días)
-        </h3>
-        {!diario || diario.length === 0 ? (
-          <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 140, paddingTop: 8 }}>
-            {diario.map((d, i) => (
-              <div
-                key={d.fecha}
-                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}
-                onMouseEnter={() => setHoverIdx(i)}
-                onMouseLeave={() => setHoverIdx(null)}
-              >
-                {hoverIdx === i && d.total > 0 && (
-                  <div style={{
-                    position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
-                    background: "#1c1c18", color: "white", fontSize: 11, fontWeight: 700,
-                    padding: "2px 8px", borderRadius: 6, whiteSpace: "nowrap", zIndex: 10,
-                    pointerEvents: "none", marginBottom: 4,
-                  }}>
-                    {d.total} visita{d.total !== 1 ? "s" : ""}
-                  </div>
-                )}
-                <div style={{
-                  width: "100%", borderRadius: "4px 4px 0 0",
-                  background: "#863819",
-                  height: `${(d.total / maxDiario) * 100}%`,
-                  minHeight: d.total > 0 ? 4 : 0,
-                  transition: "height 0.3s ease",
-                  opacity: hoverIdx === i ? 1 : 0.8,
-                }} />
-                <div style={{ fontSize: 9, color: "#888", transform: "rotate(-45deg)", whiteSpace: "nowrap", marginTop: 4 }}>
-                  {new Date(d.fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit" })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Palabras View ─── */
-function PalabrasView({ authFetch, showConfirm, showPopup }) {
-  const [palabras, setPalabras] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [nuevaPalabra, setNuevaPalabra] = useState("");
-  const [nuevoSignificado, setNuevoSignificado] = useState("");
-  const [editandoId, setEditandoId] = useState(null);
-  const [editandoPalabra, setEditandoPalabra] = useState("");
-  const [editandoSignificado, setEditandoSignificado] = useState("");
-  const [adding, setAdding] = useState(false);
-
-  const cargarPalabras = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await authFetch("/api/palabras");
-      if (res.ok) setPalabras(await res.json());
-    } catch {} finally {
-      setLoading(false);
-    }
-  }, [authFetch]);
-
-  useEffect(() => { cargarPalabras(); }, [cargarPalabras]);
-
-  const agregarPalabra = async () => {
-    if (!nuevaPalabra.trim()) return;
-    setAdding(true);
-    try {
-      const res = await authFetch("/api/palabras", {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          palabra: nuevaPalabra.trim(),
-          significado: nuevoSignificado.trim() || undefined,
-        }),
-      });
-      if (res.ok) {
-        setNuevaPalabra("");
-        setNuevoSignificado("");
-        cargarPalabras();
-      }
-    } catch {} finally {
-      setAdding(false);
-    }
-  };
-
-  const actualizarPalabra = async (id) => {
-    if (!editandoPalabra.trim()) return;
-    try {
-      const res = await authFetch(`/api/palabras/${id}`, {
-        method: "PUT",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          palabra: editandoPalabra.trim(),
-          significado: editandoSignificado.trim() || undefined,
-        }),
-      });
-      if (res.ok) {
-        setEditandoId(null);
-        setEditandoPalabra("");
-        setEditandoSignificado("");
-        cargarPalabras();
-      }
-    } catch {}
-  };
-
-  const eliminarPalabra = async (id, palabra) => {
-    const ok = await showConfirm(`¿Eliminar "${palabra}"?`, "ELIMINAR");
-    if (!ok) return;
-    try {
-      const res = await authFetch(`/api/palabras/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-      if (res.ok) cargarPalabras();
-    } catch {}
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-          <img src="/icons/edit.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
-          Palabras regionales
-        </h2>
-        <button onClick={cargarPalabras} disabled={loading} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", opacity: loading ? 0.5 : 1 }}>
-          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-          {loading ? "CARGANDO…" : "ACTUALIZAR"}
-        </button>
-      </div>
-
-      <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20, marginBottom: 20 }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <input
-            style={{ ...styles.input, marginBottom: 0, flex: 1 }}
-            placeholder="Palabra o frase chaqueña..."
-            value={nuevaPalabra}
-            onChange={(e) => setNuevaPalabra(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && agregarPalabra()}
-          />
-          <button
-            onClick={agregarPalabra}
-            disabled={adding || !nuevaPalabra.trim()}
-            className="admin-btn"
-            style={{
-              background: "#2e7d32", color: "white", border: "none",
-              padding: "10px 20px", borderRadius: 12, fontWeight: 700,
-              fontSize: 14, cursor: "pointer", whiteSpace: "nowrap",
-              opacity: adding || !nuevaPalabra.trim() ? 0.5 : 1,
-            }}
-          >
-            {adding ? "AGREGANDO…" : "+ AGREGAR"}
-          </button>
-        </div>
-        <textarea
-          style={{ ...styles.input, marginBottom: 0, width: "100%", boxSizing: "border-box", minHeight: 60, resize: "vertical" }}
-          placeholder="Significado (opcional)"
-          value={nuevoSignificado}
-          onChange={(e) => setNuevoSignificado(e.target.value)}
-        />
-      </div>
-
-      {palabras.length === 0 && !loading && (
-        <div style={{ color: "#888", fontSize: 14, padding: 40, textAlign: "center" }}>
-          No hay palabras todavía. Agregá la primera arriba.
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {palabras.map((p) => (
-          <div key={p.id} style={styles.entityCard}>
-            {editandoId === p.id ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input
-                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #863819", borderRadius: 8, fontSize: 14, color: "#1c1c18", outline: "none" }}
-                    value={editandoPalabra}
-                    onChange={(e) => setEditandoPalabra(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) actualizarPalabra(p.id);
-                      if (e.key === "Escape") { setEditandoId(null); setEditandoPalabra(""); setEditandoSignificado(""); }
-                    }}
-                    autoFocus
-                  />
-                  <button onClick={() => actualizarPalabra(p.id)} className="admin-btn" style={{ background: "#2e7d32", color: "white", border: "none", padding: "8px 14px", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                    GUARDAR
-                  </button>
-                  <button onClick={() => { setEditandoId(null); setEditandoPalabra(""); setEditandoSignificado(""); }} className="admin-btn-ghost" style={{ padding: "8px 14px", background: "white", border: "1px solid #ccc", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", color: "#555" }}>
-                    CANCELAR
-                  </button>
-                </div>
-                <textarea
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, color: "#1c1c18", outline: "none", minHeight: 50, resize: "vertical" }}
-                  placeholder="Significado (opcional)"
-                  value={editandoSignificado}
-                  onChange={(e) => setEditandoSignificado(e.target.value)}
-                />
-              </div>
-            ) : (
-              <>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, color: "#1c1c18" }}>{p.palabra}</div>
-                  {p.significado && (
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 4, lineHeight: 1.4 }}>{p.significado}</div>
-                  )}
-                </div>
-                <button onClick={() => { setEditandoId(p.id); setEditandoPalabra(p.palabra); setEditandoSignificado(p.significado || ""); }} className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
-                  <img src="/icons/edit.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: 4 }} alt="" />
-                  EDITAR
-                </button>
-                <button onClick={() => eliminarPalabra(p.id, p.palabra)} className="admin-btn-danger" style={styles.smallBtn("#c0392b")}>
-                  <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: 4 }} alt="" />
-                  ELIMINAR
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPendingDevoluciones, cargarEntidades, showPopup, showConfirm }) {
-  const [devoluciones, setDevoluciones] = useState(null);
-  const [detalleEntity, setDetalleEntity] = useState(null);
-
-  const cargarDevoluciones = useCallback(async () => {
-    try {
-      const res = await authFetch("/api/suscripciones/devoluciones", { headers: authHeaders() });
-      if (res.ok) { const data = await res.json(); setDevoluciones(data); setPendingDevoluciones(data.length); }
-    } catch {}
-  }, [authFetch, authHeaders, setPendingDevoluciones]);
-
-  useEffect(() => { cargarDevoluciones(); }, [cargarDevoluciones]);
-
-  const verDetalle = async (id) => {
-    try {
-      const res = await authFetch(`/api/entidades/${id}`);
-      if (res.ok) { setDetalleEntity(await res.json()); }
-    } catch {}
-  };
-
-  const aprobar = async (id, nombre) => {
-    const ok = await showConfirm(`¿Aprobar devolución de "${nombre}"? La suscripción se cancelará.`, "APROBAR");
-    if (!ok) return;
-    const res = await authFetch(`/api/suscripciones/aprobar-devolucion/${id}`, {
-      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
-    });
-    if (res.ok) {
-      showPopup(`Devolución de "${nombre}" aprobada`);
-      setDetalleEntity(null);
-      cargarDevoluciones();
-      cargarEntidades();
-    } else {
-      const d = await res.json().catch(() => ({}));
-      showPopup(d.error || "Error al aprobar", "error");
-    }
-  };
-
-  const rechazar = async (id, nombre) => {
-    const ok = await showConfirm(`¿Rechazar devolución de "${nombre}"? La suscripción seguirá activa.`, "RECHAZAR");
-    if (!ok) return;
-    const res = await authFetch(`/api/suscripciones/rechazar-devolucion/${id}`, {
-      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
-    });
-    if (res.ok) {
-      showPopup(`Devolución de "${nombre}" rechazada`);
-      setDetalleEntity(null);
-      cargarDevoluciones();
-      cargarEntidades();
-    } else {
-      const d = await res.json().catch(() => ({}));
-      showPopup(d.error || "Error al rechazar", "error");
-    }
-  };
-
-  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
-
-  const camposEntidad = (e) => {
-    const campos = [
-      { label: "Nombre", val: e.nombre },
-      { label: "Tipo", val: e.tipo },
-      { label: "Plan", val: e.plan_tipo || "—" },
-      { label: "Vigencia", val: e.fecha_inicio_suscripcion && e.fecha_fin_suscripcion
-        ? `Del ${new Date(e.fecha_inicio_suscripcion).toLocaleDateString("es-AR")} al ${new Date(e.fecha_fin_suscripcion).toLocaleDateString("es-AR")}`
-        : "—" },
-      { label: "Email", val: e.email || "—" },
-      { label: "Razón social", val: e.razon_social || "—" },
-      { label: "CUIT", val: e.cuit || "—" },
-      { label: "Resumen", val: e.resumen || "—" },
-      { label: "Dirección", val: e.direccion_escrita || "—" },
-      { label: "Sitio web", val: e.sitio_web || "—" },
-    ];
-    if (e.tipo === "comercio") {
-      campos.push({ label: "Rubro", val: e.rubro_especifico || "—" });
-      campos.push({ label: "Horario", val: `${e.horario_apertura || "?"} – ${e.horario_cierre || "?"}` });
-    }
-    if (e.tipo === "hospedaje") {
-      campos.push({ label: "Categoría", val: e.categoria_hospedaje || "—" });
-      campos.push({ label: "Servicios", val: e.servicios || "—" });
-    }
-    if (e.tipo === "productor") {
-      campos.push({ label: "Producto", val: e.tipo_producto || "—" });
-    }
-    if (e.tipo === "evento") {
-      campos.push({ label: "Fecha evento", val: e.fecha_evento ? new Date(e.fecha_evento).toLocaleDateString("es-AR") : "—" });
-    }
-    return campos;
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h2 style={styles.sectionTitle}>
-          <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-          Devoluciones solicitadas
-        </h2>
-        <button onClick={cargarDevoluciones} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-          ACTUALIZAR
-        </button>
-      </div>
-      {devoluciones === null ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
-      ) : devoluciones.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay solicitudes de devolución pendientes.</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {devoluciones.map((e) => (
-            <div key={e.id} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "16px 20px", border: "1px solid #eee", borderRadius: 12,
-              background: "#fff",
-            }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[e.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>{e.tipo}</span>
-                </div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18", margin: "0 0 4px" }}>{e.nombre}</p>
-                <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
-                  {e.perfil_nombre || e.perfil_email} — {e.plan_tipo || "Sin plan"}
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => verDetalle(e.id)}
-                  style={{ padding: "8px 16px", background: "transparent", color: "#555", border: "1px solid #ddd", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  VER
-                </button>
-                <button onClick={() => aprobar(e.id, e.nombre)}
-                  style={{ padding: "8px 16px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  APROBAR
-                </button>
-                <button onClick={() => rechazar(e.id, e.nombre)}
-                  style={{ padding: "8px 16px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  RECHAZAR
-                </button>
-              </div>
-            </div>
+        <div style={styles.sidebarNav}>
+          {[
+            { key: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
+            { key: "entidades", label: "Entidades", icon: "/icons/todos.png", count: totalEntidades },
+            { key: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png", badge: pendingSolicitudes },
+            { key: "ediciones", label: "Ediciones", icon: "/icons/edit.png", badge: pendingEdiciones },
+            { key: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png", badge: pendingDevoluciones },
+            { key: "recorridos", label: "Recorridos", icon: "/icons/route.png" },
+            { key: "palabras", label: "Palabras", icon: "/icons/edit.png" },
+            { key: "usuarios", label: "Usuarios", icon: "/icons/user.png" },
+            { key: "planes", label: "Planes", icon: "/icons/card.png" },
+            { key: "localidades", label: "Localidades", icon: "/icons/location.png" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setView(item.key)}
+              style={{
+                ...styles.navBtn,
+                background: view === item.key ? "#f5f2eb" : "transparent",
+                color: view === item.key ? "#863819" : "#555",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                justifyContent: "space-between",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {item.icon && <img src={item.icon} style={{ width: 18, height: 18 }} alt="" />}
+                {item.label}
+              </span>
+              {(item.count || item.badge) && (
+                <span style={{
+                  background: item.badge > 0 ? "#863819" : "#f0ede8",
+                  color: item.badge > 0 ? "white" : "#888",
+                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center",
+                }}>
+                  {item.badge ?? item.count}
+                </span>
+              )}
+            </button>
           ))}
         </div>
-      )}
 
-      {/* Modal detalle */}
-      {detalleEntity && (() => {
-        const e = detalleEntity;
-        return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
-            onClick={() => setDetalleEntity(null)}
-          >
-            <div style={{ background: "white", borderRadius: "16px", padding: "28px", maxWidth: "560px", width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: 0, fontSize: "20px" }}>
-                  Detalle de entidad
-                </h3>
-                <button onClick={() => setDetalleEntity(null)}
-                  style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", padding: "4px 8px", borderRadius: "6px" }}>
-                  ✕
-                </button>
+        <button onClick={logout} style={styles.logoutBtn}>
+          CERRAR SESIÓN
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={styles.contentArea}>
+        <div style={styles.viewContainer}>
+          {/* ENTIDADES */}
+          {view === "entidades" && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+                  <img src="/icons/todos.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
+                  Entidades ({totalEntidades})
+                </h2>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button onClick={() => { setView("nuevo-editar"); setEditingEntityId(null); setStep(1); setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "" }); setEspecifico({}); setConexTempList([]); setMultimediaItems([{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }]); setDetailError(""); setMultimediaError(""); }} className="admin-btn" style={styles.btnPrimary}>
+                    + NUEVA
+                  </button>
+                </div>
               </div>
 
-              {e.imagen && (
-                <img src={e.imagen} alt="" style={{ width: "100%", height: "160px", borderRadius: 12, objectFit: "cover", marginBottom: 16, border: "1px solid #eee" }} />
-              )}
+              {/* Filter + search */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+                <input
+                  style={{ ...styles.input, marginBottom: 0, flex: 1, minWidth: 200 }}
+                  placeholder="Buscar entidad por nombre, tipo o localidad..."
+                  value={entidadSearch}
+                  onChange={(e) => setEntidadSearch(e.target.value)}
+                />
+                <input
+                  style={{ ...styles.input, marginBottom: 0, width: 200 }}
+                  placeholder="Filtrar por perfil (email/nombre)..."
+                  value={entidadFilterPerfil}
+                  onChange={(e) => setEntidadFilterPerfil(e.target.value)}
+                />
+              </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
-                {camposEntidad(e).map((c) => (
-                  <div key={c.label}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{c.label}</div>
-                    <div style={{ fontSize: "13px", color: "#000", wordBreak: "break-word" }}>{c.val}</div>
+              {/* Tipo filters */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+                {[
+                  { value: "", label: "Todas", color: "#555" },
+                  ...TIPO_OPTIONS.filter((o) => o.value).map((o) => ({
+                    ...o,
+                    color: colorMapAdmin[o.value] || "#555",
+                  })),
+                ].map((f) => {
+                  const active = entidadSearch === "" && entidadFilterPerfil === "" && tipos.length > 0
+                    ? f.value === ""
+                    : false;
+                  return (
+                    <span
+                      key={f.value}
+                      onClick={() => setEntidadSearch(f.value)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 20,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        background: active ? f.color : "#f5f2eb",
+                        color: active ? "white" : "#555",
+                        fontWeight: active ? 700 : 500,
+                        border: active ? "none" : "1px solid #eee",
+                      }}
+                    >
+                      {f.label} {f.value ? `(${tipoCounts[f.value] || 0})` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* Entity list */}
+              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                {entidadesFiltradas.map((ent) => (
+                  <div key={ent.id} style={styles.entityCard}>
+                    {ent.imagen && <img src={ent.imagen} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18" }}>{ent.nombre}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: colorMapAdmin[ent.tipo] || "#555", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          {ent.tipo}
+                        </span>
+                        {ent.estado_sello === "aprobado" && <span style={{ fontSize: 9, fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>SELLO</span>}
+                        {ent.estado_pago === "al_dia" && <span style={{ fontSize: 9, fontWeight: 700, background: "#d4a017", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>AL DÍA</span>}
+                        {ent.estado_pago === "atrasado" && <span style={{ fontSize: 9, fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>DEUDA</span>}
+                        {!ent.visible && <span style={{ fontSize: 9, fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>OCULTA</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#888", marginTop: 4, display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                        {ent.localidad_nombre && <span>📍 {ent.localidad_nombre}</span>}
+                        {ent.perfil_email && <span>👤 {ent.perfil_email}</span>}
+                        {ent.fecha_fin_suscripcion && <span>📅 Vence: {new Date(ent.fecha_fin_suscripcion).toLocaleDateString("es-AR")}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <a href={`/entidad/${ent.slug}`} target="_blank" rel="noopener noreferrer">
+                        <button className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
+                          <img src="/icons/view.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
+                          VER
+                        </button>
+                      </a>
+                      <button onClick={() => cargarEntidadParaEditar(ent.id)} className="admin-btn" style={styles.smallBtn("#863819")}>
+                        EDITAR
+                      </button>
+                      <button onClick={() => toggleVisibilidad(ent.id, ent.visible)} className="admin-btn" style={styles.smallBtn(ent.visible ? "#f39c12" : "#2e7d32")}>
+                        {ent.visible ? "OCULTAR" : "MOSTRAR"}
+                      </button>
+                      <button onClick={() => eliminarEntidad(ent.id, ent.nombre)} className="admin-btn-danger" style={styles.smallBtn("#c0392b")}>
+                        <img src="/icons/delete.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
+                        ELIMINAR
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* NUEVO / EDITAR ENTIDAD */}
+          {view === "nuevo-editar" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                <button onClick={() => setView("entidades")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#888", padding: "4px 8px" }}>
+                  ←
+                </button>
+                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
+                  {editingEntityId ? "Editar entidad" : "Nueva entidad"}
+                </h2>
+              </div>
+
+              {/* Stepper */}
+              <div style={styles.stepperNav}>
+                {["Datos generales", "Detalles específicos", "Multimedia", "Conexiones"].map((label, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ ...styles.dot, background: step >= i + 1 ? "#863819" : "#ddd" }}>{i + 1}</div>
+                    <span style={{ fontSize: 13, fontWeight: step === i + 1 ? 700 : 400, color: step === i + 1 ? "#863819" : "#888", display: i === 3 ? "inline" : "none" }}>
+                      {label}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              {e.redes_sociales && (() => {
-                const items = parseSocialList(e.redes_sociales);
-                if (items.length === 0) return null;
-                return (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 4 }}>Redes sociales</div>
-                    {items.map((item, i) => {
-                      const platform = SOCIAL_PLATFORMS.find((p) => p.value === item.type) || SOCIAL_PLATFORMS.find((p) => p.value === "otro");
-                      return (
-                        <div key={i} style={{ fontSize: "13px", color: "#000", marginBottom: 2 }}>
-                          <span style={{ fontWeight: 600, color: "#555" }}>{platform ? platform.label : item.type}: </span>
-                          <span style={{ color: "#000" }}>{item.value}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+              {step === 1 && (
+                <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
+                  <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Datos generales</h3>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "center" }}>
-                <button onClick={() => {
-                  setDetalleEntity(null);
-                }} style={{ padding: "8px 18px", background: "white", color: "#555", border: "1px solid #ccc", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  CANCELAR
-                </button>
-                <button onClick={() => aprobar(e.id, e.nombre)} style={{ padding: "8px 18px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  APROBAR DEVOLUCIÓN
-                </button>
-                <button onClick={() => rechazar(e.id, e.nombre)} style={{ padding: "8px 18px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  RECHAZAR
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
+                  <DetailField field="tipo" fieldVal={general.tipo} onFieldChange={onFieldChange} label="Tipo de entidad" type="select" options={TIPO_OPTIONS} />
+                  <DetailField field="nombre" fieldVal={general.nombre} onFieldChange={onFieldChange} label="Nombre" placeholder="Nombre de la entidad" />
+                  <DetailField field="slug" fieldVal={general.slug} onFieldChange={onFieldChange} label="Slug (URL)" placeholder="nombre-de-la-entidad" />
+                  <DetailField field="resumen" fieldVal={general.resumen} onFieldChange={onFieldChange} label="Resumen / descripción breve" type="textarea" placeholder="Breve descripción..." />
 
-const styles = {
-  mainLayout: {
-    width: "100%",
-    minHeight: "100vh",
-    background: "#f5f2eb",
-    display: "flex",
-    fontFamily: "Merriweather, serif",
-    padding: "10px",
-    boxSizing: "border-box",
-    gap: "10px",
-  },
-  sidebar: {
-    width: "240px",
-    minWidth: "240px",
-    height: "calc(100vh - 40px)",
-    background: "white",
-    display: "flex",
-    flexDirection: "column",
-    borderRight: "1px solid #eee",
-    position: "sticky",
-    top: "20px",
-    boxSizing: "border-box",
-    borderRadius: "12px",
-  },
-  sidebarHeader: {
-    padding: "24px 20px 16px",
-    borderBottom: "1px solid #f0ede8",
-  },
-  sidebarNav: {
-    padding: "12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    flex: 1,
-  },
-  navBtn: {
-    width: "100%",
-    padding: "12px 16px",
-    border: "none",
-    borderRadius: "10px",
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: "14px",
-    textAlign: "left",
-    transition: "all 0.15s",
-  },
-  logoutBtn: {
-    width: "100%",
-    padding: "14px 20px",
-    border: "none",
-    borderTop: "1px solid #f0ede8",
-    background: "transparent",
-    color: "#863819",
-    fontWeight: 700,
-    fontSize: "13px",
-    cursor: "pointer",
-    textAlign: "center",
-  },
-  contentArea: { flex: 1, padding: "20px 0 20px 20px", display: "flex", flexDirection: "column" },
-  viewContainer: { width: "100%", flex: 1, display: "flex", flexDirection: "column", overflow: "auto", paddingRight: "20px" },
-  sectionTitle: {
-    fontFamily: "Cinzel, serif",
-    color: "#1c1c18",
-    marginBottom: "10px",
-    fontSize: "28px",
-  },
-  entityCard: {
-    background: "white",
-    borderRadius: "12px",
-    padding: "14px 18px",
-    marginBottom: "8px",
-    border: "1px solid #eee",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-  },
-  smallBtn: (color) => ({
-    padding: "6px 12px",
-    background: "white",
-    border: `1px solid ${color}`,
-    color,
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: "11px",
-    whiteSpace: "nowrap",
-    transition: "0.15s",
-  }),
-  stepperNav: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "16px",
-    marginBottom: "24px",
-    alignItems: "center",
-  },
-  dot: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "50%",
-    color: "white",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    fontSize: "14px",
-  },
-  input: {
-    width: "100%",
-    padding: "14px",
-    marginBottom: "12px",
-    border: "1px solid #eee",
-    borderRadius: "12px",
-    outline: "none",
-    fontSize: "15px",
-    boxSizing: "border-box",
-  },
-  btnNext: {
-    padding: "14px 20px",
-    background: "#863819",
-    color: "white",
-    border: "none",
-    borderRadius: "15px",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "14px",
-    whiteSpace: "nowrap",
-  },
-  btnPrimary: {
-    padding: "12px 24px",
-    background: "#863819",
-    color: "white",
-    border: "none",
-    borderRadius: "15px",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "14px",
-  },
-  btnSecondary: {
-    padding: "14px 20px",
-    background: "white",
-    color: "#863819",
-    border: "1px solid #863819",
-    borderRadius: "15px",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "14px",
-    whiteSpace: "nowrap",
-  },
-  principalBadge: {
-    position: "absolute",
-    top: "8px",
-    right: "8px",
-    fontSize: "10px",
-    background: "#863819",
-    color: "white",
-    padding: "2px 8px",
-    borderRadius: "10px",
-    fontWeight: "bold",
-    zIndex: 1,
-  },
-};
-
-const LocalidadRow = ({ loc, values, onChange }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 160px 160px 80px", gap: "40px", padding: "10px 0", fontSize: "14px", borderBottom: "1px solid #f5f2eb", alignItems: "center" }}>
-    <div style={{ fontWeight: 600, color: "#1c1c18" }}>{loc.nombre}</div>
-    <div>
-      <input
-        type="number"
-        style={{ width: "100%", padding: "4px 6px", border: "1px solid #eee", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", color: "#1c1c18" }}
-        value={values?.habitantes ?? loc.habitantes?.toString() ?? ""}
-        onChange={(e) => onChange("habitantes", e.target.value)}
-      />
-    </div>
-    <div>
-      <input
-        type="date"
-        style={{ width: "100%", padding: "4px 6px", border: "1px solid #eee", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", color: "#1c1c18" }}
-        value={values?.fecha_fundacion ?? loc.fecha_fundacion ?? ""}
-        onChange={(e) => onChange("fecha_fundacion", e.target.value)}
-      />
-    </div>
-    <div>
-      <input
-        style={{ width: "100%", padding: "4px 6px", border: "1px solid #eee", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", color: "#1c1c18" }}
-        value={values?.gentilicio ?? loc.gentilicio ?? ""}
-        onChange={(e) => onChange("gentilicio", e.target.value)}
-      />
-    </div>
-    <div style={{ fontSize: "12px", color: loc.es_cabecera ? "#2e7d32" : "#999" }}>
-      {loc.es_cabecera ? "Sí" : "No"}
-    </div>
-  </div>
-);
-
-const FIELD_LABELS = {
-  nombre: "Nombre", resumen: "Descripción", email: "Email",
-  direccion_escrita: "Dirección", latitud: "Latitud", longitud: "Longitud",
-  localidad_id: "Localidad", imagen: "Foto de portada",
-  biografia_larga: "Descripción", redes_sociales: "Redes sociales",
-  sitio_web: "Sitio web", razon_social: "Razón social", cuit: "CUIT",
-  rubro_especifico: "Rubro específico", horario_apertura: "Horario apertura",
-  horario_cierre: "Horario cierre", dias_abierto: "Días abierto",
-  acepta_tarjetas: "Acepta tarjetas", fecha_evento: "Fecha del evento",
-  duracion_dias: "Duración (días)", actividades_principales: "Actividades principales",
-  link_entradas: "Link de entradas", es_itinerante: "Es itinerante",
-  fecha_inicio_suscripcion: "Inicio suscripción",
-  fecha_fin_suscripcion: "Fin suscripción",
-  tecnica_principal: "Técnica principal", materiales_usados: "Materiales usados",
-  anios_experiencia: "Años de experiencia", taller_abierto: "Taller abierto",
-  comunidad_etnica: "Comunidad étnica", contacto_comercial: "Contacto comercial",
-  historia_plato: "Historia del plato", ingredientes_clave: "Ingredientes clave",
-  receta_destacada: "Receta destacada",
-  establecimientos_donde_probar: "Establecimientos",
-  año_referencia: "Año de referencia", estilo_arquitectonico: "Estilo arquitectónico",
-  declaratoria_oficial: "Declaratoria oficial",
-  estado_conservacion: "Estado de conservación",
-  nombre_completo: "Nombre completo", apodo: "Apodo",
-  biografia_resumida: "Biografía", profesion: "Profesión",
-  fecha_nacimiento: "Fecha de nacimiento",
-  es_referente_comunidad: "Referente comunitario", contacto: "Contacto",
-  etnia: "Etnia", lenguas: "Lenguas", territorio_tradicional: "Territorio tradicional",
-  cosmovision: "Cosmovisión", categoria_natural: "Categoría natural",
-  actividades: "Actividades", acceso: "Acceso",
-  flora_fauna_destacada: "Flora y fauna destacada", mejor_epoca: "Mejor época",
-  categoria_hospedaje: "Categoría", servicios: "Servicios",
-  capacidad: "Capacidad", tipo_producto: "Tipo de producto",
-  metodos_produccion: "Métodos de producción", certificaciones: "Certificaciones",
-  tipo_experiencia: "Tipo de experiencia", duracion_experiencia: "Duración",
-  que_incluye: "Qué incluye", precio_referencia: "Precio de referencia",
-  contacto_reserva: "Contacto / Reserva", operador: "Operador",
-  autor: "Autor", fecha_relato: "Fecha del relato",
-  tipo_relato: "Tipo de relato", contenido_completo: "Contenido completo",
-  tipo_espacio: "Tipo de espacio", horarios: "Horarios",
-};
-
-function RevisarModal({ sol, onClose }) {
-  const actual = sol.entidad_actual || {};
-  const datos = sol.datos || {};
-  const changes = Object.keys(datos).filter((k) => {
-    if (k === "multimedia" || k.endsWith("_custom")) return false;
-    const current = actual[k] ?? "";
-    const proposed = datos[k] ?? "";
-    return String(current) !== String(proposed);
-  });
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 16, padding: 32, fontFamily: "Epilogue, sans-serif" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[sol.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 4px" }}>{sol.tipo}</p>
-            <h2 style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 700, color: "#1c1c18", margin: 0 }}>{sol.entidad_nombre}</h2>
-            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-              Solicitado por {sol.perfil_nombre || sol.perfil_email || "\u2014"} · {new Date(sol.created_at).toLocaleDateString("es-AR")}
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#999", padding: 4, lineHeight: 1 }}>✕</button>
-        </div>
-
-        {changes.length === 0 ? (
-          <p style={{ color: "#999", fontSize: 14 }}>No se detectaron cambios en los campos principales.</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #eee" }}>
-                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "30%" }}>Campo</th>
-                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "35%" }}>Valor actual</th>
-                <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, width: "35%" }}>Valor propuesto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {changes.map((k) => {
-                const current = actual[k];
-                const proposed = datos[k];
-                const label = FIELD_LABELS[k] || k;
-                const displayVal = (v) => {
-                  if (v === null || v === undefined || v === "") return <span style={{ color: "#ccc", fontStyle: "italic" }}>vacío</span>;
-                  if (k === "redes_sociales") {
-                    try {
-                      const parsed = typeof v === "string" ? JSON.parse(v) : v;
-                      if (Array.isArray(parsed)) return parsed.map((c) => `${c.type}: ${c.value}`).join(" · ");
-                    } catch {}
-                    return String(v);
-                  }
-                  if (k === "localidad_id") return `ID: ${v}`;
-                  if (k === "multimedia") return `${Array.isArray(v) ? v.length : 0} archivo(s)`;
-                  return String(v);
-                };
-                const isNew = current === null || current === undefined || current === "";
-                return (
-                  <tr key={k} style={{ borderBottom: "1px solid #f5f2eb" }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 600, color: "#1c1c18" }}>{label}</td>
-                    <td style={{ padding: "10px 12px", color: isNew ? "#ccc" : "#666", fontStyle: isNew ? "italic" : "normal" }}>
-                      {displayVal(current)}
-                    </td>
-                    <td style={{ padding: "10px 12px", color: "#2e7d32", background: "#f1f8e9" }}>
-                      {displayVal(proposed)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {datos.multimedia && Array.isArray(datos.multimedia) && datos.multimedia.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", margin: "0 0 12px" }}>Multimedia nueva</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {datos.multimedia.filter((m) => m.url_recurso).map((m, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#fafaf8", borderRadius: 8, border: "1px solid #eee" }}>
-                  {m.tipo_recurso === "foto" ? (
-                    <img src={m.url_recurso} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4 }} />
-                  ) : m.tipo_recurso === "video" ? (
-                    <video src={m.url_recurso} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4 }} />
-                  ) : (
-                    <div style={{ width: 48, height: 48, background: "#f5f2eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎵</div>
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18", margin: 0 }}>{m.titulo_alternativo || `Multimedia ${i + 1}`}</p>
-                    <p style={{ fontSize: 11, color: "#999", margin: 0 }}>{m.tipo_recurso} · {m.descripcion_recurso || ""}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 32 }}>
-          <button onClick={onClose} style={{
-            fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer",
-            border: "1px solid #ddd", background: "transparent", padding: "8px 16px",
-            borderRadius: 8, color: "#555",
-          }}>CERRAR</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdiciones, showConfirm, showPopup }) {
-  const [ediciones, setEdiciones] = useState(null);
-  const [revisando, setRevisando] = useState(null);
-  const setEdicionesCount = useCallback((data) => {
-    setEdiciones(data);
-    if (setPendingEdiciones) setPendingEdiciones(data ? data.length : 0);
-  }, [setPendingEdiciones]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
-        if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
-      } catch {}
-    })();
-  }, [authFetch, authHeaders, setEdicionesCount]);
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h2 style={styles.sectionTitle}>
-          <img src="/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-          Ediciones
-        </h2>
-        <button onClick={async () => {
-          const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
-          if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
-        }} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-          ACTUALIZAR
-        </button>
-      </div>
-      {ediciones === null ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
-      ) : ediciones.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay ediciones pendientes.</p>
-      ) : (
-        <>
-        {(() => {
-          const grouped = ediciones.reduce((acc, sol) => {
-            const key = sol.owner_email || "desconocido";
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(sol);
-            return acc;
-          }, {});
-          return Object.entries(grouped).map(([email, sols]) => (
-            <div key={email} style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#555", marginBottom: 8, padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 6 }}>
-                <img src="/icons/user.png" style={{ width: 16, height: 16 }} alt="" />
-                {sols[0].owner_nombre || email}
-              </div>
-              {sols.map((sol) => (
-                <div key={sol.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", border: "1px solid #eee", borderRadius: 12, background: "#fff", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[sol.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>{sol.tipo}</span>
-                      <span style={{ fontSize: 11, color: "#f39c12", background: "#fff8e1", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>PENDIENTE</span>
-                    </div>
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18", margin: 0 }}>{sol.entidad_nombre}</p>
-                    <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-                      {new Date(sol.created_at).toLocaleDateString("es-AR")}
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setRevisando(sol)} style={{
-                      padding: "8px 16px", background: "transparent", color: "#555",
-                      border: "1px solid #ddd", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      cursor: "pointer", fontFamily: "inherit",
-                    }}>REVISAR</button>
-                    <button onClick={async () => {
-                      const ok = await showConfirm("¿Aprobar esta edición? Los datos se aplicarán a la entidad.", "APROBAR");
-                      if (!ok) return;
-                      await authFetch(`/api/solicitudes-edicion/${sol.id}/aprobar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
-                      const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
-                      if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
-                    }} style={{ padding: "8px 16px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      APROBAR
-                    </button>
-                    <button onClick={async () => {
-                      const ok = await showConfirm("¿Rechazar esta edición?", "RECHAZAR");
-                      if (!ok) return;
-                      await authFetch(`/api/solicitudes-edicion/${sol.id}/rechazar`, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }) });
-                      const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
-                      if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
-                    }} style={{ padding: "8px 16px", background: "#c62828", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      RECHAZAR
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ));
-        })()}
-        </>
-      )}
-      {revisando && <RevisarModal sol={revisando} onClose={() => setRevisando(null)} />}
-    </div>
-  );
-}
-
-/* ─── Planes View ─── */
-/* ─── Usuarios View ─── */
-function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, onEditEntity }) {
-  const [perfiles, setPerfiles] = useState(null);
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const cargar = useCallback(async (q) => {
-    setLoading(true);
-    try {
-      const url = q ? `/api/admin/perfiles?search=${encodeURIComponent(q)}` : "/api/admin/perfiles";
-      const res = await authFetch(url, { headers: authHeaders() });
-      if (res.ok) setPerfiles(await res.json());
-    } catch {} finally {
-      setLoading(false);
-    }
-  }, [authFetch, authHeaders]);
-
-  useEffect(() => { cargar(); }, [cargar]);
-
-  const verDetalle = async (id) => {
-    try {
-      const res = await authFetch(`/api/admin/perfiles/${id}`, { headers: authHeaders() });
-      if (res.ok) setSelected(await res.json());
-    } catch {}
-  };
-
-  const toggleBan = async (perfil, baneado) => {
-    const accion = baneado ? "BANEAR" : "DESBANEAR";
-    const msg = baneado
-      ? `¿Banear a "${perfil.nombre || perfil.email}"? No podrá iniciar sesión ni acceder al sistema.\n\nEscribí su email para confirmar.`
-      : `¿Desbanear a "${perfil.nombre || perfil.email}"? Recuperará el acceso al sistema.`;
-    const ok = await showConfirm(msg, accion, baneado ? perfil.email : null);
-    if (!ok) return;
-    try {
-      const res = await authFetch(`/api/admin/perfiles/${perfil.id}/ban`, {
-        method: "PUT",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ baneado }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        showPopup(baneado ? "Usuario baneado" : "Usuario desbaneado");
-        // Update list
-        setPerfiles((prev) => prev.map((p) => p.id === updated.id ? { ...p, baneado: updated.baneado } : p));
-        // Update detail if open
-        if (selected && selected.perfil.id === updated.id) {
-          setSelected((prev) => ({ ...prev, perfil: { ...prev.perfil, baneado: updated.baneado } }));
-        }
-      }
-    } catch {}
-  };
-
-  if (selected) {
-    const { perfil, entidades } = selected;
-    return (
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-          <button onClick={() => setSelected(null)} style={{
-            background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#888", padding: "4px 8px",
-          }}>←</button>
-          <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
-            <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-            {perfil.nombre || "Sin nombre"}
-          </h2>
-        </div>
-
-        <div style={{ display: "flex", gap: "24px", flex: 1, minHeight: 0 }}>
-          {/* Profile info */}
-          <div style={{ flex: 1, background: "white", borderRadius: "12px", padding: "24px", border: "1px solid #eee" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
-              {perfil.avatar_url ? (
-                <img src={perfil.avatar_url} alt="" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "2px solid #f0ede8" }} />
-              ) : (
-                <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "#999" }}>👤</div>
-              )}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "20px", fontWeight: 700, color: "#1c1c18" }}>{perfil.nombre || "Sin nombre"}</span>
-                  {perfil.baneado && (
-                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>BANEADO</span>
-                  )}
-                  {perfil.verified ? (
-                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>VERIFICADO</span>
-                  ) : (
-                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 10px", borderRadius: "10px" }}>NO VERIFICADO</span>
-                  )}
-                </div>
-                <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{perfil.email}</div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
-              {[
-                { label: "Email", val: perfil.email },
-                { label: "Profesión", val: perfil.profesion || "—" },
-                { label: "País", val: perfil.pais || "—" },
-                { label: "Provincia", val: perfil.provincia || "—" },
-                { label: "Localidad", val: perfil.localidad || "—" },
-                { label: "Nacionalidad", val: perfil.nacionalidad || "—" },
-                { label: "Sexo", val: perfil.sexo || "—" },
-                { label: "Fecha de nacimiento", val: perfil.fecha_nacimiento ? new Date(perfil.fecha_nacimiento).toLocaleDateString("es-AR") : "—" },
-                { label: "WhatsApp", val: perfil.whatsapp || "—" },
-                { label: "Bio", val: perfil.bio || "—", fullWidth: true },
-                { label: "Google ID", val: perfil.google_id || "—" },
-                { label: "Registrado", val: perfil.created_at ? new Date(perfil.created_at).toLocaleDateString("es-AR") : "—" },
-                { label: "Actualizado", val: perfil.updated_at ? new Date(perfil.updated_at).toLocaleDateString("es-AR") : "—" },
-              ].map((f) => (
-                <div key={f.label} style={f.fullWidth ? { gridColumn: "1 / -1" } : {}}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>{f.label}</div>
-                  <div style={{ fontSize: "14px", color: "#000", wordBreak: "break-word" }}>{f.val}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", gap: "8px", marginTop: "24px", flexWrap: "wrap" }}>
-              <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(perfil.email)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#863819", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", textDecoration: "none", fontFamily: "inherit" }}>
-                <img src="/icons/mail.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
-                ENVIAR EMAIL
-              </a>
-              {perfil.whatsapp && (
-                <a href={`https://wa.me/${perfil.whatsapp.replace(/[^0-9]/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#25D366", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", textDecoration: "none", fontFamily: "inherit" }}>
-                  <img src="/icons/whatsapp.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
-                  WHATSAPP
-                </a>
-              )}
-              {perfil.baneado ? (
-                <button onClick={() => toggleBan(perfil, false)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  DESBANEAR
-                </button>
-              ) : (
-                <button onClick={() => toggleBan(perfil, true)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#c62828", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  <img src="/icons/delete.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="" />
-                  BANEAR
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Entities list */}
-          <div style={{ width: "360px", minWidth: "300px", background: "white", borderRadius: "12px", padding: "20px", border: "1px solid #eee", display: "flex", flexDirection: "column" }}>
-            <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: "16px" }}>
-              Entidades ({entidades.length})
-            </h3>
-            <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-              {entidades.length === 0 ? (
-                <p style={{ color: "#aaa", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No tiene entidades.</p>
-              ) : (
-                entidades.map((ent) => (
-                  <a
-                    key={ent.id}
-                    href={`/entidad/${ent.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: "none", display: "block" }}
-                  >
-                    <div style={{
-                      padding: "12px", border: "1px solid #f0ede8", borderRadius: "8px", marginBottom: "8px",
-                      background: ent.visible ? "#fff" : "#f9f9f9", opacity: ent.visible ? 1 : 0.6,
-                      cursor: "pointer", transition: "box-shadow 0.15s",
-                    }}
-                      onMouseEnter={(e) => { if (ent.visible) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Localidad
+                    </label>
+                    <select
+                      style={styles.input}
+                      value={general.localidad_id}
+                      onChange={(e) => setGeneral((prev) => ({ ...prev, localidad_id: e.target.value }))}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "10px", fontWeight: 700, color: colorMapAdmin[ent.tipo] || "#555", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          {ent.tipo}
-                        </span>
-                        {!ent.visible && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>OCULTA</span>
-                        )}
-                        {ent.estado_sello === "aprobado" && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>SELLO</span>
-                        )}
-                        {ent.estado_pago === "atrasado" && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>DEUDA</span>
-                        )}
-                        {ent.estado_pago === "reembolso_solicitado" && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, background: "#e65100", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>DEVOLUCIÓN</span>
-                        )}
-                        {ent.fecha_fin_suscripcion && (() => {
-                          try {
-                            const d = new Date();
-                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            const fin = ent.fecha_fin_suscripcion.split('T')[0];
-                            if (fin < hoy) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>VENCIDA</span>;
-                          } catch {}
-                          return null;
-                        })()}
-                        {ent.fecha_fin_suscripcion && ent.estado_pago === "al_dia" && (() => {
-                          try {
-                            const d = new Date();
-                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            const fin = ent.fecha_fin_suscripcion.split('T')[0];
-                            const diff = Math.ceil((new Date(fin + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
-                            if (diff >= 0 && diff <= 30) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>PRÓXIMO A VENCER ({diff}d)</span>;
-                          } catch {}
-                          return null;
-                        })()}
-                        {ent.tipo === "evento" && ent.fecha_evento && (() => {
-                          try {
-                            const d = new Date();
-                            const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            const fe = ent.fecha_evento.split('T')[0];
-                            if (fe < hoy) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#e74c3c", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>VENCIDO</span>;
-                            const diff = Math.ceil((new Date(fe + 'T23:59:59') - new Date(hoy + 'T00:00:00')) / 86400000);
-                            if (diff <= 7) return <span style={{ fontSize: "9px", fontWeight: 700, background: "#f39c12", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>PRONTO ({diff}d)</span>;
-                            return <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>FALTAN {diff}d</span>;
-                          } catch {}
-                          return null;
-                        })()}
+                      <option value="">Sin localidad</option>
+                      {localidades.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
+                    </select>
+                  </div>
+
+                  <DetailField field="direccion_escrita" fieldVal={general.direccion_escrita} onFieldChange={onFieldChange} label="Dirección escrita" placeholder="Calle y número" />
+
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
+                      <input type="checkbox" checked={general.visible} onChange={(e) => setGeneral((prev) => ({ ...prev, visible: e.target.checked }))} />
+                      Visible en el mapa
+                    </label>
+                  </div>
+
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Ubicación en el mapa
+                    </label>
+                    <input
+                      style={{ ...styles.input, marginBottom: 8 }}
+                      placeholder="Buscar dirección o localidad..."
+                      value={geoQuery}
+                      onChange={(e) => setGeoQuery(e.target.value)}
+                    />
+                    {geoResults.length > 0 && (
+                      <div style={{ background: "white", border: "1px solid #eee", borderRadius: 12, maxHeight: 200, overflowY: "auto", marginBottom: 12 }}>
+                        {geoResults.map((f) => (
+                          <div key={f.id} onClick={() => seleccionarGeo(f)} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #f5f2eb", color: "#333" }}>
+                            {f.place_name}
+                          </div>
+                        ))}
                       </div>
-                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#1c1c18", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                        {ent.nombre}
-                        <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditEntity(ent.id); }}
-                          style={{
-                            padding: "4px 10px", background: "transparent", color: "#863819",
-                            border: "1px solid #863819", borderRadius: "6px", fontSize: "10px",
-                            fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                            whiteSpace: "nowrap", transition: "0.15s",
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#863819"; e.currentTarget.style.color = "white"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#863819"; }}
-                        >
-                          EDITAR
-                        </button>
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
-                        {new Date(ent.created_at).toLocaleDateString("es-AR")}
-                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>Lat:</label>
+                      <input
+                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #eee", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
+                        type="number" step="any" value={general.latitud}
+                        onChange={(e) => setGeneral((prev) => ({ ...prev, latitud: e.target.value }))}
+                      />
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>Lng:</label>
+                      <input
+                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #eee", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
+                        type="number" step="any" value={general.longitud}
+                        onChange={(e) => setGeneral((prev) => ({ ...prev, longitud: e.target.value }))}
+                      />
                     </div>
-                  </a>
-                ))
+                  </div>
+
+                  <div ref={mapContainer} style={{ width: "100%", height: 300, borderRadius: 12, overflow: "hidden", border: "1px solid #eee" }} />
+
+                  {(editingEntityId || general.tipo === "comercio" || general.tipo === "hospedaje" || general.tipo === "evento" || general.tipo === "productor") && (
+                    <div style={{ marginTop: 20, padding: "16px 20px", background: "#fff8e1", borderRadius: 12, border: "1px solid #ffe082" }}>
+                      <h4 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 12px", fontSize: 15 }}>Suscripción</h4>
+                      <DetailField field="fecha_inicio_suscripcion" fieldVal={general.fecha_inicio_suscripcion} onFieldChange={onFieldChange} label="Inicio de suscripción" type="date" />
+                      <DetailField field="fecha_fin_suscripcion" fieldVal={general.fecha_fin_suscripcion} onFieldChange={onFieldChange} label="Fin de suscripción" type="date" />
+                    </div>
+                  )}
+
+                  <div style={{ textAlign: "right", marginTop: 20 }}>
+                    <button onClick={() => setStep(2)} className="admin-btn" style={styles.btnNext}>
+                      SIGUIENTE →
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h2 style={styles.sectionTitle}>
-          <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
-          Usuarios
-        </h2>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <input
-            placeholder="Buscar por nombre o email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") cargar(search); }}
-            style={{
-              padding: "8px 14px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "13px",
-              outline: "none", width: "260px", fontFamily: "inherit",
-            }}
-          />
-          <button onClick={() => cargar(search)} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-            <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-            BUSCAR
-          </button>
-        </div>
-      </div>
+              {step === 2 && renderSpecInputs() && (
+                <div style={{ textAlign: "right", marginTop: 20, display: "flex", justifyContent: "space-between" }}>
+                  <button onClick={() => setStep(1)} className="admin-btn" style={styles.btnSecondary}>← ANTERIOR</button>
+                  <button onClick={() => setStep(3)} className="admin-btn" style={styles.btnNext}>SIGUIENTE →</button>
+                </div>
+              )}
 
-      {loading ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
-      ) : perfiles === null ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
-      ) : perfiles.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay usuarios registrados.</p>
-      ) : (
-        <div style={{ background: "white", borderRadius: "12px", border: "1px solid #eee", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1.2fr 0.8fr 0.8fr 0.6fr 80px", gap: "16px", padding: "16px 16px 9px", fontWeight: 800, fontSize: "13px", textTransform: "uppercase", borderBottom: "1px solid #d4cfc4", background: "#f0ede8", borderRadius: "8px 8px 0 0", alignItems: "center" }}>
-            <div></div>
-            <div style={{ color: "#1c1c18" }}>Nombre</div>
-            <div style={{ color: "#1c1c18" }}>Email</div>
-            <div style={{ color: "#1c1c18" }}>Localidad</div>
-            <div style={{ color: "#1c1c18" }}>Registro</div>
-            <div style={{ color: "#1c1c18" }}>Entidades</div>
-            <div></div>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "8px 16px 16px" }}>
-            {perfiles.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => verDetalle(p.id)}
-                style={{
-                  display: "grid", gridTemplateColumns: "40px 1fr 1.2fr 0.8fr 0.8fr 0.6fr 80px", gap: "16px",
-                  padding: "12px 0", fontSize: "14px", borderBottom: "1px solid #f5f2eb", alignItems: "center",
-                  cursor: "pointer", transition: "background 0.1s",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "#fafaf8"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-              >
+              {step === 2 && !renderSpecInputs() && (
+                <div style={{ textAlign: "center", padding: 40, color: "#888" }}>
+                  Seleccioná un tipo de entidad para ver los detalles específicos.
+                </div>
+              )}
+
+              {step === 3 && (
                 <div>
-                  {p.avatar_url ? (
-                    <img src={p.avatar_url} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f0ede8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", color: "#999" }}>👤</div>
-                  )}
+                  <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
+                    <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Multimedia</h3>
+                    {multimediaError && <div style={{ color: "#c62828", fontSize: 13, marginBottom: 12 }}>{multimediaError}</div>}
+                    {multimediaItems.map((item, i) => (
+                      <div key={i} style={{ marginBottom: 16, padding: 16, background: "#fafaf8", borderRadius: 12, border: "1px solid #eee" }}>
+                        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                          {item.url_recurso && item.tipo_recurso === "foto" && (
+                            <img src={item.url_recurso} alt="" style={{ width: 80, height: 80, borderRadius: 8, objectFit: "cover" }} />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                              <select
+                                value={item.tipo_recurso}
+                                onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, tipo_recurso: e.target.value } : m))}
+                                style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
+                              >
+                                <option value="foto">Foto</option>
+                                <option value="video">Video</option>
+                                <option value="audio">Audio</option>
+                              </select>
+                              <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, cursor: "pointer" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.es_principal}
+                                  onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, es_principal: e.target.checked } : m))}
+                                />
+                                Principal
+                              </label>
+                            </div>
+                            <input
+                              style={{ ...styles.input, marginBottom: 8 }}
+                              placeholder="URL del recurso"
+                              value={item.url_recurso}
+                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, url_recurso: e.target.value } : m))}
+                            />
+                            <input
+                              style={{ ...styles.input, marginBottom: 8 }}
+                              placeholder="Título alternativo (opcional)"
+                              value={item.titulo_alternativo}
+                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, titulo_alternativo: e.target.value } : m))}
+                            />
+                            <textarea
+                              style={{ ...styles.input, marginBottom: 8 }}
+                              placeholder="Descripción (opcional)"
+                              value={item.descripcion_recurso}
+                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, descripcion_recurso: e.target.value } : m))}
+                            />
+                          </div>
+                        </div>
+                        <TagSelector
+                          entidades={allEntities.filter((e) => e.id !== (editingEntityId || -1))}
+                          selected={item.entidades_etiquetadas || []}
+                          onChange={(tags) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, entidades_etiquetadas: tags } : m))}
+                          searchQuery={tagSearchQueries[i] || ""}
+                          setSearchQuery={(q) => setTagSearchQueries((prev) => ({ ...prev, [i]: q }))}
+                          typeFilter={tagTypeFilters[i] || ""}
+                          setTypeFilter={(f) => setTagTypeFilters((prev) => ({ ...prev, [i]: f }))}
+                        />
+                        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="file"
+                            accept={INFO_FORMATOS[item.tipo_recurso]?.accept?.join(",") || "image/*"}
+                            onChange={(e) => e.target.files[0] && handleUpload(i, e.target.files[0])}
+                            style={{ fontSize: 13, flex: 1 }}
+                          />
+                          {uploadingIndex === i && <span style={{ fontSize: 12, color: "#888" }}>Subiendo...</span>}
+                          {multimediaItems.length > 1 && (
+                            <button onClick={() => setMultimediaItems((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 13 }}>
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => setMultimediaItems((prev) => [...prev, { url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: false, public_id: "", entidades_etiquetadas: [] }])} className="admin-btn" style={{ ...styles.smallBtn("#863819"), marginRight: 8 }}>
+                      + AGREGAR ARCHIVO
+                    </button>
+                  </div>
+
+                  {/* Conexiones en step 3 */}
+                  <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee", marginTop: 16 }}>
+                    <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>
+                      Conexiones {conexTempList.length > 0 && `(${conexTempList.length})`}
+                    </h3>
+
+                    <div style={{ position: "relative", marginBottom: 12 }}>
+                      <input
+                        style={styles.input}
+                        placeholder="Buscar entidad para conectar..."
+                        value={conexSearch}
+                        onChange={(e) => setConexSearch(e.target.value)}
+                      />
+                      {conexResults.length > 0 && (
+                        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: "1px solid #eee", borderRadius: 12, zIndex: 10, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+                          {conexResults.filter((e) => e.id !== editingEntityId).map((e) => (
+                            <div key={e.id} onClick={() => agregarConexTemp(e)} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #f5f2eb", color: "#333", display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: colorMapAdmin[e.tipo] || "#888", textTransform: "uppercase" }}>{e.tipo}</span>
+                              {e.nombre}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {conexTempList.map((c, i) => (
+                      <div key={c.entidad_destino_id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, padding: "10px 14px", background: "#fafaf8", borderRadius: 8 }}>
+                        <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{c.nombre}</span>
+                        <input
+                          style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18" }}
+                          placeholder="Tipo de relación (ej: colabora con)"
+                          value={c.tipo_relacion}
+                          onChange={(e) => {
+                            const next = [...conexTempList];
+                            next[i] = { ...next[i], tipo_relacion: e.target.value };
+                            setConexTempList(next);
+                          }}
+                        />
+                        <input
+                          style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18" }}
+                          placeholder="Relación inversa (ej: es colaborado por)"
+                          value={c.tipo_relacion_inversa}
+                          onChange={(e) => {
+                            const next = [...conexTempList];
+                            next[i] = { ...next[i], tipo_relacion_inversa: e.target.value };
+                            setConexTempList(next);
+                          }}
+                        />
+                        <button onClick={() => quitarConexTemp(c.entidad_destino_id)} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ textAlign: "right", marginTop: 20, display: "flex", justifyContent: "space-between" }}>
+                    <button onClick={() => setStep(2)} className="admin-btn" style={styles.btnSecondary}>← ANTERIOR</button>
+                    <button onClick={guardarEntidad} disabled={loading} className="admin-btn" style={{ ...styles.btnPrimary, opacity: loading ? 0.6 : 1 }}>
+                      {loading ? "GUARDANDO..." : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontWeight: 600, color: "#1c1c18", display: "flex", alignItems: "center", gap: "6px" }}>
-                  {p.nombre || "Sin nombre"}
-                  {p.baneado && <span style={{ fontSize: "9px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>B</span>}
-                  {p.verified && <span style={{ fontSize: "9px", fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "1px 6px", borderRadius: "6px" }}>V</span>}
-                </div>
-                <div style={{ color: "#666", fontSize: "13px" }}>{p.email}</div>
-                <div style={{ color: "#888", fontSize: "13px" }}>{p.localidad || "—"}</div>
-                <div style={{ color: "#888", fontSize: "13px" }}>{p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : "—"}</div>
-                <div style={{ color: "#888", fontSize: "13px", textAlign: "center" }}>{p.entidades_count}</div>
-                <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                  <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(p.email)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "8px", background: "#f0ede8", cursor: "pointer", textDecoration: "none" }}
-                    title="Enviar email por Gmail"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <img src="/icons/mail.png" style={{ width: "16px", height: "16px" }} alt="email" />
-                  </a>
-                  {p.whatsapp && (
-                    <a href={`https://wa.me/${p.whatsapp.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "8px", background: "#25D366", cursor: "pointer", textDecoration: "none" }}
-                      title="Enviar WhatsApp"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <img src="/icons/whatsapp.png" style={{ width: "16px", height: "16px", filter: "brightness(0) invert(1)" }} alt="whatsapp" />
-                    </a>
+              )}
+            </div>
+          )}
+
+          {/* SOLICITUDES */}
+          {view === "solicitudes" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h2 style={styles.sectionTitle}>
+                  <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                  Solicitudes de Sello
+                  {solicitudesPendientes > 0 && (
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#863819", marginLeft: 12, background: "#f5f2eb", padding: "4px 12px", borderRadius: 10 }}>
+                      {solicitudesPendientes} pendiente{solicitudesPendientes !== 1 ? "s" : ""}
+                    </span>
                   )}
+                </h2>
+                <button onClick={cargarSolicitudes} className="admin-btn" style={styles.smallBtn("#863819")}>
+                  <img src="/icons/refresh.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
+                  RECARGAR
+                </button>
+              </div>
+
+              {solicitudesLoading ? (
+                <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
+              ) : solicitudes.length === 0 ? (
+                <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay solicitudes.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {solicitudes.map((sol) => (
+                    <div key={sol.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "16px 20px", border: "1px solid #eee", borderRadius: 12, background: "#fff", gap: 8,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[sol.tipo] || "#555", textTransform: "uppercase", letterSpacing: "1px" }}>{sol.tipo}</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 10,
+                            background: sol.estado === "aprobado" ? "#e8f5e9" : sol.estado === "rechazado" ? "#ffebee" : "#fff8e1",
+                            color: sol.estado === "aprobado" ? "#2e7d32" : sol.estado === "rechazado" ? "#c62828" : "#f39c12",
+                          }}>
+                            {sol.estado?.toUpperCase()}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18", margin: "0 0 4px" }}>{sol.nombre}</p>
+                        <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+                          {sol.perfil_nombre || sol.perfil_email} · {new Date(sol.created_at).toLocaleDateString("es-AR")}
+                          {sol.updated_at && ` · ${sol.estado === "aprobado" ? "Aprobado" : "Rechazado"} el ${new Date(sol.updated_at).toLocaleDateString("es-AR")}`}
+                        </p>
+                      </div>
+                      {sol.estado === "pendiente" && (
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => setSolicitudDetalle(sol)} className="admin-btn" style={styles.smallBtn("#863819")}>
+                            <img src="/icons/view.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
+                            VER
+                          </button>
+                          <button onClick={() => setApproveModal(sol)} className="admin-btn" style={{ ...styles.smallBtn("#2e7d32"), background: "#2e7d32", color: "white" }}>
+                            APROBAR
+                          </button>
+                          <button onClick={() => rechazarSolicitud(sol.id, sol.nombre)} className="admin-btn" style={{ ...styles.smallBtn("#c62828"), background: "#c62828", color: "white" }}>
+                            RECHAZAR
+                          </button>
+                        </div>
+                      )}
+                      {sol.estado !== "pendiente" && (
+                        <span style={{ fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                          {sol.estado === "aprobado" ? "✅ Aprobado" : "❌ Rechazado"}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Solicitud detail modal */}
+              {solicitudDetalle && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSolicitudDetalle(null)}>
+                  <div style={{ background: "white", borderRadius: 16, padding: 32, maxWidth: 500, width: "100%", maxHeight: "80vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+                    <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 16, fontSize: 20 }}>{solicitudDetalle.nombre}</h3>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {[
+                        { label: "Tipo", val: solicitudDetalle.tipo },
+                        { label: "Estado", val: solicitudDetalle.estado },
+                        { label: "Email", val: solicitudDetalle.email || "—" },
+                        { label: "Teléfono", val: solicitudDetalle.telefono || "—" },
+                        { label: "Solicitante", val: solicitudDetalle.perfil_nombre || solicitudDetalle.perfil_email },
+                        { label: "Fecha", val: new Date(solicitudDetalle.created_at).toLocaleDateString("es-AR") },
+                      ].map((f) => (
+                        <div key={f.label}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>{f.label}</span>
+                          <div style={{ fontSize: 14, color: "#1c1c18" }}>{f.val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
+                      <button onClick={() => { setSolicitudDetalle(null); setApproveModal(solicitudDetalle); }} className="admin-btn" style={{ ...styles.smallBtn("#2e7d32"), background: "#2e7d32", color: "white" }}>APROBAR</button>
+                      <button onClick={() => { rechazarSolicitud(solicitudDetalle.id, solicitudDetalle.nombre); }} className="admin-btn" style={{ ...styles.smallBtn("#c62828"), background: "#c62828", color: "white" }}>RECHAZAR</button>
+                      <button onClick={() => setSolicitudDetalle(null)} className="admin-btn" style={styles.smallBtn("#555")}>CERRAR</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Approve modal */}
+              {approveModal && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setApproveModal(null)}>
+                  <div style={{ background: "white", borderRadius: 16, padding: 32, maxWidth: 500, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+                    <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", marginBottom: 8, fontSize: 20 }}>Aprobar "{approveModal.nombre}"</h3>
+                    <p style={{ fontSize: 14, color: "#555", marginBottom: 16 }}>
+                      Al aprobar esta solicitud, la entidad quedará habilitada para adquirir un plan de suscripción y aparecer en el mapa.
+                    </p>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={() => setApproveModal(null)} className="admin-btn" style={styles.smallBtn("#555")}>CANCELAR</button>
+                      <button onClick={() => aprobarSolicitud(approveModal.id, approveModal.nombre, approveModal.tipo)} className="admin-btn" style={{ ...styles.smallBtn("#2e7d32"), background: "#2e7d32", color: "white" }}>APROBAR</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* RECORRIDOS */}
+          {view === "recorridos" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h2 style={styles.sectionTitle}>
+                  <img src="/icons/route.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
+                  Recorridos
+                </h2>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {editingRecorridoId && (
+                    <button onClick={() => { setEditingRecorridoId(null); setRecForm({ nombre: "", slug: "", descripcion: "", imagen: "" }); setRecPasos([]); }} className="admin-btn" style={styles.smallBtn("#555")}>
+                      CANCELAR EDICIÓN
+                    </button>
+                  )}
+                  <button onClick={() => {
+                    setEditingRecorridoId(null);
+                    setRecForm({ nombre: "", slug: "", descripcion: "", imagen: "" });
+                    setRecPasos([]);
+                    setView("recorrido-form");
+                  }} className="admin-btn" style={styles.btnPrimary}>
+                    + NUEVO RECORRIDO
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Lista de recorridos */}
+              {recorridos.map((rec) => (
+                <div key={rec.id} style={styles.entityCard}>
+                  {rec.imagen && <img src={rec.imagen} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: "#1c1c18" }}>{rec.nombre}</div>
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                      {rec.pasos?.length || 0} paso{(rec.pasos?.length || 0) !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <a href={`/recorrido/${rec.slug}`} target="_blank" rel="noopener noreferrer">
+                      <button className="admin-btn-ghost" style={styles.smallBtn("#863819")}>VER</button>
+                    </a>
+                    <button onClick={() => cargarRecorridoParaEditar(rec.id)} className="admin-btn" style={styles.smallBtn("#863819")}>EDITAR</button>
+                    <button onClick={() => eliminarRecorrido(rec.id, rec.nombre)} className="admin-btn-danger" style={styles.smallBtn("#c0392b")}>ELIMINAR</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* RECORRIDO FORM */}
+          {view === "recorrido-form" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                <button onClick={() => setView("recorridos")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#888", padding: "4px 8px" }}>←</button>
+                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
+                  {editingRecorridoId ? "Editar recorrido" : "Nuevo recorrido"}
+                </h2>
+              </div>
+
+              <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee", marginBottom: 16 }}>
+                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Datos del recorrido</h3>
+                <DetailField field="nombre" fieldVal={recForm.nombre} onFieldChange={(_, v) => {
+                  const slug = v.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+                  setRecForm((prev) => ({ ...prev, nombre: v, slug }));
+                }} label="Nombre" placeholder="Nombre del recorrido" />
+                <DetailField field="slug" fieldVal={recForm.slug} onFieldChange={(_, v) => setRecForm((prev) => ({ ...prev, slug: v }))} label="Slug" placeholder="nombre-del-recorrido" />
+                <DetailField field="descripcion" fieldVal={recForm.descripcion} onFieldChange={(_, v) => setRecForm((prev) => ({ ...prev, descripcion: v }))} label="Descripción" type="textarea" placeholder="Descripción del recorrido..." />
+                <input ref={recImagenRef} type="file" accept="image/*" style={{ fontSize: 14, color: "#555" }} />
+              </div>
+
+              <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
+                <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>
+                  Pasos del recorrido {recPasos.length > 0 && `(${recPasos.length})`}
+                </h3>
+
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <input
+                    style={styles.input}
+                    placeholder="Buscar entidad para agregar al recorrido..."
+                    value={pasoSearch}
+                    onChange={(e) => setPasosearch(e.target.value)}
+                  />
+                  {pasoResults.length > 0 && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: "1px solid #eee", borderRadius: 12, zIndex: 10, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+                      {pasoResults.map((e) => (
+                        <div key={e.id} onClick={() => agregarPaso(e)} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #f5f2eb", color: "#333", display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: colorMapAdmin[e.tipo] || "#888", textTransform: "uppercase" }}>{e.tipo}</span>
+                          {e.nombre}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {recPasos.map((paso, i) => (
+                  <div key={paso.entidad_id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, padding: "10px 14px", background: "#fafaf8", borderRadius: 8, border: "1px solid #f0ede8" }}>
+                    <span style={{ fontWeight: 700, color: "#863819", fontSize: 14, minWidth: 24 }}>{i + 1}.</span>
+                    <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{paso.nombre}</span>
+                    <input
+                      style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18" }}
+                      placeholder="Descripción de este paso"
+                      value={paso.descripcion_paso}
+                      onChange={(e) => {
+                        const next = [...recPasos];
+                        next[i] = { ...next[i], descripcion_paso: e.target.value };
+                        setRecPasos(next);
+                      }}
+                    />
+                    <button onClick={() => reordenarPasos(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? "#ddd" : "#863819", fontSize: 16 }}>↑</button>
+                    <button onClick={() => reordenarPasos(i, 1)} disabled={i === recPasos.length - 1} style={{ background: "none", border: "none", cursor: i === recPasos.length - 1 ? "default" : "pointer", color: i === recPasos.length - 1 ? "#ddd" : "#863819", fontSize: 16 }}>↓</button>
+                    <button onClick={() => setRecPasos((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ textAlign: "right", marginTop: 20 }}>
+                <button onClick={guardarRecorrido} disabled={recSaving} className="admin-btn" style={{ ...styles.btnPrimary, opacity: recSaving ? 0.6 : 1 }}>
+                  {recSaving ? "GUARDANDO..." : editingRecorridoId ? "ACTUALIZAR RECORRIDO" : "CREAR RECORRIDO"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* EDICIONES */}
+          {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} showConfirm={showConfirm} showPopup={showPopup} />}
+
+          {/* PALABRAS */}
+          {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
+
+          {/* PLANES */}
+          {view === "planes" && <PlanesView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
+
+          {/* USUARIOS */}
+          {view === "usuarios" && (
+            <UsuariosView
+              authFetch={authFetch}
+              authHeaders={authHeaders}
+              showConfirm={showConfirm}
+              showPopup={showPopup}
+              onEditEntity={(id) => { cargarEntidadParaEditar(id); setView("nuevo-editar"); }}
+            />
+          )}
+
+          {/* DEVOLUCIONES */}
+          {view === "devoluciones" && (
+            <DevolucionesView
+              authFetch={authFetch}
+              authHeaders={authHeaders}
+              colorMapAdmin={colorMapAdmin}
+              setPendingDevoluciones={setPendingDevoluciones}
+              cargarEntidades={cargarEntidades}
+              showPopup={showPopup}
+              showConfirm={showConfirm}
+            />
+          )}
+
+          {/* DASHBOARD */}
+          {view === "dashboard" && (
+            <DashboardView authFetch={authFetch} />
+          )}
+
+          {/* LOCALIDADES */}
+          {view === "localidades" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+                  <img src="/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
+                  Localidades
+                </h2>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={guardarLocalidades}
+                    disabled={dirtyCount === 0}
+                    className="admin-btn"
+                    style={{
+                      ...styles.btnPrimary,
+                      opacity: dirtyCount === 0 ? 0.4 : 1,
+                      fontSize: "13px",
+                      padding: "10px 20px",
+                    }}
+                  >
+                    GUARDAR CAMBIOS{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 140px 160px 160px 80px", gap: "40px",
+                padding: "10px 16px", fontWeight: 700, fontSize: "12px", textTransform: "uppercase",
+                color: "#888", background: "white", borderRadius: "12px", border: "1px solid #eee",
+                marginBottom: "8px",
+              }}>
+                <div>Nombre</div>
+                <div>Habitantes</div>
+                <div>Fundación</div>
+                <div>Gentilicio</div>
+                <div>Cabecera</div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                {localidades.map((loc) => (
+                  <LocalidadRow
+                    key={loc.id}
+                    loc={loc}
+                    values={editValues[loc.id]}
+                    onChange={(field, value) => handleEditChange(loc.id, field, value)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-}
-
-function PlanesView({ authFetch, showConfirm, showPopup }) {
-  const [planes, setPlanes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [editandoId, setEditandoId] = useState(null);
-  const [editando, setEditando] = useState({});
-
-  const cargarPlanes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await authFetch("/api/planes/admin", { headers: authHeaders() });
-      if (res.ok) setPlanes(await res.json());
-    } catch {} finally {
-      setLoading(false);
-    }
-  }, [authFetch]);
-
-  useEffect(() => { cargarPlanes(); }, [cargarPlanes]);
-
-  const iniciarEdicion = (plan) => {
-    setEditandoId(plan.id);
-    setEditando({
-      nombre: plan.nombre,
-      descripcion: plan.descripcion || "",
-      precio: plan.precio,
-      duracion_dias: plan.duracion_dias,
-      entidades_incluidas: plan.entidades_incluidas,
-      activo: plan.activo,
-    });
-  };
-
-  const guardar = async (id) => {
-    if (!editando.nombre.trim()) return;
-    try {
-      const res = await authFetch(`/api/planes/${id}`, {
-        method: "PUT",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify(editando),
-      });
-      if (res.ok) {
-        setEditandoId(null);
-        showPopup("Plan actualizado");
-        cargarPlanes();
-      }
-    } catch {}
-  };
-
-  const eliminar = async (id, nombre) => {
-    const ok = await showConfirm(`¿Eliminar el plan "${nombre}"?`, "ELIMINAR");
-    if (!ok) return;
-    try {
-      const res = await authFetch(`/api/planes/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-      if (res.ok) {
-        showPopup("Plan eliminado");
-        cargarPlanes();
-      }
-    } catch {}
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h2 style={styles.sectionTitle}>
-          <img src="/icons/card.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle", filter: "brightness(0)" }} alt="" />
-          Planes
-        </h2>
-        <button onClick={cargarPlanes} className="admin-btn" style={{ background: "#d4a017", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-          <img src="/icons/refresh.png" style={{ width: "14px", height: "14px" }} alt="" />
-          ACTUALIZAR
-        </button>
       </div>
 
-      {loading ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Cargando...</p>
-      ) : planes.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No hay planes todavía.</p>
-      ) : (
-        planes.map((plan) => (
-          <div key={plan.id} style={styles.entityCard}>
-            {editandoId === plan.id ? (
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "8px" }}>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>NOMBRE</label>
-                    <input style={styles.input} value={editando.nombre} onChange={(e) => setEditando({ ...editando, nombre: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>PRECIO ($)</label>
-                    <input style={styles.input} type="number" step="0.01" value={editando.precio} onChange={(e) => setEditando({ ...editando, precio: e.target.value })} />
-                  </div>
-                  {plan.nombre !== "Personalizado" && (
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>DURACIÓN (DÍAS)</label>
-                      <input style={styles.input} type="number" value={editando.duracion_dias} onChange={(e) => setEditando({ ...editando, duracion_dias: e.target.value })} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "8px" }}>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>DESCRIPCIÓN</label>
-                    <textarea style={styles.input} rows={2} value={editando.descripcion} onChange={(e) => setEditando({ ...editando, descripcion: e.target.value })} />
-                  </div>
-                  {plan.nombre !== "Personalizado" && (
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4 }}>ENTIDADES INCLUIDAS</label>
-                      <input style={styles.input} type="number" value={editando.entidades_incluidas} onChange={(e) => setEditando({ ...editando, entidades_incluidas: e.target.value })} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: 13, cursor: "pointer" }}>
-                    <input type="checkbox" checked={editando.activo} onChange={(e) => setEditando({ ...editando, activo: e.target.checked })} />
-                    Plan activo
-                  </label>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button onClick={() => guardar(plan.id)} className="admin-btn" style={{ ...styles.btnPrimary, fontSize: 12, padding: "8px 16px" }}>
-                    GUARDAR
-                  </button>
-                  <button onClick={() => setEditandoId(null)} className="admin-btn" style={{ ...styles.btnSecondary, fontSize: 12, padding: "8px 16px" }}>
+      {/* Popup */}
+      {popup && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: popup.isConfirm ? "rgba(0,0,0,0.4)" : "transparent", pointerEvents: popup.isConfirm ? "auto" : "none" }}
+          onClick={() => {
+            if (popup.isConfirm) {
+              pendingConfirm.current?.(false);
+              setPopup(null);
+            }
+          }}
+        >
+          <div style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px 32px",
+            maxWidth: "420px",
+            width: "100%",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            pointerEvents: "auto",
+          }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {popup.isConfirm ? (
+              <>
+                <p style={{ margin: "0 0 16px", fontSize: "15px", color: "#1c1c18", fontFamily: "Merriweather, serif", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  {popup.message}
+                </p>
+                {popup.confirmEmail && (
+                  <input
+                    style={{ ...styles.input, marginBottom: 12, fontSize: 14 }}
+                    placeholder={`Escribí ${popup.confirmEmail} para confirmar`}
+                    value={confirmEmailInput}
+                    onChange={(e) => setConfirmEmailInput(e.target.value)}
+                  />
+                )}
+                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                  <button onClick={() => { pendingConfirm.current?.(false); setPopup(null); }} className="admin-btn" style={{ padding: "8px 20px", background: "white", color: "#555", border: "1px solid #ccc", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
                     CANCELAR
                   </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 700, fontSize: "15px", color: "#1c1c18" }}>{plan.nombre}</span>
-                    {!plan.activo && (
-                      <span style={{ fontSize: "10px", fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: "10px" }}>INACTIVO</span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-                    {plan.descripcion ? `${plan.descripcion} · ` : ""}
-                    <strong>${Number(plan.precio).toLocaleString("es-AR")}</strong> · {plan.duracion_dias} días · {plan.entidades_incluidas} entidad{plan.entidades_incluidas !== 1 ? "es" : ""}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                  <button onClick={() => iniciarEdicion(plan)} className="admin-btn" style={styles.smallBtn("#863819")}>
-                    EDITAR
-                  </button>
-                  <button onClick={() => eliminar(plan.id, plan.nombre)} className="admin-btn" style={{ ...styles.smallBtn("#c62828") }}>
-                    <img src="/icons/delete.png" style={{ width: "14px", height: "14px", verticalAlign: "middle", marginRight: "4px" }} alt="" />
-                    ELIMINAR
+                  <button onClick={() => {
+                    if (popup.confirmEmail && confirmEmailInput !== popup.confirmEmail) {
+                      showPopup("El email no coincide", "error");
+                      return;
+                    }
+                    pendingConfirm.current?.(true);
+                    setPopup(null);
+                  }} className="admin-btn" style={{ padding: "8px 20px", background: "#863819", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+                    {popup.confirmLabel || "CONFIRMAR"}
                   </button>
                 </div>
               </>
+            ) : (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                background: popup.type === "error" ? "#ffebee" : "#e8f5e9",
+                color: "#1c1c18",
+                padding: "14px 24px",
+                borderRadius: "14px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                textAlign: "center",
+                fontFamily: "Merriweather, serif",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+              >
+                {popup.message}
+              </div>
             )}
           </div>
-        ))
+        </div>
       )}
     </div>
   );
-}
+};

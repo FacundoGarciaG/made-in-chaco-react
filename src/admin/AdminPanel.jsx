@@ -432,7 +432,7 @@ export const AdminPanel = () => {
       ...prev,
       latitud: lat,
       longitud: lon,
-      direccion_escrita: r.display_name,
+      direccion_escrita: (prev.direccion_escrita || "").trim() || r.display_name.split(",")[0]?.trim() || r.display_name,
     }));
     setGeoQuery(r.display_name);
     setGeoResults([]);
@@ -1697,13 +1697,25 @@ export const AdminPanel = () => {
 
                   <div style={{ marginBottom: 12 }}>
                     <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                      Dirección escrita
+                      Calle y número
                     </label>
                     <input
                       style={styles.input}
-                      placeholder="Calle y número, lugar..."
+                      placeholder="Ej: San Martín 123"
+                      value={general.direccion_escrita || ""}
+                      onChange={(e) => setGeneral((prev) => ({ ...prev, direccion_escrita: e.target.value }))}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Buscar en el mapa
+                    </label>
+                    <input
+                      style={styles.input}
+                      placeholder="Ej: San Martín 123, Resistencia..."
                       value={geoQuery}
-                      onChange={(e) => { setGeoQuery(e.target.value); setGeneral((prev) => ({ ...prev, direccion_escrita: e.target.value })); }}
+                      onChange={(e) => { setGeoQuery(e.target.value); }}
                     />
                     {geoResults.length > 0 && (
                       <div style={{ background: "white", border: "1px solid #eee", borderRadius: 12, maxHeight: 180, overflowY: "auto", marginTop: 4 }}>

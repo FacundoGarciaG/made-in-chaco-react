@@ -716,11 +716,15 @@ export const SolicitarEdicionPage = () => {
             </select>
           </div>
 
+          <div className="solicitar-floating-group">
+            <input id="edit-calle" value={form.direccion_escrita ?? ""} onChange={(e) => set("direccion_escrita", e.target.value)} placeholder=" " autoComplete="off" />
+            <label htmlFor="edit-calle">Calle y número</label>
+          </div>
+
           <div className="solicitar-floating-group" style={{ position: "relative" }}>
-            <input id="edit-direccion" value={geoQuery}
+            <input id="edit-buscar-mapa" value={geoQuery}
               onChange={(e) => {
                 setGeoQuery(e.target.value);
-                set("direccion_escrita", e.target.value);
                 if (e.target.value.length < 3) { setGeoResults([]); return; }
                 clearTimeout(geoTimeoutRef.current);
                 geoTimeoutRef.current = setTimeout(async () => {
@@ -739,7 +743,7 @@ export const SolicitarEdicionPage = () => {
               placeholder=" "
               autoComplete="off"
             />
-            <label htmlFor="edit-direccion">Dirección</label>
+            <label htmlFor="edit-buscar-mapa">Buscar en el mapa</label>
             {geoResults.length > 0 && (
               <div className="solicitar-geo-results">
                 {geoResults.map((r, i) => (
@@ -749,7 +753,13 @@ export const SolicitarEdicionPage = () => {
                       clearTimeout(geoTimeoutRef.current);
                       const lat = parseFloat(r.lat);
                       const lon = parseFloat(r.lon);
-                      setForm((f) => ({ ...f, direccion_escrita: r.display_name, latitud: lat.toFixed(7), longitud: lon.toFixed(7) }));
+                      const dirActual = (form.direccion_escrita ?? "").trim();
+                      setForm((f) => ({
+                        ...f,
+                        latitud: lat.toFixed(7),
+                        longitud: lon.toFixed(7),
+                        direccion_escrita: dirActual || r.display_name.split(",")[0]?.trim() || r.display_name,
+                      }));
                       setGeoQuery(r.display_name);
                       setGeoResults([]);
                       if (mapRef.current && markerRef.current) {

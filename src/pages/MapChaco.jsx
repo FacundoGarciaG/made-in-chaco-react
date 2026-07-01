@@ -663,35 +663,26 @@ export const MapChaco = () => {
             popupRef.current = null;
           }
 
-          // Determinar si es la misma entidad ANTES del fetch
           const isSameEntity = lastClickedEntityRef.current === id;
           lastClickedEntityRef.current = id;
           setEntityActive(true);
 
-          // Arrancar easeTo INMEDIATAMENTE (sin esperar fetch)
-          if (isSameEntity) {
-            map.easeTo({
-              center: coordinates,
-              zoom: 14,
-              duration: 2500,
-            });
-          } else {
-            map.easeTo({
-              center: coordinates,
-              zoom: 9,
-              duration: 1800,
-            });
-          }
-
-          // Fetch conexiones en paralelo (mientras se anima el mapa)
+          // Fetch conexiones (necesitamos saber si hay antes de decidir zoom)
           let conexionesData = [];
           try {
             const res = await fetch(`/api/entidades/${id}/conexiones`);
             conexionesData = await res.json();
           } catch (_) {}
 
-          // Si es nueva entidad con conexiones → fitBounds
-          if (!isSameEntity && conexionesData.length > 0) {
+          // Segundo click → zoom cercano siempre
+          if (isSameEntity) {
+            map.easeTo({
+              center: coordinates,
+              zoom: 14,
+              duration: 2500,
+            });
+          } else if (conexionesData.length > 0) {
+            // Primer click con conexiones → fitBounds para ver todas
             const bounds = new mapboxgl.LngLatBounds(coordinates, coordinates);
             const lookup = entidadCoordsRef.current;
             for (const c of conexionesData) {
@@ -703,6 +694,13 @@ export const MapChaco = () => {
               if (otherCoords) bounds.extend(otherCoords);
             }
             map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
+          } else {
+            // Primer click sin conexiones → zoom cercano
+            map.easeTo({
+              center: coordinates,
+              zoom: 14,
+              duration: 2500,
+            });
           }
 
           // Esperar a que termine la animación del mapa antes de crear el popup

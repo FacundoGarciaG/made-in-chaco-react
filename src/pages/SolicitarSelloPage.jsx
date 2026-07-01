@@ -661,9 +661,20 @@ export const SolicitarSelloPage = () => {
                   </select>
                 </div>
 
+                <div className="solicitar-floating-group">
+                  <input
+                    id="sello-calle"
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    placeholder=" "
+                    autoComplete="off"
+                  />
+                  <label htmlFor="sello-calle">Calle y número *</label>
+                </div>
+
                 <div className="solicitar-floating-group" style={{ position: "relative" }}>
                   <input
-                    id="sello-direccion"
+                    id="sello-buscar-mapa"
                     value={geoQuery}
                     onChange={(e) => {
                       setGeoQuery(e.target.value);
@@ -686,7 +697,7 @@ export const SolicitarSelloPage = () => {
                     placeholder=" "
                     autoComplete="off"
                   />
-                  <label htmlFor="sello-direccion">Dirección *</label>
+                  <label htmlFor="sello-buscar-mapa">Buscar en el mapa</label>
                   {geoResults.length > 0 && (
                     <div className="solicitar-geo-results">
                       {geoResults.map((r, i) => (
@@ -696,13 +707,16 @@ export const SolicitarSelloPage = () => {
                           onMouseDown={(e) => {
                             e.preventDefault();
                             clearTimeout(geoTimeoutRef.current);
-                            setDireccion(r.display_name);
                             setGeoQuery(r.display_name);
                             setGeoResults([]);
                             const lat = parseFloat(r.lat);
                             const lon = parseFloat(r.lon);
                             setLatitud(lat.toFixed(7));
                             setLongitud(lon.toFixed(7));
+                            if (!direccion.trim()) {
+                              const streetPart = r.display_name.split(",")[0]?.trim() || r.display_name;
+                              setDireccion(streetPart);
+                            }
                             if (mapRef.current && markerRef.current) {
                               mapRef.current.flyTo({ center: [lon, lat], zoom: 14, speed: 1 });
                               markerRef.current.setLngLat([lon, lat]);

@@ -14,6 +14,7 @@ import { optimizarUrlCloudinary } from "../utils/imageUrl";
 import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS, QUE_INCLUYE_EXPERIENCIA, TIPOS_EXPERIENCIA, TIPOS_PRODUCTO, SERVICIOS_SUGERIDOS, ACTIVIDADES_SUGERIDAS, TIPOS_RELATO, RUBROS_COMERCIO, DIAS_SEMANA, CATEGORIAS_HOSPEDAJE } from "./constants";
 import { DetailField, GastronomiaSelector, SocialMediaManager, LocalidadRow } from "./components";
 import { DashboardView } from "./DashboardView";
+import logoAdm from "../assets/imagenes/logo-madeinchaco.png";
 import { SEO } from "../components/SEO";
 import { PalabrasView } from "./PalabrasView";
 import { DevolucionesView } from "./DevolucionesView";
@@ -1308,6 +1309,9 @@ export const AdminPanel = () => {
       {/* Sidebar */}
       <div className="admin-sidebar" style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
+          <div style={{ textAlign: "center", marginBottom: 10 }}>
+            <img src={logoAdm} alt="Made in Chaco" style={{ width: 180 }} />
+          </div>
           <div style={{ fontFamily: "Cinzel, serif", fontSize: 16, fontWeight: 700, color: "#863819", lineHeight: 1.2, letterSpacing: "1px", textAlign: "center" }}>
             ADMINISTRADOR
           </div>

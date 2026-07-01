@@ -51,6 +51,7 @@ export function RevisarModal({ sol, onClose }) {
                   }
                   if (k === "localidad_id") return `ID: ${v}`;
                   if (k === "multimedia") return `${Array.isArray(v) ? v.length : 0} archivo(s)`;
+                  if (k === "imagen" || k === "icono") return "(imagen)";
                   return String(v);
                 };
                 const isNew = current === null || current === undefined || current === "";

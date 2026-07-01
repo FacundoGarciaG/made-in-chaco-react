@@ -2,17 +2,14 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
+import { adminLoginRules } from "../middleware/validation.js";
+import { JWT_SECRET, JWT_EXPIRY } from "../config/env.js";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "made-in-chaco-secret-dev";
 
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", adminLoginRules, async (req, res) => {
   try {
     const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: "Usuario y contraseña requeridos" });
-    }
 
     const { rows } = await pool.query(
       "SELECT id, username, password FROM usuarios WHERE username = $1",
@@ -33,7 +30,7 @@ router.post("/auth/login", async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username },
       JWT_SECRET,
-      { expiresIn: "24h" },
+      { expiresIn: JWT_EXPIRY.admin },
     );
 
     res.json({ token, username: user.username });

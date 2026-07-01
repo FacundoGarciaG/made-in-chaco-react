@@ -7,6 +7,9 @@ import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
 import { cloudinary } from "../config/cloudinary.js";
+import { JWT_SECRET, JWT_EXPIRY } from "../config/env.js";
+import { registroRules, loginRules, perfilRules, emailOnlyRules, resetPasswordRules, sanitizarHtml } from "../middleware/validation.js";
+import { crearNotificacion } from "./notificaciones.js";
 
 const SITE_URL = process.env.SITE_URL || "http://localhost:5173";
 
@@ -21,19 +24,10 @@ const transporter = nodemailer.createTransport({
 });
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "made-in-chaco-secret-dev";
 
-router.post("/auth/registro", async (req, res) => {
+router.post("/auth/registro", registroRules, async (req, res) => {
   try {
-    const { email, password, nombre, whatsapp } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email y contraseña requeridos" });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-    }
+    const { email, password, nombre, whatsapp } = sanitizarHtml(req.body);
 
     const existe = await pool.query(
       "SELECT id FROM perfiles WHERE email = $1 AND deleted_at IS NULL",
@@ -54,7 +48,15 @@ router.post("/auth/registro", async (req, res) => {
     const token = jwt.sign(
       { id: perfil.id, email: perfil.email, tipo: "publico" },
       JWT_SECRET,
-      { expiresIn: "30d" },
+      { expiresIn: JWT_EXPIRY.publico },
+    );
+
+    crearNotificacion(
+      perfil.id,
+      "bienvenida",
+      "¡Bienvenido a Made in Chaco!",
+      "Descubrí cómo funciona tu panel de perfil. Hacé clic para comenzar un recorrido guiado por las secciones.",
+      null,
     );
 
     res.status(201).json({
@@ -131,13 +133,9 @@ router.post("/auth/reenviar-verificacion", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/auth/login-publico", async (req, res) => {
+router.post("/auth/login-publico", loginRules, async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email y contraseña requeridos" });
-    }
 
     const { rows } = await pool.query(
       "SELECT id, email, password, nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, verified, baneado, whatsapp, deleted_at FROM perfiles WHERE email = $1",
@@ -174,7 +172,7 @@ router.post("/auth/login-publico", async (req, res) => {
     const token = jwt.sign(
       { id: perfil.id, email: perfil.email, tipo: "publico" },
       JWT_SECRET,
-      { expiresIn: "30d" },
+      { expiresIn: JWT_EXPIRY.publico },
     );
 
     res.json({
@@ -221,9 +219,9 @@ router.get("/auth/perfil", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/auth/perfil", authMiddleware, async (req, res) => {
+router.put("/auth/perfil", authMiddleware, perfilRules, async (req, res) => {
   try {
-    const { nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, whatsapp } = req.body;
+    const { nombre, avatar_url, profesion, bio, localidad, pais, provincia, nacionalidad, fecha_nacimiento, sexo, avatar_public_id, whatsapp } = sanitizarHtml(req.body);
 
     const result = await pool.query(
       `UPDATE perfiles SET
@@ -392,13 +390,9 @@ router.delete("/auth/perfil", authMiddleware, async (req, res) => {
 });
 
 // Restaurar perfil dentro del período de gracia de 30 días (público, con email + password)
-router.post("/auth/restaurar", async (req, res) => {
+router.post("/auth/restaurar", loginRules, async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email y contraseña requeridos" });
-    }
 
     const { rows } = await pool.query(
       "SELECT id, password, deleted_at FROM perfiles WHERE email = $1",
@@ -472,13 +466,9 @@ router.post("/auth/restaurar", async (req, res) => {
 // ============================================================
 
 // POST /auth/olvide-password — enviar email con link de restablecimiento
-router.post("/auth/olvide-password", async (req, res) => {
+router.post("/auth/olvide-password", emailOnlyRules, async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email requerido" });
-    }
 
     // Siempre responder igual por seguridad (no revelar si el email existe)
     const mensaje = "Si el email está registrado, vas a recibir un link para restablecer tu contraseña.";
@@ -549,17 +539,9 @@ router.post("/auth/olvide-password", async (req, res) => {
 });
 
 // POST /auth/reestablecer-password — validar token y cambiar contraseña
-router.post("/auth/reestablecer-password", async (req, res) => {
+router.post("/auth/reestablecer-password", resetPasswordRules, async (req, res) => {
   try {
     const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({ error: "Token y contraseña requeridos" });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-    }
 
     // Buscar perfil con token válido y no expirado
     const { rows } = await pool.query(

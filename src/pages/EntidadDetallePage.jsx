@@ -7,6 +7,7 @@ import { track } from "../utils/tracking";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
 import "../styles/EntidadDetallePage.css";
 import { useSocketEvent } from "../hooks/useSocket";
+import { SEO } from "../components/SEO";
 
 const colorMap = {
   artesano: "#ff5722",
@@ -76,6 +77,7 @@ const sectionVariants = {
 export const EntidadDetallePage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const vieneDelMapa = typeof window !== "undefined" && sessionStorage.getItem("mapState");
   const [loading, setLoading] = useState(true);
   const [entidad, setEntidad] = useState(null);
   const [conexiones, setConexiones] = useState([]);
@@ -495,13 +497,13 @@ export const EntidadDetallePage = () => {
       <div className="entidad-error">
         <div className="entidad-error-icon">⟡</div>
         <p className="entidad-error-text">No pudimos encontrar esta entidad.</p>
-        <nav className="entidad-nav-bar" style={{ position: "static", display: "inline-flex", marginTop: 16 }}>
-          <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn">
+        <nav className="entidad-nav-bar" aria-label="Navegación de entidad" style={{ position: "static", display: "inline-flex", marginTop: 16 }}>
+          <button onClick={() => { if (sessionStorage.getItem("fromAdmin")) { sessionStorage.removeItem("fromAdmin"); navigate("/admin"); } else { if (vieneDelMapa) sessionStorage.setItem("return-to-map", "true"); navigate(-1); } }} className="entidad-nav-btn">
             <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
             Volver
           </button>
           <Link to="/descubre" className="entidad-nav-btn">
-            <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+            <i className="ri-map-pin-line" />
             Mapa
           </Link>
         </nav>
@@ -511,11 +513,7 @@ export const EntidadDetallePage = () => {
 
   const catColor = colorMap[entidad.tipo] || "#863819";
   const catName = entidad.tipo.charAt(0).toUpperCase() + entidad.tipo.slice(1);
-  const mainDescription =
-    entidad.biografia_larga ||
-    entidad.resumen ||
-    entidad.historia_plato ||
-    null;
+  const mainDescription = entidad.biografia_larga || entidad.resumen || entidad.historia_plato || null;
   const fichaItems = getFichaItems();
 
   return (
@@ -525,12 +523,12 @@ export const EntidadDetallePage = () => {
 
       {/* Back + Map buttons */}
       <nav className="entidad-nav-bar">
-        <button onClick={() => { sessionStorage.setItem("return-to-map", "true"); navigate(-1); }} className="entidad-nav-btn">
+        <button onClick={() => { if (sessionStorage.getItem("fromAdmin")) { sessionStorage.removeItem("fromAdmin"); navigate("/admin"); } else { if (vieneDelMapa) sessionStorage.setItem("return-to-map", "true"); navigate(-1); } }} className="entidad-nav-btn">
           <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
           Volver
         </button>
         <Link to="/descubre" className="entidad-nav-btn">
-          <img src="/icons/location.png" style={{ width: 14, height: 14 }} alt="" />
+          <i className="ri-map-pin-line" />
           Mapa
         </Link>
       </nav>
@@ -1381,7 +1379,7 @@ export const EntidadDetallePage = () => {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <button className="entidad-lightbox-close" onClick={closeLightbox}>
+          <button className="entidad-lightbox-close" aria-label="Cerrar" onClick={closeLightbox}>
             <i className="ri-close-line" />
           </button>
 
@@ -1391,6 +1389,7 @@ export const EntidadDetallePage = () => {
 
           <button
             className="entidad-lightbox-nav entidad-lightbox-prev"
+            aria-label="Imagen anterior"
             onClick={(e) => { e.stopPropagation(); prevImage(); }}
           >
             <i className="ri-arrow-left-s-line" />
@@ -1522,6 +1521,7 @@ export const EntidadDetallePage = () => {
 
           <button
             className="entidad-lightbox-nav entidad-lightbox-next"
+            aria-label="Imagen siguiente"
             onClick={(e) => { e.stopPropagation(); nextImage(); }}
           >
             <i className="ri-arrow-right-s-line" />

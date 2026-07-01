@@ -4,6 +4,7 @@ import { motion, useScroll, useSpring } from "motion/react";
 import "../styles/RecorridosPage.css";
 import { useSocketEvent } from "../hooks/useSocket";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
+import { SEO } from "../components/SEO";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0);
@@ -102,12 +103,13 @@ export const RecorridosPage = () => {
 
   return (
     <div className={darkMode ? "dark-mode" : ""}>
+      <SEO title="Recorridos" description="Descubrí recorridos temáticos por el Chaco: rutas culturales, naturales y gastronómicas." />
       <motion.div
         className="recorridos-progress"
         style={{ scaleX, originX: 0 }}
       />
 
-      <nav className="recorridos-nav-bar">
+      <nav className="recorridos-nav-bar" aria-label="Navegación de recorridos">
         <Link to="/descubre" className="recorridos-nav-btn">
           <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
           Volver

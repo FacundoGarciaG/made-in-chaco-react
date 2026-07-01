@@ -1,3 +1,7 @@
+.admin-sidebar * {
+  color: #1c1c18 !important;
+}
+
 :root {
   --color-terracotta: #863819;
   --color-terracotta-hover: #6d2d14;
@@ -516,16 +520,11 @@ button[type="submit"]:hover {
 
 /* === BUTTON HOVER EFFECTS === */
 .admin-btn {
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
 }
 
 .admin-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(134, 56, 25, 0.15);
-}
-
-.admin-btn:active {
-  transform: translateY(0);
+  opacity: 0.7;
 }
 
 .admin-btn-ghost {
@@ -554,7 +553,6 @@ button[type="submit"]:hover {
 
 .admin-nav-btn:hover {
   background: #f0ede8 !important;
-  color: #863819 !important;
 }
 
 .admin-logout-btn {
@@ -581,6 +579,11 @@ button[type="submit"]:hover {
 
 .admin-modal .minimap-container .mapboxgl-ctrl-bottom-left,
 .admin-modal .minimap-container .mapboxgl-ctrl-bottom-right {
+  display: none;
+}
+
+.admin-edit-map .mapboxgl-ctrl-bottom-left,
+.admin-edit-map .mapboxgl-ctrl-bottom-right {
   display: none;
 }
 

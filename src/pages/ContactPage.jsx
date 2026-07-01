@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/ContactPage.css";
 import { ContactMapBackground } from "../components/ContactMapBackground";
+import { SEO } from "../components/SEO";
 
 const STEPS = [
   { num: 1, label: "Datos" },
@@ -69,6 +70,7 @@ export const ContactPage = () => {
 
   return (
     <div className="contact-page">
+      <SEO title="Contacto" description="Comunicate con el equipo de Made in Chaco. Consultas, sugerencias y colaboraciones." />
       {!success && (
         <div className="steps-bar">
           {STEPS.map((s, i) => (

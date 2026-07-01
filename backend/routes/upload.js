@@ -5,9 +5,23 @@ import { cloudinary } from "../config/cloudinary.js";
 
 const router = Router();
 
+const TIPOS_PERMITIDOS = [
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+  "video/mp4", "video/webm", "video/ogg",
+];
+
+function fileFilter(_req, file, cb) {
+  if (TIPOS_PERMITIDOS.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`));
+  }
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB público
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter,
 });
 
 // POST /api/upload (auth required)
@@ -72,6 +86,7 @@ router.post("/upload", authMiddleware, uploadFields, async (req, res) => {
 const uploadPublic = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter,
 });
 
 router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) => {
@@ -111,7 +126,7 @@ router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) =
   }
 });
 
-router.post("/delete-public-image", async (req, res) => {
+router.post("/delete-public-image", authMiddleware, async (req, res) => {
   try {
     const { public_id } = req.body;
     if (!public_id) return res.status(400).json({ error: "public_id requerido" });

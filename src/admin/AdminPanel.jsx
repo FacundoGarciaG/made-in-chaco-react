@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/AdminPanel.css";
 import { useAuth } from "../context/AuthContext";
-import { validarArchivo, validarFormato, INFO_FORMATOS } from "../utils/mediaValidation";
+import { validarArchivo } from "../utils/mediaValidation";
 import { subirArchivo, subirImagen } from "./uploadService";
 import TagSelector from "../components/TagSelector";
 import { MiniMap } from "../components/MiniMap";
 import { useSocketEvent } from "../hooks/useSocket";
 import { getToken, authHeaders, authFetch, colorMapAdmin, parseSocialList, styles } from "./helpers";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
-import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS, QUE_INCLUYE_EXPERIENCIA, TIPOS_EXPERIENCIA, TIPOS_PRODUCTO, SERVICIOS_SUGERIDOS, ACTIVIDADES_SUGERIDAS, TIPOS_RELATO } from "./constants";
+import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS, QUE_INCLUYE_EXPERIENCIA, TIPOS_EXPERIENCIA, TIPOS_PRODUCTO, SERVICIOS_SUGERIDOS, ACTIVIDADES_SUGERIDAS, TIPOS_RELATO, RUBROS_COMERCIO, DIAS_SEMANA, CATEGORIAS_HOSPEDAJE } from "./constants";
 import { DetailField, GastronomiaSelector, SocialMediaManager, LocalidadRow } from "./components";
 import { DashboardView } from "./DashboardView";
+import { SEO } from "../components/SEO";
 import { PalabrasView } from "./PalabrasView";
 import { DevolucionesView } from "./DevolucionesView";
 import { EdicionesView } from "./EdicionesView";
@@ -23,8 +25,9 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export const AdminPanel = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [view, setView] = useState("entidades");
-  const [expandedGroups, setExpandedGroups] = useState({ entidades: true, recorridos: false });
+  const [expandedGroups, setExpandedGroups] = useState({ contenido: true, pendientes: true, administracion: false });
   const [loading, setLoading] = useState(false);
   const [localidades, setLocalidades] = useState([]);
   const [editValues, setEditValues] = useState({});
@@ -90,7 +93,9 @@ export const AdminPanel = () => {
 
   const [allEntities, setAllEntities] = useState([]);
   const [entidadSearch, setEntidadSearch] = useState("");
+  const [entidadFilterTipo, setEntidadFilterTipo] = useState("");
   const [entidadFilterPerfil, setEntidadFilterPerfil] = useState("");
+  const [entidadFilterLocalidad, setEntidadFilterLocalidad] = useState("");
   const [solicitudes, setSolicitudes] = useState([]);
   const [solicitudesLoading, setSolicitudesLoading] = useState(false);
   const [approveModal, setApproveModal] = useState(null); // { id, tipo, nombre }
@@ -105,6 +110,10 @@ export const AdminPanel = () => {
   const map = useRef(null);
   const marker = useRef(null);
   const geoTimeoutRef = useRef(null);
+  const originalGeneralRef = useRef(null);
+  const originalEspecificoRef = useRef(null);
+  const originalMultimediaRef = useRef(null);
+  const originalConexRef = useRef(null);
 
   const [geoQuery, setGeoQuery] = useState("");
   const [geoResults, setGeoResults] = useState([]);
@@ -119,6 +128,7 @@ export const AdminPanel = () => {
     longitud: -58.9861,
     visible: true,
     direccion_escrita: "",
+    icono: "",
   });
 
   const [especifico, setEspecifico] = useState({});
@@ -133,18 +143,50 @@ export const AdminPanel = () => {
       entidades_etiquetadas: [],
     },
   ]);
-  const [conexiones, setConexiones] = useState([]);
 
   const [uploadingIndex, setUploadingIndex] = useState(null);
+  const [uploadingPortada, setUploadingPortada] = useState(false);
   const [subiendoIconoAdm, setSubiendoIconoAdm] = useState(false);
   const [multimediaError, setMultimediaError] = useState("");
   const [detailError, setDetailError] = useState("");
 
   const [conexModal, setConexModal] = useState(null); // { id, nombre }
   const [conexSearch, setConexSearch] = useState("");
+  const [conexFilterTipo, setConexFilterTipo] = useState("");
   const [conexResults, setConexResults] = useState([]);
   const [conexTempList, setConexTempList] = useState([]); // [{ entidad_destino_id, nombre, tipo_relacion, tipo_relacion_inversa }]
   const [conexSaving, setConexSaving] = useState(false);
+
+  const hasEntityChanges = (() => {
+    if (!editingEntityId) return true;
+    const orig = originalGeneralRef.current;
+    if (!orig) return false;
+    for (const k of Object.keys(orig)) {
+      if (String(general[k] ?? "") !== String(orig[k] ?? "")) return true;
+    }
+    const origSpec = originalEspecificoRef.current;
+    if (origSpec) {
+      const keys = new Set([...Object.keys(origSpec), ...Object.keys(especifico)]);
+      for (const k of keys) {
+        if (String(especifico[k] ?? "") !== String(origSpec[k] ?? "")) return true;
+      }
+    } else if (Object.keys(especifico).length > 0) {
+      return true;
+    }
+    const origMult = originalMultimediaRef.current;
+    if (origMult) {
+      const a = JSON.stringify(multimediaItems.map((m) => m.url_recurso));
+      const b = JSON.stringify(origMult.map((m) => m.url_recurso));
+      if (a !== b) return true;
+    }
+    const origCx = originalConexRef.current;
+    if (origCx) {
+      const a = JSON.stringify([...conexTempList].sort((x, y) => x.entidad_destino_id - y.entidad_destino_id));
+      const b = JSON.stringify([...origCx].sort((x, y) => x.entidad_destino_id - y.entidad_destino_id));
+      if (a !== b) return true;
+    }
+    return false;
+  })();
 
   const [recorridos, setRecorridos] = useState([]);
   const [editingRecorridoId, setEditingRecorridoId] = useState(null);
@@ -178,10 +220,6 @@ export const AdminPanel = () => {
       setPopup({ message: msg, confirmLabel, isConfirm: true, confirmEmail });
     });
   };
-
-  // Tag search
-  const [tagSearchQueries, setTagSearchQueries] = useState({});
-  const [tagTypeFilters, setTagTypeFilters] = useState({});
 
   // --- CARGAR DATOS ---
   const cargarLocalidades = async () => {
@@ -242,21 +280,38 @@ export const AdminPanel = () => {
     }
   }, [socketRefresh]);
 
+  const localidadOptions = useMemo(() => {
+    const set = new Set(allEntities.map((e) => e.localidad_nombre).filter(Boolean));
+    localidades.forEach((l) => { if (l.nombre) set.add(l.nombre); });
+    return [...set].sort();
+  }, [allEntities, localidades]);
+
+  const perfilOptions = useMemo(() => {
+    const map = new Map();
+    allEntities.forEach((e) => {
+      if (e.perfil_nombre && e.perfil_id) map.set(e.perfil_id, e.perfil_nombre);
+    });
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [allEntities]);
+
   const entidadesFiltradas = useMemo(() => {
     let items = [...allEntities];
     if (entidadSearch) {
       const q = entidadSearch.toLowerCase();
-      items = items.filter((e) => e.nombre.toLowerCase().includes(q) || e.tipo?.includes(q) || e.localidad_nombre?.toLowerCase().includes(q));
+      items = items.filter((e) => e.nombre.toLowerCase().includes(q));
+    }
+    if (entidadFilterTipo) {
+      items = items.filter((e) => e.tipo === entidadFilterTipo);
     }
     if (entidadFilterPerfil) {
-      items = items.filter((e) => {
-        const email = (e.perfil_email || "").toLowerCase();
-        const nombre = (e.perfil_nombre || "").toLowerCase();
-        return email.includes(entidadFilterPerfil.toLowerCase()) || nombre.includes(entidadFilterPerfil.toLowerCase());
-      });
+      items = items.filter((e) => String(e.perfil_id) === entidadFilterPerfil);
+    }
+    if (entidadFilterLocalidad) {
+      const locId = localidades.find((l) => l.nombre === entidadFilterLocalidad)?.id;
+      items = items.filter((e) => e.localidad_nombre === entidadFilterLocalidad || (locId && e.localidad_id === locId));
     }
     return items;
-  }, [allEntities, entidadSearch, entidadFilterPerfil]);
+  }, [allEntities, entidadSearch, entidadFilterTipo, entidadFilterPerfil, entidadFilterLocalidad]);
 
   const tipoCounts = useMemo(() => {
     const counts = {};
@@ -268,65 +323,122 @@ export const AdminPanel = () => {
   const totalEntidades = allEntities.length;
 
   // --- MAPA ---
+  const mapLat = general.latitud ?? -27.4511;
+  const mapLng = general.longitud ?? -58.9861;
+
   useEffect(() => {
-    if (step === 1 || !mapContainer.current) return;
-    if (!map.current) {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [general.longitud, general.latitud],
-        zoom: 12,
-      });
-      map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    if (!mapContainer.current) return;
+    if (map.current) {
+      map.current.remove();
+      map.current = null;
     }
-    if (marker.current) marker.current.remove();
-    marker.current = new mapboxgl.Marker({ color: "#863819", draggable: true })
-      .setLngLat([general.longitud, general.latitud])
-      .addTo(map.current);
-    marker.current.on("dragend", () => {
-      const lngLat = marker.current.getLngLat();
-      setGeneral((prev) => ({ ...prev, latitud: lngLat.lat, longitud: lngLat.lng }));
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [mapLng, mapLat],
+      zoom: 12,
     });
+    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    if (marker.current) marker.current.remove();
+    const el = document.createElement("div");
+    const iconoSrc = general.icono || (general.tipo ? `/icons/${general.tipo}.png` : "");
+    if (iconoSrc) {
+      const img = document.createElement("img");
+      img.src = iconoSrc;
+      img.style.width = "36px";
+      img.style.height = "36px";
+      img.style.borderRadius = "4px";
+      img.style.boxShadow = "0 2px 8px rgba(0,0,0,0.25)";
+      img.style.objectFit = "contain";
+      el.appendChild(img);
+    }
+    marker.current = new mapboxgl.Marker({ element: el })
+      .setLngLat([mapLng, mapLat])
+      .addTo(map.current);
     return () => {
       if (marker.current) { marker.current.remove(); marker.current = null; }
+      if (map.current) { map.current.remove(); map.current = null; }
     };
-  }, [step]);
+  }, [step, view, mapLat, mapLng]);
 
   useEffect(() => {
-    if (marker.current && step > 1) {
-      marker.current.setLngLat([general.longitud, general.latitud]);
+    if (marker.current) {
+      marker.current.setLngLat([mapLng, mapLat]);
+      map.current?.flyTo({ center: [mapLng, mapLat], zoom: 15, duration: 800 });
     }
-  }, [general.latitud, general.longitud, step]);
+  }, [mapLat, mapLng]);
+
+  useEffect(() => {
+    if (!marker.current || !map.current) return;
+    const iconoSrc = general.icono || (general.tipo ? `/icons/${general.tipo}.png` : "");
+    const el = document.createElement("div");
+    if (iconoSrc) {
+      const img = document.createElement("img");
+      img.src = iconoSrc;
+      img.style.width = "36px";
+      img.style.height = "36px";
+      img.style.borderRadius = "4px";
+      img.style.boxShadow = "0 2px 8px rgba(0,0,0,0.25)";
+      img.style.objectFit = "contain";
+      el.appendChild(img);
+    }
+    marker.current.remove();
+    marker.current = new mapboxgl.Marker({ element: el })
+      .setLngLat([mapLng, mapLat])
+      .addTo(map.current);
+  }, [general.tipo, general.icono]);
+
+  // Mover mapa al seleccionar localidad (solo cambios del usuario)
+  const localidadUserRef = useRef(false);
+  useEffect(() => {
+    if (!localidadUserRef.current) return;
+    if (!general.localidad_id) return;
+    const loc = localidades.find((l) => l.id === Number(general.localidad_id));
+    if (loc?.latitud && loc?.longitud) {
+      setGeneral((prev) => ({
+        ...prev,
+        latitud: Number(loc.latitud),
+        longitud: Number(loc.longitud),
+      }));
+    }
+  }, [general.localidad_id, localidades]);
 
   // --- BÚSQUEDA GEOGRÁFICA ---
+  const geoTimer = useRef(null);
   useEffect(() => {
-    if (!geoQuery.trim()) { setGeoResults([]); return; }
-    const t = setTimeout(async () => {
+    if (!geoQuery.trim() || geoQuery.trim().length < 3) { setGeoResults([]); return; }
+    clearTimeout(geoTimer.current);
+    geoTimer.current = setTimeout(async () => {
       try {
+        const locNombre = general.localidad_id
+          ? localidades.find((l) => l.id === Number(general.localidad_id))?.nombre
+          : null;
+        const q = geoQuery.includes(",") ? geoQuery : `${geoQuery}${locNombre ? `, ${locNombre}` : ""}, Chaco, Argentina`;
         const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json?country=AR&limit=6&types=place,locality,region&access_token=${mapboxgl.accessToken}`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=ar`,
+          { headers: { "User-Agent": "MadeInChaco/1.0", "Accept-Language": "es" } },
         );
-        if (res.ok) { const data = await res.json(); setGeoResults(data.features || []); }
+        if (res.ok) setGeoResults(await res.json());
       } catch {}
-    }, 300);
-    return () => clearTimeout(t);
-  }, [geoQuery]);
+    }, 400);
+    return () => clearTimeout(geoTimer.current);
+  }, [geoQuery, general.localidad_id]);
 
-  const seleccionarGeo = (feature) => {
-    const [lng, lat] = feature.center;
-    const nombreLocalidad = feature.text;
-    const match = localidades.find(
-      (l) => l.nombre.toLowerCase() === nombreLocalidad.toLowerCase(),
-    );
+  const seleccionarGeo = (r) => {
+    const lat = parseFloat(r.lat);
+    const lon = parseFloat(r.lon);
     setGeneral((prev) => ({
       ...prev,
       latitud: lat,
-      longitud: lng,
-      localidad_id: match ? match.id : prev.localidad_id,
-      direccion_escrita: feature.place_name,
+      longitud: lon,
+      direccion_escrita: r.display_name,
     }));
-    setGeoQuery(feature.place_name);
+    setGeoQuery(r.display_name);
     setGeoResults([]);
+    if (map.current && marker.current) {
+      map.current.flyTo({ center: [lon, lat], zoom: 15, duration: 800 });
+      marker.current.setLngLat([lon, lat]);
+    }
   };
 
   const onFieldChange = (field, value) => {
@@ -349,50 +461,84 @@ export const AdminPanel = () => {
 
   // --- CARGAR ENTIDAD PARA EDITAR ---
   const cargarEntidadParaEditar = async (id) => {
+    originalGeneralRef.current = null;
+    originalEspecificoRef.current = null;
+    originalMultimediaRef.current = null;
+    originalConexRef.current = null;
     try {
       const res = await authFetch(`/api/entidades/${id}`);
       if (!res.ok) return;
       const ent = await res.json();
       setEditingEntityId(ent.id);
       setStep(1);
-      setGeneral({
+      const gen = {
         tipo: ent.tipo || "",
         nombre: ent.nombre || "",
         slug: ent.slug || "",
         resumen: ent.resumen || "",
         localidad_id: ent.localidad_id || "",
-        latitud: ent.latitud || -27.4511,
-        longitud: ent.longitud || -58.9861,
+        latitud: ent.latitud ?? null,
+        longitud: ent.longitud ?? null,
         visible: ent.visible ?? true,
         direccion_escrita: ent.direccion_escrita || "",
-      });
+        imagen: ent.imagen || "",
+        icono: ent.icono || "",
+        fecha_inicio_suscripcion: ent.fecha_inicio_suscripcion
+          ? (typeof ent.fecha_inicio_suscripcion === "string" ? ent.fecha_inicio_suscripcion.split("T")[0] : new Date(ent.fecha_inicio_suscripcion).toISOString().split("T")[0])
+          : "",
+        fecha_fin_suscripcion: ent.fecha_fin_suscripcion
+          ? (typeof ent.fecha_fin_suscripcion === "string" ? ent.fecha_fin_suscripcion.split("T")[0] : new Date(ent.fecha_fin_suscripcion).toISOString().split("T")[0])
+          : "",
+      };
+      setGeneral(gen);
+      originalGeneralRef.current = gen;
+      setGeoQuery(ent.direccion_escrita || "");
       const spec = {};
       const typeDefs = TIPO_DETALLES[ent.tipo];
-      if (typeDefs) typeDefs.forEach((def) => { spec[def.field] = ent[def.field] ?? ""; });
+      if (typeDefs) typeDefs.forEach((def) => {
+        let val = ent[def.field] ?? "";
+        if (def.type === "date" && val) {
+          val = typeof val === "string" ? val.split("T")[0] : new Date(val).toISOString().split("T")[0];
+        }
+        spec[def.field] = val;
+      });
       setEspecifico(spec);
+      originalEspecificoRef.current = { ...spec };
 
       // Multimedia existente
       const multRes = await authFetch(`/api/entidades/${id}/multimedia`);
       if (multRes.ok) {
         const multimedia = await multRes.json();
-        setMultimediaItems(
-          multimedia.length > 0
-            ? multimedia.map((m) => ({
-                id: m.id,
-                url_recurso: m.url_recurso,
-                titulo_alternativo: m.titulo_alternativo || "",
-                descripcion_recurso: m.descripcion_recurso || "",
-                tipo_recurso: m.tipo_recurso || "foto",
-                es_principal: m.es_principal || false,
-                public_id: m.public_id || "",
-                entidades_etiquetadas: m.entidades_etiquetadas || [],
-              }))
-            : [{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }],
-        );
+        const items = multimedia.length > 0
+          ? multimedia.map((m) => ({
+              id: m.id,
+              url_recurso: m.url_recurso,
+              titulo_alternativo: m.titulo_alternativo || "",
+              descripcion_recurso: m.descripcion_recurso || "",
+              tipo_recurso: m.tipo_recurso || "foto",
+              es_principal: m.es_principal || false,
+              public_id: m.public_id || "",
+              entidades_etiquetadas: m.entidades_etiquetadas || [],
+            }))
+          : [{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }];
+        setMultimediaItems(items);
+        originalMultimediaRef.current = items;
       }
       // Conexiones
       const conexRes = await authFetch(`/api/entidades/${id}/conexiones`);
-      if (conexRes.ok) setConexiones(await conexRes.json());
+      if (conexRes.ok) {
+        const conexData = await conexRes.json();
+        const items = conexData.map((c) => ({
+          id: c.id,
+          entidad_destino_id: c.entidad_origen_id === ent.id ? c.entidad_destino_id : c.entidad_origen_id,
+          nombre: c.entidad_origen_id === ent.id ? c.nombre_destino : c.nombre_origen,
+          tipo: c.entidad_origen_id === ent.id ? c.tipo_destino : c.tipo_origen,
+          tipo_relacion: c.tipo_relacion || "",
+          tipo_relacion_inversa: c.tipo_relacion_inversa || "",
+        }));
+        setConexTempList(items);
+        originalConexRef.current = items;
+      }
 
       setView("nuevo-editar");
       window.scrollTo(0, 0);
@@ -439,10 +585,10 @@ export const AdminPanel = () => {
       { field: "razon_social", label: "Razón social" },
       { field: "cuit", label: "CUIT" },
       { field: "email", label: "Email" },
-      { field: "rubro_especifico", label: "Rubro específico" },
+      { field: "rubro_especifico", label: "Rubro específico", type: "rubro" },
       { field: "horario_apertura", label: "Horario apertura" },
       { field: "horario_cierre", label: "Horario cierre" },
-      { field: "dias_abierto", label: "Días abierto" },
+      { field: "dias_abierto", label: "Días abierto", type: "dias" },
       { field: "acepta_tarjetas", label: "Acepta tarjetas", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
       { field: "sitio_web", label: "Sitio web" },
       { field: "biografia_larga", label: "Descripción", type: "textarea" },
@@ -453,7 +599,7 @@ export const AdminPanel = () => {
       { field: "cuit", label: "CUIT" },
       { field: "fecha_evento", label: "Fecha del evento", type: "date" },
       { field: "duracion_dias", label: "Duración (días)", type: "number" },
-      { field: "actividades_principales", label: "Actividades principales", type: "textarea" },
+      { field: "actividades_principales", label: "Actividades principales", type: "actividades" },
       { field: "es_itinerante", label: "Evento itinerante", type: "select", options: [{ value: "true", label: "Sí" }, { value: "false", label: "No" }] },
       { field: "link_entradas", label: "Link a compra de entradas" },
       { field: "biografia_larga", label: "Descripción", type: "textarea" },
@@ -500,7 +646,7 @@ export const AdminPanel = () => {
       { field: "razon_social", label: "Razón social" },
       { field: "cuit", label: "CUIT" },
       { field: "biografia_larga", label: "Descripción", type: "textarea" },
-      { field: "categoria_hospedaje", label: "Categoría" },
+      { field: "categoria_hospedaje", label: "Categoría", type: "categoria" },
       { field: "servicios", label: "Servicios", type: "servicios" },
       { field: "capacidad", label: "Capacidad" },
       { field: "sitio_web", label: "Sitio web" },
@@ -569,147 +715,181 @@ export const AdminPanel = () => {
       );
     }
     if (fieldDef.type === "servicios") {
-      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
       return (
         <div key={fieldDef.field} style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
             {fieldDef.label}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {SERVICIOS_SUGERIDOS.map((sv) => {
-              const active = selected.includes(sv);
-              return (
-                <span
-                  key={sv}
-                  onClick={() => {
-                    const next = active ? selected.filter((s) => s !== sv) : [...selected, sv];
-                    onSpecChange(fieldDef.field, next.join(", "));
-                  }}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 20,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    background: active ? "#863819" : "#f5f2eb",
-                    color: active ? "white" : "#555",
-                    fontWeight: active ? 600 : 400,
-                    border: active ? "none" : "1px solid #eee",
-                    transition: "0.15s",
-                  }}
-                >
-                  {sv}
-                </span>
-              );
-            })}
-          </div>
+          <TagSelector
+            value={especifico[fieldDef.field] || ""}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            suggestions={SERVICIOS_SUGERIDOS}
+            placeholder="Escribí o seleccioná servicios..."
+          />
         </div>
       );
     }
     if (fieldDef.type === "productos") {
-      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
       return (
         <div key={fieldDef.field} style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
             {fieldDef.label}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {TIPOS_PRODUCTO.map((tp) => {
-              const active = selected.includes(tp);
-              return (
-                <span
-                  key={tp}
-                  onClick={() => {
-                    const next = active ? selected.filter((s) => s !== tp) : [...selected, tp];
-                    onSpecChange(fieldDef.field, next.join(", "));
-                  }}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 20,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    background: active ? "#863819" : "#f5f2eb",
-                    color: active ? "white" : "#555",
-                    fontWeight: active ? 600 : 400,
-                    border: active ? "none" : "1px solid #eee",
-                    transition: "0.15s",
-                  }}
-                >
-                  {tp}
-                </span>
-              );
-            })}
-          </div>
+          <TagSelector
+            value={especifico[fieldDef.field] || ""}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            suggestions={TIPOS_PRODUCTO}
+            placeholder="Escribí o seleccioná tipo de producto..."
+          />
         </div>
       );
     }
     if (fieldDef.type === "experiencias") {
-      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
       return (
         <div key={fieldDef.field} style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
             {fieldDef.label}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {TIPOS_EXPERIENCIA.map((tx) => {
-              const active = selected.includes(tx);
-              return (
-                <span
-                  key={tx}
-                  onClick={() => {
-                    const next = active ? selected.filter((s) => s !== tx) : [...selected, tx];
-                    onSpecChange(fieldDef.field, next.join(", "));
-                  }}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 20,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    background: active ? "#863819" : "#f5f2eb",
-                    color: active ? "white" : "#555",
-                    fontWeight: active ? 600 : 400,
-                    border: active ? "none" : "1px solid #eee",
-                    transition: "0.15s",
-                  }}
-                >
-                  {tx}
-                </span>
-              );
-            })}
-          </div>
+          <TagSelector
+            value={especifico[fieldDef.field] || ""}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            suggestions={TIPOS_EXPERIENCIA}
+            placeholder="Escribí o seleccioná tipo de experiencia..."
+          />
         </div>
       );
     }
     if (fieldDef.type === "incluye") {
-      const selected = (especifico[fieldDef.field] || "").split(",").map((s) => s.trim()).filter(Boolean);
       return (
         <div key={fieldDef.field} style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
             {fieldDef.label}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {QUE_INCLUYE_EXPERIENCIA.map((incl) => {
-              const active = selected.includes(incl);
+          <TagSelector
+            value={especifico[fieldDef.field] || ""}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            suggestions={QUE_INCLUYE_EXPERIENCIA}
+            placeholder="Escribí o seleccioná..."
+          />
+        </div>
+      );
+    }
+    if (fieldDef.type === "actividades") {
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            {fieldDef.label}
+          </label>
+          <TagSelector
+            value={especifico[fieldDef.field] || ""}
+            onChange={(v) => onSpecChange(fieldDef.field, v)}
+            suggestions={ACTIVIDADES_SUGERIDAS}
+            placeholder="Escribí o seleccioná actividades..."
+          />
+        </div>
+      );
+    }
+    if (fieldDef.type === "rubro") {
+      const val = especifico[fieldDef.field] || "";
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            {fieldDef.label}
+          </label>
+          <select
+            value={val}
+            onChange={(e) => onSpecChange(fieldDef.field, e.target.value)}
+            style={styles.input}
+          >
+            <option value="">Seleccionar rubro...</option>
+            {RUBROS_COMERCIO.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            <option value="__otro__">Otros</option>
+          </select>
+          {val === "__otro__" && (
+            <input
+              type="text"
+              placeholder="Escribí el rubro..."
+              value={especifico[fieldDef.field + "_custom"] || ""}
+              onChange={(e) => onSpecChange(fieldDef.field + "_custom", e.target.value)}
+              style={{ ...styles.input, marginTop: 8 }}
+            />
+          )}
+        </div>
+      );
+    }
+    if (fieldDef.type === "categoria") {
+      const val = especifico[fieldDef.field] || "";
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            {fieldDef.label}
+          </label>
+          <select
+            value={val}
+            onChange={(e) => onSpecChange(fieldDef.field, e.target.value)}
+            style={styles.input}
+          >
+            <option value="">Seleccionar categoría...</option>
+            {CATEGORIAS_HOSPEDAJE.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            <option value="__otro__">Otros</option>
+          </select>
+          {val === "__otro__" && (
+            <input
+              type="text"
+              placeholder="Escribí la categoría..."
+              value={especifico[fieldDef.field + "_custom"] || ""}
+              onChange={(e) => onSpecChange(fieldDef.field + "_custom", e.target.value)}
+              style={{ ...styles.input, marginTop: 8 }}
+            />
+          )}
+        </div>
+      );
+    }
+    if (fieldDef.type === "dias") {
+      const dias = (especifico[fieldDef.field] || "").split(",").filter(Boolean);
+      return (
+        <div key={fieldDef.field} style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 8, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            {fieldDef.label}
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {DIAS_SEMANA.map((dia) => {
+              const checked = dias.includes(dia);
               return (
-                <span
-                  key={incl}
-                  onClick={() => {
-                    const next = active ? selected.filter((s) => s !== incl) : [...selected, incl];
-                    onSpecChange(fieldDef.field, next.join(", "));
-                  }}
+                <label
+                  key={dia}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                     padding: "6px 14px",
                     borderRadius: 20,
                     fontSize: 13,
                     cursor: "pointer",
-                    background: active ? "#863819" : "#f5f2eb",
-                    color: active ? "white" : "#555",
-                    fontWeight: active ? 600 : 400,
-                    border: active ? "none" : "1px solid #eee",
+                    background: checked ? "#863819" : "#f5f2eb",
+                    color: checked ? "white" : "#555",
+                    fontWeight: checked ? 600 : 400,
+                    border: checked ? "none" : "1px solid #eee",
                     transition: "0.15s",
                   }}
                 >
-                  {incl}
-                </span>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = checked
+                        ? dias.filter((d) => d !== dia)
+                        : [...dias, dia];
+                      onSpecChange(fieldDef.field, next.join(","));
+                    }}
+                    style={{ display: "none" }}
+                  />
+                  {dia}
+                </label>
               );
             })}
           </div>
@@ -758,6 +938,10 @@ export const AdminPanel = () => {
       showPopup("Completá tipo y nombre", "error");
       return;
     }
+    if (editingEntityId && !hasEntityChanges) {
+      showPopup("No hay cambios para guardar", "error");
+      return;
+    }
     setLoading(true);
     try {
       const body = {
@@ -765,12 +949,24 @@ export const AdminPanel = () => {
         ...especifico,
         fecha_inicio_suscripcion: general.fecha_inicio_suscripcion || null,
         fecha_fin_suscripcion: general.fecha_fin_suscripcion || null,
-        latitud: Number(general.latitud),
-        longitud: Number(general.longitud),
       };
+      delete body.latitud;
+      delete body.longitud;
+      if (general.latitud != null) body.latitud = Number(general.latitud);
+      if (general.longitud != null) body.longitud = Number(general.longitud);
       if (body.nombre_completo && !body.nombre) body.nombre = body.nombre_completo;
       if (body.es_referente_comunidad === "true") body.es_referente_comunidad = true;
       if (body.es_referente_comunidad === "false") body.es_referente_comunidad = false;
+
+      // Convertir __otro__ en selects con opción "Otros"
+      if (body.rubro_especifico === "__otro__") {
+        body.rubro_especifico = body.rubro_especifico_custom || "Otros";
+      }
+      delete body.rubro_especifico_custom;
+      if (body.categoria_hospedaje === "__otro__") {
+        body.categoria_hospedaje = body.categoria_hospedaje_custom || "Otros";
+      }
+      delete body.categoria_hospedaje_custom;
 
       const method = editingEntityId ? "PUT" : "POST";
       const url = editingEntityId ? `/api/entidades/${editingEntityId}` : "/api/entidades";
@@ -811,28 +1007,33 @@ export const AdminPanel = () => {
 
         // Guardar conexiones
         if (conexTempList.length > 0) {
-          for (const c of conexTempList) {
-            await authFetch(`/api/entidades/${entityId}/conexiones`, {
-              method: "POST",
-              headers: authHeaders({ "Content-Type": "application/json" }),
-              body: JSON.stringify({
-                entidad_destino_id: c.entidad_destino_id,
-                tipo_relacion: c.tipo_relacion,
-                tipo_relacion_inversa: c.tipo_relacion_inversa,
-              }),
-            });
-          }
+          await authFetch(`/api/entidades/${entityId}/conexiones`, {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(conexTempList.map((c) => ({
+              entidad_destino_id: c.entidad_destino_id,
+              tipo_relacion: c.tipo_relacion,
+              tipo_relacion_inversa: c.tipo_relacion_inversa,
+            }))),
+          });
           setConexTempList([]);
+        } else {
+          // Si no hay conexiones, mandar array vacío para limpiar
+          await authFetch(`/api/entidades/${entityId}/conexiones`, {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify([]),
+          });
         }
 
         showPopup(editingEntityId ? "Entidad actualizada" : "Entidad creada");
         setView("entidades");
         setEditingEntityId(null);
         setStep(1);
-        setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "" });
+        setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "", imagen: "", fecha_inicio_suscripcion: "", fecha_fin_suscripcion: "" });
+        setGeoQuery("");
         setEspecifico({});
         setMultimediaItems([{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }]);
-        setConexiones([]);
         cargarEntidades();
         cargarSolicitudes();
       } else {
@@ -872,6 +1073,55 @@ export const AdminPanel = () => {
     } catch {}
   };
 
+  // --- SUBIR PORTADA ---
+  const handlePortadaUpload = async (file) => {
+    setUploadingPortada(true);
+    try {
+      const url = await subirImagen(file);
+      setGeneral((prev) => ({ ...prev, imagen: url }));
+    } catch {
+      showPopup("Error al subir imagen de portada", "error");
+    } finally {
+      setUploadingPortada(false);
+    }
+  };
+
+  const handleIconoUpload = async (file) => {
+    if (file.type !== "image/png") {
+      showPopup("El icono debe ser una imagen PNG.", "error");
+      return;
+    }
+    setSubiendoIconoAdm(true);
+    try {
+      const dimensionsValid = await new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          if (img.width !== 24 || img.height !== 24) {
+            showPopup(`El icono debe ser de 24×24 px. La imagen subida es de ${img.width}×${img.height} px.`, "error");
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          showPopup("No se pudo leer la imagen.", "error");
+          resolve(false);
+        };
+        img.src = url;
+      });
+      if (!dimensionsValid) { setSubiendoIconoAdm(false); return; }
+      const url = await subirImagen(file);
+      setGeneral((prev) => ({ ...prev, icono: url }));
+    } catch {
+      showPopup("Error al subir icono", "error");
+    } finally {
+      setSubiendoIconoAdm(false);
+    }
+  };
+
   // --- SUBIR MULTIMEDIA ---
   const handleUpload = async (index, file) => {
     const tipo = multimediaItems[index]?.tipo_recurso || "foto";
@@ -889,19 +1139,14 @@ export const AdminPanel = () => {
     }
   };
 
-  // --- CONEXIONES ---
-  const buscarConexiones = async (q) => {
-    if (!q.trim()) { setConexResults([]); return; }
-    try {
-      const res = await authFetch(`/api/entidades?search=${encodeURIComponent(q)}`);
-      if (res.ok) setConexResults(await res.json());
-    } catch {}
-  };
+  const eliminarMultimedia = (i) => setMultimediaItems((p) => p.filter((_, idx) => idx !== i));
 
+  // --- CONEXIONES ---
   useEffect(() => {
-    const t = setTimeout(() => buscarConexiones(conexSearch), 300);
-    return () => clearTimeout(t);
-  }, [conexSearch]);
+    if (!conexSearch.trim() && !conexFilterTipo) { setConexResults([]); return; }
+    const q = conexSearch.toLowerCase();
+    setConexResults(allEntities.filter((e) => e.id !== editingEntityId && e.nombre?.toLowerCase().includes(q) && (!conexFilterTipo || e.tipo === conexFilterTipo)));
+  }, [conexSearch, conexFilterTipo, allEntities, editingEntityId]);
 
   const agregarConexTemp = (entidad) => {
     if (conexTempList.some((c) => c.entidad_destino_id === entidad.id)) return;
@@ -1059,56 +1304,165 @@ export const AdminPanel = () => {
   // --- RENDER ---
   return (
     <div style={styles.mainLayout}>
+      <SEO title="Admin - Panel" description="Panel de administración de Made in Chaco." />
       {/* Sidebar */}
-      <div style={styles.sidebar}>
+      <div className="admin-sidebar" style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
-          <div style={{ fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 700, color: "#863819", lineHeight: 1.2 }}>
-            Admin
+          <div style={{ fontFamily: "Cinzel, serif", fontSize: 16, fontWeight: 700, color: "#863819", lineHeight: 1.2, letterSpacing: "1px", textAlign: "center" }}>
+            ADMINISTRADOR
           </div>
-          <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>{user?.username}</div>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 6, textAlign: "center" }}>{user?.username}</div>
         </div>
 
         <div style={styles.sidebarNav}>
-          {[
-            { key: "dashboard", label: "Dashboard", icon: "/icons/todos.png" },
-            { key: "entidades", label: "Entidades", icon: "/icons/todos.png", count: totalEntidades },
-            { key: "solicitudes", label: "Solicitudes", icon: "/icons/mail.png", badge: pendingSolicitudes },
-            { key: "ediciones", label: "Ediciones", icon: "/icons/edit.png", badge: pendingEdiciones },
-            { key: "devoluciones", label: "Devoluciones", icon: "/icons/mail.png", badge: pendingDevoluciones },
-            { key: "recorridos", label: "Recorridos", icon: "/icons/route.png" },
-            { key: "palabras", label: "Palabras", icon: "/icons/edit.png" },
-            { key: "usuarios", label: "Usuarios", icon: "/icons/user.png" },
-            { key: "planes", label: "Planes", icon: "/icons/card.png" },
-            { key: "localidades", label: "Localidades", icon: "/icons/location.png" },
-          ].map((item) => (
+          <button
+            onClick={() => setView("dashboard")}
+            style={{
+              ...styles.navBtn,
+              background: view === "dashboard" ? "#f5f2eb" : "transparent",
+            }}
+          >
+            Dashboard
+          </button>
+
+          <div style={{ marginTop: 4 }}>
             <button
-              key={item.key}
-              onClick={() => setView(item.key)}
+              onClick={() => setExpandedGroups((g) => ({ ...g, contenido: !g.contenido }))}
               style={{
                 ...styles.navBtn,
-                background: view === item.key ? "#f5f2eb" : "transparent",
-                color: view === item.key ? "#863819" : "#555",
+                color: "#1c1c18",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
                 justifyContent: "space-between",
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                cursor: "pointer",
               }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {item.icon && <img src={item.icon} style={{ width: 18, height: 18 }} alt="" />}
-                {item.label}
-              </span>
-              {(item.count || item.badge) && (
-                <span style={{
-                  background: item.badge > 0 ? "#863819" : "#f0ede8",
-                  color: item.badge > 0 ? "white" : "#888",
-                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center",
-                }}>
-                  {item.badge ?? item.count}
-                </span>
-              )}
+              Contenido
+              <span style={{ fontSize: 10, color: "#999" }}>{expandedGroups.contenido ? "▾" : "▸"}</span>
             </button>
-          ))}
+            {expandedGroups.contenido && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {[
+                  { key: "entidades", label: "Entidades", count: totalEntidades },
+                  { key: "recorridos", label: "Recorridos" },
+                  { key: "palabras", label: "Wikia Chaqueña" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setView(item.key)}
+                    style={{
+                      ...styles.navBtn,
+                      background: view === item.key ? "#f5f2eb" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingLeft: 24,
+                    }}
+                  >
+                    {item.label}
+                    {item.count != null && (
+                      <span style={{
+                        background: "#f0ede8",
+                        color: "#888",
+                        fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center",
+                      }}>
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 4 }}>
+            <button
+              onClick={() => setExpandedGroups((g) => ({ ...g, pendientes: !g.pendientes }))}
+              style={{
+                ...styles.navBtn,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                cursor: "pointer",
+              }}
+            >
+              Pendientes
+              <span style={{ fontSize: 10, color: "#999" }}>{expandedGroups.pendientes ? "▾" : "▸"}</span>
+            </button>
+            {expandedGroups.pendientes && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {[
+                  { key: "solicitudes", label: "Solicitudes", badge: pendingSolicitudes },
+                  { key: "ediciones", label: "Ediciones", badge: pendingEdiciones },
+                  { key: "devoluciones", label: "Devoluciones", badge: pendingDevoluciones },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setView(item.key)}
+                    style={{
+                      ...styles.navBtn,
+                      background: view === item.key ? "#f5f2eb" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingLeft: 24,
+                    }}
+                  >
+                    {item.label}
+                    {item.badge != null && (
+                      <span style={{
+                        background: item.badge > 0 ? "#863819" : "#f0ede8",
+                      color: item.badge > 0 ? "white" : "#888",
+                      fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center",
+                    }}>
+                      {item.badge}
+                    </span>
+                  )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 4 }}>
+            <button
+              onClick={() => setExpandedGroups((g) => ({ ...g, administracion: !g.administracion }))}
+              style={{
+                ...styles.navBtn,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                cursor: "pointer",
+              }}
+            >
+              Administración
+              <span style={{ fontSize: 10, color: "#999" }}>{expandedGroups.administracion ? "▾" : "▸"}</span>
+            </button>
+            {expandedGroups.administracion && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {[
+                  { key: "usuarios", label: "Usuarios" },
+                  { key: "planes", label: "Planes" },
+                  { key: "localidades", label: "Localidades" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setView(item.key)}
+                    style={{
+                      ...styles.navBtn,
+                      background: view === item.key ? "#f5f2eb" : "transparent",
+                      paddingLeft: 24,
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <button onClick={logout} style={styles.logoutBtn}>
@@ -1124,63 +1478,72 @@ export const AdminPanel = () => {
             <>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
                 <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-                  <img src="/icons/todos.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
                   Entidades ({totalEntidades})
                 </h2>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <button onClick={() => { setView("nuevo-editar"); setEditingEntityId(null); setStep(1); setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "" }); setEspecifico({}); setConexTempList([]); setMultimediaItems([{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }]); setDetailError(""); setMultimediaError(""); }} className="admin-btn" style={styles.btnPrimary}>
-                    + NUEVA
+                  <button onClick={() => {
+                    setView("nuevo-editar"); setEditingEntityId(null); setStep(1);
+                    setGeneral({ tipo: "", nombre: "", slug: "", resumen: "", localidad_id: "", latitud: -27.4511, longitud: -58.9861, visible: true, direccion_escrita: "", fecha_inicio_suscripcion: "", fecha_fin_suscripcion: "", imagen: "", icono: "" });
+                    setGeoQuery(""); setEspecifico({}); setConexTempList([]);
+                    setMultimediaItems([{ url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: true, public_id: "", entidades_etiquetadas: [] }]);
+                    setDetailError(""); setMultimediaError("");
+                    originalGeneralRef.current = null; originalEspecificoRef.current = null; originalMultimediaRef.current = null; originalConexRef.current = null;
+                  }} className="admin-btn" style={styles.btnPrimary}>
+                    Nueva entidad
                   </button>
                 </div>
               </div>
 
               {/* Filter + search */}
-              <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
                 <input
-                  style={{ ...styles.input, marginBottom: 0, flex: 1, minWidth: 200 }}
-                  placeholder="Buscar entidad por nombre, tipo o localidad..."
+                  style={{ ...styles.input, marginBottom: 0, flex: 1, minWidth: 180 }}
+                  placeholder="Buscar por nombre..."
                   value={entidadSearch}
                   onChange={(e) => setEntidadSearch(e.target.value)}
                 />
-                <input
-                  style={{ ...styles.input, marginBottom: 0, width: 200 }}
-                  placeholder="Filtrar por perfil (email/nombre)..."
+                <select
+                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
+                  value={entidadFilterTipo}
+                  onChange={(e) => setEntidadFilterTipo(e.target.value)}
+                >
+                  <option value="">Todos los tipos</option>
+                  {TIPO_OPTIONS.filter((o) => o.value).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label} ({tipoCounts[o.value] || 0})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
+                  value={entidadFilterLocalidad}
+                  onChange={(e) => setEntidadFilterLocalidad(e.target.value)}
+                >
+                  <option value="">Todas las localidades</option>
+                  {localidadOptions.map((loc) => (
+                    <option key={loc} value={loc}>{loc}</option>
+                  ))}
+                </select>
+                <select
+                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
                   value={entidadFilterPerfil}
                   onChange={(e) => setEntidadFilterPerfil(e.target.value)}
-                />
-              </div>
-
-              {/* Tipo filters */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
-                {[
-                  { value: "", label: "Todas", color: "#555" },
-                  ...TIPO_OPTIONS.filter((o) => o.value).map((o) => ({
-                    ...o,
-                    color: colorMapAdmin[o.value] || "#555",
-                  })),
-                ].map((f) => {
-                  const active = entidadSearch === "" && entidadFilterPerfil === "" && tipos.length > 0
-                    ? f.value === ""
-                    : false;
-                  return (
-                    <span
-                      key={f.value}
-                      onClick={() => setEntidadSearch(f.value)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: 20,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        background: active ? f.color : "#f5f2eb",
-                        color: active ? "white" : "#555",
-                        fontWeight: active ? 700 : 500,
-                        border: active ? "none" : "1px solid #eee",
-                      }}
-                    >
-                      {f.label} {f.value ? `(${tipoCounts[f.value] || 0})` : ""}
-                    </span>
-                  );
-                })}
+                >
+                  <option value="">Todos los perfiles</option>
+                  {perfilOptions.map(([id, nombre]) => (
+                    <option key={id} value={id}>{nombre}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => { setEntidadSearch(""); setEntidadFilterTipo(""); setEntidadFilterLocalidad(""); setEntidadFilterPerfil(""); }}
+                  style={{
+                    background: "none", border: "1px solid #e0ddd5", borderRadius: "6px",
+                    padding: "10px 12px", cursor: "pointer", color: "#888", fontSize: "12px",
+                    fontWeight: 500, whiteSpace: "nowrap",
+                  }}
+                >
+                  ✕ Limpiar
+                </button>
               </div>
 
               {/* Entity list */}
@@ -1201,65 +1564,117 @@ export const AdminPanel = () => {
                       </div>
                       <div style={{ fontSize: 12, color: "#888", marginTop: 4, display: "flex", gap: "12px", flexWrap: "wrap" }}>
                         {ent.localidad_nombre && <span>📍 {ent.localidad_nombre}</span>}
-                        {ent.perfil_email && <span>👤 {ent.perfil_email}</span>}
-                        {ent.fecha_fin_suscripcion && <span>📅 Vence: {new Date(ent.fecha_fin_suscripcion).toLocaleDateString("es-AR")}</span>}
-                      </div>
+                        {(ent.perfil_nombre || ent.perfil_email) && (
+                          <span style={{ color: "#1c1c18" }}>👤 {ent.perfil_nombre || ent.perfil_email}</span>
+                        )}
+                        {ent.created_at && <span style={{ color: "#1c1c18" }}>📅 Creado: {new Date(ent.created_at).toLocaleDateString("es-AR")}</span>}
+                        {ent.fecha_fin_suscripcion && <span style={{ color: "#1c1c18" }}>⏱ Vence: {new Date(ent.fecha_fin_suscripcion).toLocaleDateString("es-AR")}</span>}
                     </div>
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                      <a href={`/entidad/${ent.slug}`} target="_blank" rel="noopener noreferrer">
-                        <button className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
-                          <img src="/icons/view.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
-                          VER
-                        </button>
-                      </a>
-                      <button onClick={() => cargarEntidadParaEditar(ent.id)} className="admin-btn" style={styles.smallBtn("#863819")}>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <button onClick={() => { sessionStorage.setItem("fromAdmin", "true"); navigate(`/entidad/${ent.slug}`); }} className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
+                        VER
+                      </button>
+                      <button onClick={() => { cargarEntidadParaEditar(ent.id); }} className="admin-btn" style={styles.smallBtn("#863819")}>
                         EDITAR
+                      </button>
+                      <button onClick={async () => { await cargarEntidadParaEditar(ent.id); setStep(4); }} className="admin-btn" style={styles.smallBtn("#5b6abf")}>
+                        CONEXIONES
                       </button>
                       <button onClick={() => toggleVisibilidad(ent.id, ent.visible)} className="admin-btn" style={styles.smallBtn(ent.visible ? "#f39c12" : "#2e7d32")}>
                         {ent.visible ? "OCULTAR" : "MOSTRAR"}
                       </button>
                       <button onClick={() => eliminarEntidad(ent.id, ent.nombre)} className="admin-btn-danger" style={styles.smallBtn("#c0392b")}>
-                        <img src="/icons/delete.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
                         ELIMINAR
                       </button>
                     </div>
                   </div>
-                ))}
+              ))}
               </div>
             </>
           )}
 
           {/* NUEVO / EDITAR ENTIDAD */}
           {view === "nuevo-editar" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                <button onClick={() => setView("entidades")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#888", padding: "4px 8px" }}>
-                  ←
-                </button>
-                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
-                  {editingEntityId ? "Editar entidad" : "Nueva entidad"}
-                </h2>
-              </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <button onClick={() => setView("entidades")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#888", padding: "0 0 12px", display: "flex", alignItems: "center", gap: 6, width: "fit-content" }}>
+                ← Entidades
+              </button>
+
+              {editingEntityId && general.nombre ? (
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: colorMapAdmin[general.tipo] || "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                    {TIPO_OPTIONS.find((o) => o.value === general.tipo)?.label || general.tipo}
+                  </div>
+                  <div style={{ fontFamily: "Cinzel, serif", fontSize: 22, fontWeight: 400, color: "#1c1c18" }}>{general.nombre}</div>
+                </div>
+              ) : (
+                <h2 style={{ ...styles.sectionTitle, textAlign: "center", marginBottom: 20 }}>Nueva entidad</h2>
+              )}
 
               {/* Stepper */}
               <div style={styles.stepperNav}>
                 {["Datos generales", "Detalles específicos", "Multimedia", "Conexiones"].map((label, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }} onClick={() => setStep(i + 1)} title={label}>
                     <div style={{ ...styles.dot, background: step >= i + 1 ? "#863819" : "#ddd" }}>{i + 1}</div>
-                    <span style={{ fontSize: 13, fontWeight: step === i + 1 ? 700 : 400, color: step === i + 1 ? "#863819" : "#888", display: i === 3 ? "inline" : "none" }}>
+                    <span style={{ fontSize: 13, fontWeight: step === i + 1 ? 700 : 400, color: step === i + 1 ? "#863819" : "#888", display: "none" }}>
                       {label}
                     </span>
                   </div>
                 ))}
               </div>
 
+              {/* Scrollable step content */}
+              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+
               {step === 1 && (
                 <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
                   <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Datos generales</h3>
 
-                  <DetailField field="tipo" fieldVal={general.tipo} onFieldChange={onFieldChange} label="Tipo de entidad" type="select" options={TIPO_OPTIONS} />
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 6, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Imagen de portada
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      {general.imagen ? (
+                        <div style={{ position: "relative", width: 80, height: 80, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: "1px solid #eee" }}>
+                          <img src={optimizarUrlCloudinary(general.imagen)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <button onClick={() => setGeneral((prev) => ({ ...prev, imagen: "" }))} style={{ position: "absolute", top: 2, right: 2, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                        </div>
+                      ) : (
+                        <div style={{ width: 80, height: 80, borderRadius: 8, background: "#f5f5f5", border: "1px dashed #ddd", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#ccc" }}>+</div>
+                      )}
+                      <label className="admin-btn" style={{ padding: "6px 14px", fontSize: 12, cursor: "pointer", background: editingEntityId ? "#863819" : "#863819", color: "#fff", border: "none", borderRadius: 6, fontWeight: 500, fontFamily: "inherit" }}>
+                        {uploadingPortada ? "Subiendo..." : "Seleccionar imagen"}
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) handlePortadaUpload(e.target.files[0]); }} disabled={uploadingPortada} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 6, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Icono del mapa
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      {general.icono ? (
+                        <div style={{ position: "relative", width: 40, height: 40, borderRadius: 4, overflow: "hidden", flexShrink: 0, border: "1px solid #eee" }}>
+                          <img src={general.icono} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          <button onClick={() => setGeneral((prev) => ({ ...prev, icono: "" }))} style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", border: "none", cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                        </div>
+                      ) : (
+                        <div style={{ width: 40, height: 40, borderRadius: 4, background: "#f5f5f5", border: "1px dashed #ddd", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#ccc" }}>+</div>
+                      )}
+                      <label className="admin-btn" style={{ padding: "6px 14px", fontSize: 12, cursor: "pointer", background: "#863819", color: "#fff", border: "none", borderRadius: 6, fontWeight: 500, fontFamily: "inherit" }}>
+                        {subiendoIconoAdm ? "Subiendo..." : "Seleccionar icono"}
+                        <input type="file" accept="image/png" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) handleIconoUpload(e.target.files[0]); }} disabled={subiendoIconoAdm} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <DetailField field="tipo" fieldVal={general.tipo} onFieldChange={onFieldChange} label="Tipo de entidad" type="select" options={TIPO_OPTIONS} readOnly={!!editingEntityId} />
                   <DetailField field="nombre" fieldVal={general.nombre} onFieldChange={onFieldChange} label="Nombre" placeholder="Nombre de la entidad" />
-                  <DetailField field="slug" fieldVal={general.slug} onFieldChange={onFieldChange} label="Slug (URL)" placeholder="nombre-de-la-entidad" />
+                  <DetailField field="slug" fieldVal={general.slug} onFieldChange={onFieldChange} label="Slug (URL)" placeholder="nombre-de-la-entidad" readOnly={!!editingEntityId} />
                   <DetailField field="resumen" fieldVal={general.resumen} onFieldChange={onFieldChange} label="Resumen / descripción breve" type="textarea" placeholder="Breve descripción..." />
 
                   <div style={{ marginBottom: 12 }}>
@@ -1269,14 +1684,35 @@ export const AdminPanel = () => {
                     <select
                       style={styles.input}
                       value={general.localidad_id}
-                      onChange={(e) => setGeneral((prev) => ({ ...prev, localidad_id: e.target.value }))}
+                      onChange={(e) => { localidadUserRef.current = true; setGeneral((prev) => ({ ...prev, localidad_id: e.target.value })); }}
                     >
                       <option value="">Sin localidad</option>
                       {localidades.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
                     </select>
                   </div>
 
-                  <DetailField field="direccion_escrita" fieldVal={general.direccion_escrita} onFieldChange={onFieldChange} label="Dirección escrita" placeholder="Calle y número" />
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Dirección escrita
+                    </label>
+                    <input
+                      style={styles.input}
+                      placeholder="Calle y número, lugar..."
+                      value={geoQuery}
+                      onChange={(e) => { setGeoQuery(e.target.value); setGeneral((prev) => ({ ...prev, direccion_escrita: e.target.value })); }}
+                    />
+                    {geoResults.length > 0 && (
+                      <div style={{ background: "white", border: "1px solid #eee", borderRadius: 12, maxHeight: 180, overflowY: "auto", marginTop: 4 }}>
+                        {geoResults.map((r, i) => (
+                          <div key={i} onMouseDown={(e) => { e.preventDefault(); seleccionarGeo(r); }} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f5f2eb", color: "#333" }}>
+                            {r.display_name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div ref={mapContainer} className="admin-edit-map" style={{ width: "100%", height: 250, borderRadius: 12, overflow: "hidden", border: "1px solid #eee", marginBottom: 12 }} />
 
                   <div style={{ marginBottom: 12 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
@@ -1284,43 +1720,6 @@ export const AdminPanel = () => {
                       Visible en el mapa
                     </label>
                   </div>
-
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#863819", display: "block", marginBottom: 4, letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                      Ubicación en el mapa
-                    </label>
-                    <input
-                      style={{ ...styles.input, marginBottom: 8 }}
-                      placeholder="Buscar dirección o localidad..."
-                      value={geoQuery}
-                      onChange={(e) => setGeoQuery(e.target.value)}
-                    />
-                    {geoResults.length > 0 && (
-                      <div style={{ background: "white", border: "1px solid #eee", borderRadius: 12, maxHeight: 200, overflowY: "auto", marginBottom: 12 }}>
-                        {geoResults.map((f) => (
-                          <div key={f.id} onClick={() => seleccionarGeo(f)} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #f5f2eb", color: "#333" }}>
-                            {f.place_name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>Lat:</label>
-                      <input
-                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #eee", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
-                        type="number" step="any" value={general.latitud}
-                        onChange={(e) => setGeneral((prev) => ({ ...prev, latitud: e.target.value }))}
-                      />
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>Lng:</label>
-                      <input
-                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #eee", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
-                        type="number" step="any" value={general.longitud}
-                        onChange={(e) => setGeneral((prev) => ({ ...prev, longitud: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div ref={mapContainer} style={{ width: "100%", height: 300, borderRadius: 12, overflow: "hidden", border: "1px solid #eee" }} />
 
                   {(editingEntityId || general.tipo === "comercio" || general.tipo === "hospedaje" || general.tipo === "evento" || general.tipo === "productor") && (
                     <div style={{ marginTop: 20, padding: "16px 20px", background: "#fff8e1", borderRadius: 12, border: "1px solid #ffe082" }}>
@@ -1330,25 +1729,18 @@ export const AdminPanel = () => {
                     </div>
                   )}
 
-                  <div style={{ textAlign: "right", marginTop: 20 }}>
-                    <button onClick={() => setStep(2)} className="admin-btn" style={styles.btnNext}>
-                      SIGUIENTE →
-                    </button>
-                  </div>
                 </div>
               )}
 
-              {step === 2 && renderSpecInputs() && (
-                <div style={{ textAlign: "right", marginTop: 20, display: "flex", justifyContent: "space-between" }}>
-                  <button onClick={() => setStep(1)} className="admin-btn" style={styles.btnSecondary}>← ANTERIOR</button>
-                  <button onClick={() => setStep(3)} className="admin-btn" style={styles.btnNext}>SIGUIENTE →</button>
-                </div>
-              )}
-
-              {step === 2 && !renderSpecInputs() && (
-                <div style={{ textAlign: "center", padding: 40, color: "#888" }}>
-                  Seleccioná un tipo de entidad para ver los detalles específicos.
-                </div>
+              {step === 2 && (
+                <>
+                  {renderSpecInputs()}
+                  {!TIPO_DETALLES[general.tipo] && (
+                    <div style={{ textAlign: "center", padding: 40, color: "#888" }}>
+                      Seleccioná un tipo de entidad para ver los detalles específicos.
+                    </div>
+                  )}
+                </>
               )}
 
               {step === 3 && (
@@ -1356,95 +1748,117 @@ export const AdminPanel = () => {
                   <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
                     <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>Multimedia</h3>
                     {multimediaError && <div style={{ color: "#c62828", fontSize: 13, marginBottom: 12 }}>{multimediaError}</div>}
-                    {multimediaItems.map((item, i) => (
-                      <div key={i} style={{ marginBottom: 16, padding: 16, background: "#fafaf8", borderRadius: 12, border: "1px solid #eee" }}>
-                        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                          {item.url_recurso && item.tipo_recurso === "foto" && (
-                            <img src={item.url_recurso} alt="" style={{ width: 80, height: 80, borderRadius: 8, objectFit: "cover" }} />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                              <select
-                                value={item.tipo_recurso}
-                                onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, tipo_recurso: e.target.value } : m))}
-                                style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
-                              >
-                                <option value="foto">Foto</option>
-                                <option value="video">Video</option>
-                                <option value="audio">Audio</option>
-                              </select>
-                              <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, cursor: "pointer" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.es_principal}
-                                  onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, es_principal: e.target.checked } : m))}
-                                />
-                                Principal
-                              </label>
+
+                    {/* Multimedia existente */}
+                    {multimediaItems.filter((m) => m.id).length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <p style={{ fontSize: 12, color: "#999", fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>Actuales</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                          {multimediaItems.filter((m) => m.id).map((m) => (
+                            <div key={m.id} style={{ width: 120, textAlign: "center" }}>
+                              {m.tipo_recurso === "foto" ? (
+                                <img src={m.url_recurso} alt={m.titulo_alternativo || ""} style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }} />
+                              ) : m.tipo_recurso === "video" ? (
+                                <video src={m.url_recurso} style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }} />
+                              ) : (
+                                <div style={{ width: 120, height: 80, background: "#fafaf8", borderRadius: 6, border: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "#999" }}>🎵</div>
+                              )}
+                              <div style={{ fontSize: 11, color: "#999", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.titulo_alternativo || m.tipo_recurso}</div>
                             </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nuevos archivos multimedia */}
+                    {multimediaItems.filter((m) => !m.id).map((item, idx) => {
+                      const realIdx = multimediaItems.indexOf(item);
+                      return (
+                        <div key={realIdx} style={{ marginBottom: 16, padding: 16, background: "#fafaf8", borderRadius: 12, border: "1px solid #eee" }}>
+                          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                            <select
+                              value={item.tipo_recurso}
+                              onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, tipo_recurso: e.target.value } : m))}
+                              style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, color: "#1c1c18" }}
+                            >
+                              <option value="foto">Foto</option>
+                              <option value="video">Video</option>
+                              <option value="audio">Audio</option>
+                            </select>
+                            <label style={{ fontFamily: "inherit", fontSize: 13, cursor: "pointer", padding: "6px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", color: "#555", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              {uploadingIndex === realIdx ? "Subiendo..." : item.url_recurso ? "✅ Subido" : "Seleccionar"}
+                              <input type="file" hidden disabled={uploadingIndex === realIdx}
+                                accept={
+                                  item.tipo_recurso === "foto" ? "image/jpeg,image/png,image/webp" :
+                                  item.tipo_recurso === "video" ? "video/mp4,video/webm" : "audio/mpeg,audio/wav,audio/ogg"
+                                }
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(realIdx, f); e.target.value = ""; }}
+                              />
+                            </label>
+                            {item.url_recurso && (
+                              item.tipo_recurso === "foto" ? (
+                                <img src={item.url_recurso} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }} />
+                              ) : item.tipo_recurso === "video" ? (
+                                <video src={item.url_recurso} style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }} />
+                              ) : (
+                                <div style={{ width: 64, height: 64, background: "#f5f2eb", borderRadius: 6, border: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#999" }}>🎵</div>
+                              )
+                            )}
+                            {multimediaItems.filter((m) => !m.id).length > 1 && (
+                              <button onClick={() => eliminarMultimedia(realIdx)} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 18, padding: 4, lineHeight: 1 }}>✕</button>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                             <input
-                              style={{ ...styles.input, marginBottom: 8 }}
-                              placeholder="URL del recurso"
-                              value={item.url_recurso}
-                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, url_recurso: e.target.value } : m))}
-                            />
-                            <input
-                              style={{ ...styles.input, marginBottom: 8 }}
-                              placeholder="Título alternativo (opcional)"
+                              style={{ ...styles.input, flex: 1 }}
+                              placeholder="Título (opcional)"
                               value={item.titulo_alternativo}
-                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, titulo_alternativo: e.target.value } : m))}
+                              onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, titulo_alternativo: e.target.value } : m))}
                             />
-                            <textarea
-                              style={{ ...styles.input, marginBottom: 8 }}
+                            <input
+                              style={{ ...styles.input, flex: 1 }}
                               placeholder="Descripción (opcional)"
                               value={item.descripcion_recurso}
-                              onChange={(e) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, descripcion_recurso: e.target.value } : m))}
+                              onChange={(e) => setMultimediaItems((p) => p.map((m, i) => i === realIdx ? { ...m, descripcion_recurso: e.target.value } : m))}
                             />
                           </div>
                         </div>
-                        <TagSelector
-                          entidades={allEntities.filter((e) => e.id !== (editingEntityId || -1))}
-                          selected={item.entidades_etiquetadas || []}
-                          onChange={(tags) => setMultimediaItems((prev) => prev.map((m, idx) => idx === i ? { ...m, entidades_etiquetadas: tags } : m))}
-                          searchQuery={tagSearchQueries[i] || ""}
-                          setSearchQuery={(q) => setTagSearchQueries((prev) => ({ ...prev, [i]: q }))}
-                          typeFilter={tagTypeFilters[i] || ""}
-                          setTypeFilter={(f) => setTagTypeFilters((prev) => ({ ...prev, [i]: f }))}
-                        />
-                        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-                          <input
-                            type="file"
-                            accept={INFO_FORMATOS[item.tipo_recurso]?.accept?.join(",") || "image/*"}
-                            onChange={(e) => e.target.files[0] && handleUpload(i, e.target.files[0])}
-                            style={{ fontSize: 13, flex: 1 }}
-                          />
-                          {uploadingIndex === i && <span style={{ fontSize: 12, color: "#888" }}>Subiendo...</span>}
-                          {multimediaItems.length > 1 && (
-                            <button onClick={() => setMultimediaItems((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 13 }}>
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={() => setMultimediaItems((prev) => [...prev, { url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", es_principal: false, public_id: "", entidades_etiquetadas: [] }])} className="admin-btn" style={{ ...styles.smallBtn("#863819"), marginRight: 8 }}>
+                      );
+                    })}
+                    <button onClick={() => setMultimediaItems((prev) => [...prev, { url_recurso: "", titulo_alternativo: "", descripcion_recurso: "", tipo_recurso: "foto", public_id: "", entidades_etiquetadas: [] }])} className="admin-btn" style={{ ...styles.smallBtn("#863819"), marginRight: 8 }}>
                       + AGREGAR ARCHIVO
                     </button>
                   </div>
 
-                  {/* Conexiones en step 3 */}
-                  <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee", marginTop: 16 }}>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div>
+                  <div style={{ background: "white", borderRadius: 12, padding: "20px 24px", border: "1px solid #eee" }}>
                     <h3 style={{ fontFamily: "Cinzel, serif", color: "#1c1c18", margin: "0 0 16px", fontSize: 18 }}>
                       Conexiones {conexTempList.length > 0 && `(${conexTempList.length})`}
                     </h3>
 
                     <div style={{ position: "relative", marginBottom: 12 }}>
-                      <input
-                        style={styles.input}
-                        placeholder="Buscar entidad para conectar..."
-                        value={conexSearch}
-                        onChange={(e) => setConexSearch(e.target.value)}
-                      />
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        <input
+                          style={{ ...styles.input, flex: 1 }}
+                          placeholder="Buscar entidad para conectar..."
+                          value={conexSearch}
+                          onChange={(e) => setConexSearch(e.target.value)}
+                        />
+                        <select
+                          style={{ ...styles.input, width: 180, flexShrink: 0 }}
+                          value={conexFilterTipo}
+                          onChange={(e) => setConexFilterTipo(e.target.value)}
+                        >
+                          <option value="">Todos los tipos</option>
+                          {TIPO_OPTIONS.filter((o) => o.value).map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
                       {conexResults.length > 0 && (
                         <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: "1px solid #eee", borderRadius: 12, zIndex: 10, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
                           {conexResults.filter((e) => e.id !== editingEntityId).map((e) => (
@@ -1457,42 +1871,71 @@ export const AdminPanel = () => {
                       )}
                     </div>
 
-                    {conexTempList.map((c, i) => (
-                      <div key={c.entidad_destino_id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, padding: "10px 14px", background: "#fafaf8", borderRadius: 8 }}>
-                        <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{c.nombre}</span>
-                        <input
-                          style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18" }}
-                          placeholder="Tipo de relación (ej: colabora con)"
-                          value={c.tipo_relacion}
-                          onChange={(e) => {
-                            const next = [...conexTempList];
-                            next[i] = { ...next[i], tipo_relacion: e.target.value };
-                            setConexTempList(next);
-                          }}
-                        />
-                        <input
-                          style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18" }}
-                          placeholder="Relación inversa (ej: es colaborado por)"
-                          value={c.tipo_relacion_inversa}
-                          onChange={(e) => {
-                            const next = [...conexTempList];
-                            next[i] = { ...next[i], tipo_relacion_inversa: e.target.value };
-                            setConexTempList(next);
-                          }}
-                        />
-                        <button onClick={() => quitarConexTemp(c.entidad_destino_id)} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16 }}>✕</button>
+                    {conexTempList.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 32, color: "#999", fontSize: 14 }}>
+                        No hay conexiones. Buscá entidades para conectar arriba.
                       </div>
-                    ))}
+                    ) : (
+                      conexTempList.map((c, i) => (
+                        <div key={c.entidad_destino_id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, padding: "10px 14px", background: "#fafaf8", borderRadius: 8 }}>
+                          <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: colorMapAdmin[c.tipo] || "#888", textTransform: "uppercase" }}>{c.tipo}</span>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{c.nombre}</span>
+                          </div>
+                          <input
+                            style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18", minWidth: 120 }}
+                            placeholder="Tipo de relación (ej: colabora con)"
+                            value={c.tipo_relacion}
+                            onChange={(e) => {
+                              const next = [...conexTempList];
+                              next[i] = { ...next[i], tipo_relacion: e.target.value };
+                              setConexTempList(next);
+                            }}
+                          />
+                          <input
+                            style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, color: "#1c1c18", minWidth: 120 }}
+                            placeholder="Relación inversa (ej: es colaborado por)"
+                            value={c.tipo_relacion_inversa}
+                            onChange={(e) => {
+                              const next = [...conexTempList];
+                              next[i] = { ...next[i], tipo_relacion_inversa: e.target.value };
+                              setConexTempList(next);
+                            }}
+                          />
+                          <button onClick={() => quitarConexTemp(c.entidad_destino_id)} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16, padding: 4, flexShrink: 0 }}>✕</button>
+                        </div>
+                      ))
+                    )}
                   </div>
 
-                  <div style={{ textAlign: "right", marginTop: 20, display: "flex", justifyContent: "space-between" }}>
-                    <button onClick={() => setStep(2)} className="admin-btn" style={styles.btnSecondary}>← ANTERIOR</button>
-                    <button onClick={guardarEntidad} disabled={loading} className="admin-btn" style={{ ...styles.btnPrimary, opacity: loading ? 0.6 : 1 }}>
-                      {loading ? "GUARDANDO..." : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
-                    </button>
-                  </div>
                 </div>
               )}
+
+              </div>{/* end scrollable step content */}
+
+              {/* Bottom navigation */}
+              <div style={{
+                padding: "12px 24px 0",
+                display: "flex",
+                justifyContent: step === 1 ? "flex-end" : "space-between",
+                gap: 12,
+                flexShrink: 0,
+              }}>
+                {step > 1 && (
+                  <button onClick={() => setStep(step - 1)} className="admin-btn" style={styles.btnSecondary}>
+                    ← ANTERIOR
+                  </button>
+                )}
+                {step < 4 ? (
+                  <button onClick={() => setStep(step + 1)} className="admin-btn" style={styles.btnNext}>
+                    SIGUIENTE →
+                  </button>
+                ) : (
+                  <button onClick={guardarEntidad} disabled={loading || (!hasEntityChanges && !!editingEntityId)} className="admin-btn" style={{ ...styles.btnPrimary, opacity: loading ? 0.6 : (!hasEntityChanges && editingEntityId ? 0.5 : 1) }}>
+                    {loading ? "GUARDANDO..." : editingEntityId ? "ACTUALIZAR ENTIDAD" : "CREAR ENTIDAD"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1501,7 +1944,6 @@ export const AdminPanel = () => {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <h2 style={styles.sectionTitle}>
-                  <img src="/icons/mail.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                   Solicitudes de Sello
                   {solicitudesPendientes > 0 && (
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#863819", marginLeft: 12, background: "#f5f2eb", padding: "4px 12px", borderRadius: 10 }}>
@@ -1619,7 +2061,6 @@ export const AdminPanel = () => {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <h2 style={styles.sectionTitle}>
-                  <img src="/icons/route.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
                   Recorridos
                 </h2>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1634,7 +2075,7 @@ export const AdminPanel = () => {
                     setRecPasos([]);
                     setView("recorrido-form");
                   }} className="admin-btn" style={styles.btnPrimary}>
-                    + NUEVO RECORRIDO
+                    Nuevo recorrido
                   </button>
                 </div>
               </div>
@@ -1725,15 +2166,9 @@ export const AdminPanel = () => {
                     <button onClick={() => setRecPasos((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 16 }}>✕</button>
                   </div>
                 ))}
-              </div>
-
-              <div style={{ textAlign: "right", marginTop: 20 }}>
-                <button onClick={guardarRecorrido} disabled={recSaving} className="admin-btn" style={{ ...styles.btnPrimary, opacity: recSaving ? 0.6 : 1 }}>
-                  {recSaving ? "GUARDANDO..." : editingRecorridoId ? "ACTUALIZAR RECORRIDO" : "CREAR RECORRIDO"}
-                </button>
-              </div>
-            </div>
-          )}
+                  </div>
+                </div>
+              )}
 
           {/* EDICIONES */}
           {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} showConfirm={showConfirm} showPopup={showPopup} />}
@@ -1778,7 +2213,6 @@ export const AdminPanel = () => {
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                 <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-                  <img src="/icons/location.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
                   Localidades
                 </h2>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -1828,7 +2262,7 @@ export const AdminPanel = () => {
 
       {/* Popup */}
       {popup && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: popup.isConfirm ? "rgba(0,0,0,0.4)" : "transparent", pointerEvents: popup.isConfirm ? "auto" : "none" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: popup.isConfirm ? "center" : "flex-start", justifyContent: "center", background: popup.isConfirm ? "rgba(0,0,0,0.4)" : "transparent", pointerEvents: popup.isConfirm ? "auto" : "none", paddingTop: popup.isConfirm ? 0 : 40 }}
           onClick={() => {
             if (popup.isConfirm) {
               pendingConfirm.current?.(false);
@@ -1836,66 +2270,69 @@ export const AdminPanel = () => {
             }
           }}
         >
-          <div style={{
-            background: "white",
-            borderRadius: "16px",
-            padding: "24px 32px",
-            maxWidth: "420px",
-            width: "100%",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-            pointerEvents: "auto",
-          }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {popup.isConfirm ? (
-              <>
-                <p style={{ margin: "0 0 16px", fontSize: "15px", color: "#1c1c18", fontFamily: "Merriweather, serif", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                  {popup.message}
-                </p>
-                {popup.confirmEmail && (
-                  <input
-                    style={{ ...styles.input, marginBottom: 12, fontSize: 14 }}
-                    placeholder={`Escribí ${popup.confirmEmail} para confirmar`}
-                    value={confirmEmailInput}
-                    onChange={(e) => setConfirmEmailInput(e.target.value)}
-                  />
-                )}
-                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                  <button onClick={() => { pendingConfirm.current?.(false); setPopup(null); }} className="admin-btn" style={{ padding: "8px 20px", background: "white", color: "#555", border: "1px solid #ccc", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
-                    CANCELAR
-                  </button>
-                  <button onClick={() => {
-                    if (popup.confirmEmail && confirmEmailInput !== popup.confirmEmail) {
-                      showPopup("El email no coincide", "error");
-                      return;
-                    }
-                    pendingConfirm.current?.(true);
-                    setPopup(null);
-                  }} className="admin-btn" style={{ padding: "8px 20px", background: "#863819", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
-                    {popup.confirmLabel || "CONFIRMAR"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                background: popup.type === "error" ? "#ffebee" : "#e8f5e9",
-                color: "#1c1c18",
-                padding: "14px 24px",
-                borderRadius: "14px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-                textAlign: "center",
-                fontFamily: "Merriweather, serif",
-                fontSize: "14px",
-                fontWeight: 500,
-              }}
-              >
+          {popup.isConfirm ? (
+            <div style={{
+              background: "white",
+              borderRadius: "12px",
+              padding: "24px 32px",
+              maxWidth: "420px",
+              width: "100%",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+              pointerEvents: "auto",
+            }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p style={{ margin: "0 0 16px", fontSize: "15px", color: "#1c1c18", fontFamily: "Merriweather, serif", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
                 {popup.message}
+              </p>
+              {popup.confirmEmail && (
+                <input
+                  style={{ ...styles.input, marginBottom: 12, fontSize: 14 }}
+                  placeholder={`Escribí ${popup.confirmEmail} para confirmar`}
+                  value={confirmEmailInput}
+                  onChange={(e) => setConfirmEmailInput(e.target.value)}
+                />
+              )}
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button onClick={() => { pendingConfirm.current?.(false); setPopup(null); }} className="admin-btn" style={{ padding: "8px 20px", background: "white", color: "#555", border: "1px solid #ccc", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+                  CANCELAR
+                </button>
+                <button onClick={() => {
+                  if (popup.confirmEmail && confirmEmailInput !== popup.confirmEmail) {
+                    showPopup("El email no coincide", "error");
+                    return;
+                  }
+                  pendingConfirm.current?.(true);
+                  setPopup(null);
+                }} className="admin-btn" style={{ padding: "8px 20px", background: "#863819", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+                  {popup.confirmLabel || "CONFIRMAR"}
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "10px",
+              background: popup.type === "error" ? "#fef2f2" : "#f0faf0",
+              color: "#1c1c18",
+              padding: "14px 28px",
+              borderRadius: "10px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+              fontFamily: "Merriweather, serif",
+              fontSize: "15px",
+              fontWeight: 400,
+              letterSpacing: "0.3px",
+              pointerEvents: "auto",
+            }}
+            >
+              <span style={{ fontSize: 16, color: popup.type === "error" ? "#dc2626" : "#16a34a" }}>
+                {popup.type === "error" ? "✕" : "✓"}
+              </span>
+              {popup.message}
+            </div>
+          )}
         </div>
       )}
     </div>

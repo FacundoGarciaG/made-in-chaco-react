@@ -21,7 +21,6 @@ export function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendin
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h2 style={styles.sectionTitle}>
-          <img src="/icons/edit.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
           Ediciones
         </h2>
       </div>

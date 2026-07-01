@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 export const OlvidarContrasenaPage = () => {
   const [email, setEmail] = useState("");
@@ -30,6 +31,7 @@ export const OlvidarContrasenaPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Olvidé mi Contraseña" description="Recuperá el acceso a tu cuenta de Made in Chaco." />
       <div className="login-card">
         <div className="login-header">
           <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />

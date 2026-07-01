@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 const STATUS = {
   LOADING: "loading",
@@ -21,6 +22,7 @@ export const VerificarCuentaPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Verificar Cuenta" description="Confirmá tu correo electrónico para activar tu cuenta en Made in Chaco." />
       <div className="login-card" style={{ textAlign: "center", padding: "48px 32px" }}>
         <div className="login-header">
           <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthPublico } from "../context/AuthPublicoContext";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 export const RegisterPage = () => {
   const [nombre, setNombre] = useState("");
@@ -33,6 +34,7 @@ export const RegisterPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Registrarse" description="Creá tu cuenta en Made in Chaco y formá parte de la comunidad chaqueña." />
       <div className="login-card">
         <div className="login-header">
           <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />

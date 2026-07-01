@@ -5,13 +5,16 @@ import { getIO } from "../services/socket.js";
 
 const router = Router();
 
-export async function crearNotificacion(perfilId, tipo, titulo, mensaje, entidadId) {
+export async function crearNotificacion(perfilId, tipo, titulo, mensaje, entidadId, datos) {
   try {
+    const { rows: perfiles } = await pool.query("SELECT id FROM perfiles WHERE id = $1", [perfilId]);
+    if (perfiles.length === 0) return;
+
     const { rows } = await pool.query(
-      `INSERT INTO notificaciones (perfil_id, tipo, titulo, mensaje, entidad_id)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO notificaciones (perfil_id, tipo, titulo, mensaje, entidad_id, datos)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, created_at`,
-      [perfilId, tipo, titulo, mensaje, entidadId || null],
+      [perfilId, tipo, titulo, mensaje, entidadId || null, datos ? JSON.stringify(datos) : null],
     );
     const notif = rows[0];
     getIO()?.to(`perfil:${perfilId}`).emit("notificacion:nueva", {
@@ -21,6 +24,7 @@ export async function crearNotificacion(perfilId, tipo, titulo, mensaje, entidad
       titulo,
       mensaje,
       entidad_id: entidadId || null,
+      datos: datos || null,
       leida: false,
       created_at: notif.created_at,
     });
@@ -103,8 +107,26 @@ router.delete("/notificaciones/:id", authMiddleware, async (req, res) => {
   }
 });
 
+router.get("/notificaciones/unread-count", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM notificaciones WHERE perfil_id = $1 AND leida = false",
+      [req.user.id],
+    );
+    res.json({ count: rows[0].count });
+  } catch (err) {
+    console.error("Error GET /notificaciones/unread-count:", err);
+    res.status(500).json({ error: "Error al obtener conteo" });
+  }
+});
+
 router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (req, res) => {
   try {
+    // Solo para perfiles públicos (admin no tiene perfil en la tabla perfiles)
+    if (req.user.tipo !== "publico") {
+      return res.json({ ok: true, message: "Solo para perfiles públicos" });
+    }
+
     const { rows: entities } = await pool.query(
       `SELECT id, nombre, fecha_inicio_suscripcion, fecha_fin_suscripcion
        FROM entidades
@@ -112,8 +134,7 @@ router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (re
       [req.user.id],
     );
 
-    const today = new Date();
-    const hoyStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const hoyStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
 
     for (const ent of entities) {
       if (!ent.fecha_fin_suscripcion) continue;
@@ -123,7 +144,7 @@ router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (re
 
       const diffDays = Math.ceil((new Date(finStr + 'T23:59:59') - new Date(hoyStr + 'T00:00:00')) / (1000 * 60 * 60 * 24));
 
-      if (diffDays < 0) {
+      if (diffDays === -1) {
         const { rows: existing } = await pool.query(
           "SELECT id FROM notificaciones WHERE perfil_id = $1 AND entidad_id = $2 AND tipo = 'suscripcion_vencida'",
           [req.user.id, ent.id],
@@ -137,35 +158,25 @@ router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (re
             ent.id,
           );
         }
-      } else if (diffDays <= 30) {
+      } else if (diffDays === 10 || diffDays === 5 || diffDays === 1) {
+        const tipo = `suscripcion_por_vencer_${diffDays}`;
+        const mensaje = diffDays === 1
+          ? `La suscripción de "${ent.nombre}" vence mañana. Renová para mantenerla visible en el mapa.`
+          : `La suscripción de "${ent.nombre}" vence en ${diffDays} días. Renová para mantenerla visible en el mapa.`;
         const { rows: existing } = await pool.query(
-          "SELECT id FROM notificaciones WHERE perfil_id = $1 AND entidad_id = $2 AND tipo = 'suscripcion_por_vencer'",
-          [req.user.id, ent.id],
+          "SELECT id FROM notificaciones WHERE perfil_id = $1 AND entidad_id = $2 AND tipo = $3",
+          [req.user.id, ent.id, tipo],
         );
         if (existing.length === 0) {
           await crearNotificacion(
             req.user.id,
-            "suscripcion_por_vencer",
+            tipo,
             "Suscripción próxima a vencer",
-            `La suscripción de "${ent.nombre}" vence en ${diffDays} días. Renová para mantenerla visible en el mapa.`,
+            mensaje,
             ent.id,
           );
         }
       }
-    }
-
-    const { rows: existingBienvenida } = await pool.query(
-      "SELECT id FROM notificaciones WHERE perfil_id = $1 AND tipo = 'bienvenida'",
-      [req.user.id],
-    );
-    if (existingBienvenida.length === 0) {
-      await crearNotificacion(
-        req.user.id,
-        "bienvenida",
-        "¡Bienvenido a Made in Chaco!",
-        "Descubrí cómo funciona tu panel de perfil. Hacé clic para comenzar un recorrido guiado por las secciones.",
-        null,
-      );
     }
 
     const { rows } = await pool.query(

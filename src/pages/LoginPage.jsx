@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 export const LoginPage = () => {
   const [username, setUsername] = useState("");
@@ -28,6 +29,7 @@ export const LoginPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Admin - Iniciar Sesión" description="Acceso al panel de administración de Made in Chaco." />
       <div className="login-card">
          <div className="login-header">
            <img 

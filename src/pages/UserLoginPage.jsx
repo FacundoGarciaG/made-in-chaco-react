@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthPublico } from "../context/AuthPublicoContext";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 export const UserLoginPage = () => {
   const [email, setEmail] = useState("");
@@ -58,6 +59,7 @@ export const UserLoginPage = () => {
   if (restaurada) {
     return (
       <div className="login-page">
+        <SEO title="Iniciar Sesión" description="Accedé a tu cuenta de Made in Chaco para gestionar tu perfil y contenido." />
         <div className="login-card">
           <div className="login-header">
             <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />
@@ -79,6 +81,7 @@ export const UserLoginPage = () => {
   if (eliminada) {
     return (
       <div className="login-page">
+        <SEO title="Iniciar Sesión" description="Accedé a tu cuenta de Made in Chaco para gestionar tu perfil y contenido." />
         <div className="login-card">
           <div className="login-header">
             <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />
@@ -103,6 +106,7 @@ export const UserLoginPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Iniciar Sesión" description="Accedé a tu cuenta de Made in Chaco para gestionar tu perfil y contenido." />
       <div className="login-card">
         <div className="login-header">
           <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />

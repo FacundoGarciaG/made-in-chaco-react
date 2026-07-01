@@ -1,11 +1,13 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
-import { buildSetClause } from "../config/helpers.js";
+import { buildSetClause, CAMPOS_ENTIDAD } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { crearNotificacion } from "./notificaciones.js";
 import { cloudinary, publicIdDesdeUrl } from "../config/cloudinary.js";
 import { getIO } from "../services/socket.js";
+import { sendEmail } from "../services/mailer.js";
+import { JWT_SECRET } from "../config/env.js";
 
 const router = Router();
 
@@ -79,29 +81,37 @@ router.get("/entidades/:id", async (req, res) => {
 // POST /api/entidades
 router.post("/entidades", authMiddleware, async (req, res) => {
   try {
-    const {
-      tipo, nombre, slug, resumen, localidad_id,
-      latitud, longitud, visible, imagen, biografia_larga,
-    } = req.body;
+    const { tipo, nombre, slug } = req.body;
 
     if (!tipo || !nombre || !slug) {
       return res.status(400).json({ error: "tipo, nombre y slug son requeridos" });
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO entidades (tipo, nombre, slug, resumen, localidad_id,
-        latitud, longitud, visible, imagen, biografia_larga)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO entidades (tipo, nombre, slug)
+       VALUES ($1, $2, $3)
        RETURNING id`,
-      [
-        tipo, nombre, slug, resumen || "",
-        localidad_id || null, latitud || null, longitud || null,
-        visible !== false, imagen || "", biografia_larga || "",
-      ],
+      [tipo, nombre, slug],
     );
 
+    const id = rows[0].id;
+
+    // Save all other fields dynamically
+    const campos = { ...req.body };
+    delete campos.id;
+    delete campos.tipo;
+    delete campos.nombre;
+    delete campos.slug;
+    const built = buildSetClause(campos, 1, CAMPOS_ENTIDAD);
+    if (built) {
+      await pool.query(
+        `UPDATE entidades SET ${built.clause} WHERE id = $${built.values.length + 1}`,
+        [...built.values, id],
+      );
+    }
+
     getIO()?.emit("entidad:change");
-    res.status(201).json({ id: rows[0].id });
+    res.status(201).json({ id });
   } catch (err) {
     console.error("Error POST /entidades:", err);
     if (err.code === "23505") {
@@ -131,7 +141,7 @@ router.post("/solicitar-sello", async (req, res) => {
     if (header && header.startsWith("Bearer ")) {
       try {
         const token = header.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "made-in-chaco-secret-dev");
+        const decoded = jwt.verify(token, JWT_SECRET);
         perfilId = decoded.id;
       } catch {
         // Token inválido o expirado — seguir sin perfil_id
@@ -187,37 +197,75 @@ router.post("/solicitar-sello", async (req, res) => {
     res.status(201).json({ id: entityId, slug });
   } catch (err) {
     console.error("Error POST /solicitar-sello:", err);
-    res.status(500).json({ error: `Error al procesar la solicitud: ${err.message}` });
+    res.status(500).json({ error: "Error al procesar la solicitud" });
   }
 });
 
 // PUT /api/entidades/:id
 router.put("/entidades/:id", authMiddleware, async (req, res) => {
   try {
-    const { tipo, nombre, slug, resumen, localidad_id, latitud, longitud, visible, imagen, biografia_larga, icono } = req.body;
+    const { icono } = req.body;
+
+    const allowedCols = [...CAMPOS_ENTIDAD].join(", ");
+    const { rows: oldEntity } = await pool.query(
+      `SELECT ${allowedCols}, perfil_id, nombre FROM entidades WHERE id = $1`,
+      [req.params.id],
+    );
+    if (oldEntity.length === 0) return res.status(404).json({ error: "Entidad no encontrada" });
 
     // Delete old icono from Cloudinary if it changed
-    if (icono) {
-      const { rows: old } = await pool.query("SELECT icono FROM entidades WHERE id = $1", [req.params.id]);
-      if (old[0]?.icono && old[0].icono !== icono) {
-        const pid = publicIdDesdeUrl(old[0].icono);
-        if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-          console.warn("Cloudinary delete warning:", e.message);
-        }
+    if (icono && oldEntity[0].icono && oldEntity[0].icono !== icono) {
+      const pid = publicIdDesdeUrl(oldEntity[0].icono);
+      if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
       }
     }
 
+    const campos = { ...req.body };
+    delete campos.id;
+    const built = buildSetClause(campos, 1, CAMPOS_ENTIDAD);
+    if (!built) return res.json({ ok: true });
+
     await pool.query(
-      `UPDATE entidades SET tipo = $1, nombre = $2, slug = $3, resumen = $4,
-        localidad_id = $5, latitud = $6, longitud = $7, visible = $8,
-        imagen = $9, biografia_larga = $10, icono = $11
-       WHERE id = $12`,
-      [
-        tipo, nombre, slug, resumen || "", localidad_id || null,
-        latitud || null, longitud || null, visible !== false,
-        imagen || "", biografia_larga || "", icono || "", req.params.id,
-      ],
+      `UPDATE entidades SET ${built.clause} WHERE id = $${built.values.length + 1}`,
+      [...built.values, req.params.id],
     );
+
+    const normalizar = (v) => {
+      if (v == null) return "";
+      if (v instanceof Date) return v.toISOString().split("T")[0];
+      const s = String(v);
+      if (s === "") return "";
+      const n = Number(s);
+      if (!isNaN(n)) return String(n);
+      return s;
+    };
+
+    if (oldEntity[0].perfil_id && oldEntity[0].perfil_id !== req.user.id) {
+      const cambios = [];
+      for (const k of Object.keys(campos)) {
+        if (!CAMPOS_ENTIDAD.has(k)) continue;
+        const oldVal = oldEntity[0][k];
+        const newVal = campos[k];
+        if (normalizar(oldVal) !== normalizar(newVal)) {
+          cambios.push({ campo: k.replace(/_/g, " "), de: normalizar(oldVal), a: normalizar(newVal) });
+        }
+      }
+      const camposLista = cambios.map((c) => c.campo).join(", ");
+      const mensaje = cambios.length > 0
+        ? `"${oldEntity[0].nombre}" fue modificada por el administrador. Campos modificados: ${camposLista}.`
+        : `"${oldEntity[0].nombre}" fue modificada por el administrador.`;
+
+      await crearNotificacion(
+        oldEntity[0].perfil_id,
+        "entidad_editada",
+        "Tu entidad fue modificada",
+        mensaje,
+        parseInt(req.params.id),
+        cambios.length > 0 ? cambios : null,
+      );
+    }
+
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
@@ -232,7 +280,7 @@ router.put("/entidades/:id/detalles", authMiddleware, async (req, res) => {
     const campos = { ...req.body };
     delete campos.tipo;
 
-    const built = buildSetClause(campos, 1);
+    const built = buildSetClause(campos, 1, CAMPOS_ENTIDAD);
     if (!built) return res.json({ ok: true });
 
     await pool.query(
@@ -252,7 +300,10 @@ router.put("/entidades/:id/detalles", authMiddleware, async (req, res) => {
 router.delete("/entidades/:id", authMiddleware, async (req, res) => {
   try {
     const { rows: ent } = await pool.query(
-      "SELECT perfil_id, imagen, icono FROM entidades WHERE id = $1",
+      `SELECT e.perfil_id, e.imagen, e.icono, e.nombre, p.email AS perfil_email
+       FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       WHERE e.id = $1`,
       [req.params.id],
     );
     if (ent.length === 0) {
@@ -293,7 +344,29 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
       }
     }
 
+    const nombreEntidad = ent[0].nombre;
+    const perfilId = ent[0].perfil_id;
+    const emailOwner = ent[0].perfil_email;
+
     await pool.query("DELETE FROM entidades WHERE id = $1", [req.params.id]);
+
+    if (perfilId && perfilId !== req.user.id) {
+      await crearNotificacion(
+        perfilId,
+        "entidad_eliminada",
+        "Entidad eliminada",
+        `"${nombreEntidad}" fue eliminada por el administrador.`,
+        null,
+      );
+      if (emailOwner) {
+        await sendEmail(
+          emailOwner,
+          "Tu entidad en Made in Chaco fue eliminada",
+          `Hola,\n\n"${nombreEntidad}" fue eliminada del directorio de Made in Chaco por el administrador.\n\nSi creés que esto es un error, contactanos a madeinchacoargentina@gmail.com.\n\nSaludos,\nEquipo de Made in Chaco`,
+        );
+      }
+    }
+
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
@@ -668,7 +741,7 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
     for (const f of dateFields) {
       if (campos[f] === "") campos[f] = null;
     }
-    const built = buildSetClause(campos, 1);
+    const built = buildSetClause(campos, 1, CAMPOS_ENTIDAD);
     if (built) {
       await pool.query(
         `UPDATE entidades SET ${built.clause} WHERE id = $${built.values.length + 1}`,

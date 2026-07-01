@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/QuienesSomos.css";
 import { SelloModal } from "../components/SelloModal";
+import { SEO } from "../components/SEO";
 
 const VALORES = [
   { num: "01", title: "Identidad", desc: "Celebramos lo nuestro, lo auténtico, lo chaqueño. Cada historia es un ladrillo en la construcción de nuestra cultura." },
@@ -45,6 +46,7 @@ export const QuienesSomosPage = () => {
 
   return (
     <article>
+      <SEO title="Quiénes Somos" description="Conocé al equipo detrás de Made in Chaco y nuestra misión de visibilizar la identidad chaqueña." />
       {/* ── HERO ── */}
       <section
         className="quienes-hero"

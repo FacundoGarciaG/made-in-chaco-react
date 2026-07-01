@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { styles, parseSocialList } from "./helpers";
 import { SOCIAL_PLATFORMS, COMUNIDADES_ETNICAS } from "./constants";
 
-export function DetailField({ field, fieldVal, onFieldChange, label, type = "text", options, placeholder }) {
+export function DetailField({ field, fieldVal, onFieldChange, label, type = "text", options, placeholder, readOnly }) {
   const val = fieldVal ?? "";
   const onChange = (v) => onFieldChange(field, v);
   return (
@@ -26,12 +26,14 @@ export function DetailField({ field, fieldVal, onFieldChange, label, type = "tex
           value={val}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder || ""}
+          readOnly={readOnly}
         />
       ) : type === "select" ? (
         <select
           style={styles.input}
           value={val}
           onChange={(e) => onChange(e.target.value)}
+          disabled={readOnly}
         >
           {options?.map((o) => (
             <option key={o.value} value={o.value}>
@@ -46,6 +48,7 @@ export function DetailField({ field, fieldVal, onFieldChange, label, type = "tex
           value={val}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder || ""}
+          readOnly={readOnly}
         />
       ) : type === "date" ? (
         <input
@@ -53,6 +56,7 @@ export function DetailField({ field, fieldVal, onFieldChange, label, type = "tex
           type="date"
           value={val}
           onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
         />
       ) : (
         <input
@@ -60,6 +64,7 @@ export function DetailField({ field, fieldVal, onFieldChange, label, type = "tex
           value={val}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder || ""}
+          readOnly={readOnly}
         />
       )}
     </div>

@@ -1,7 +1,6 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "made-in-chaco-secret-dev";
+import { JWT_SECRET } from "../config/env.js";
 let io = null;
 
 function getRoomFromToken(decoded) {

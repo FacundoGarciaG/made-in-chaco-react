@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import "../styles/LoginPage.css";
+import { SEO } from "../components/SEO";
 
 export const ReestablecerContrasenaPage = () => {
   const { token } = useParams();
@@ -45,6 +46,7 @@ export const ReestablecerContrasenaPage = () => {
   if (exito) {
     return (
       <div className="login-page">
+        <SEO title="Reestablecer Contraseña" description="Creá una nueva contraseña para tu cuenta de Made in Chaco." />
         <div className="login-card">
           <div className="login-header">
             <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />
@@ -69,6 +71,7 @@ export const ReestablecerContrasenaPage = () => {
 
   return (
     <div className="login-page">
+      <SEO title="Reestablecer Contraseña" description="Creá una nueva contraseña para tu cuenta de Made in Chaco." />
       <div className="login-card">
         <div className="login-header">
           <img src="/imagenes/logo-madeinchaco.png" alt="Made in Chaco" className="login-logo" />

@@ -60,6 +60,35 @@ export const ACTIVIDADES_SUGERIDAS = [
   "Feria de la economía social", "Feria de diseño",
 ];
 
+export const RUBROS_COMERCIO = [
+  "Alfarería y cerámica", "Alimentos y bebidas artesanales", "Artesanías en cuero / Talabartería",
+  "Artesanías en madera", "Carnes y embutidos regionales", "Cerveza artesanal",
+  "Cestería y fibras naturales", "Comercio minorista", "Comercio mayorista",
+  "Conservas y dulces", "Construcción y materiales", "Consultoría y asesoría",
+  "Decoración artesanal", "Educación y capacitación", "Farmacia y perfumería",
+  "Ferias y eventos", "Ferretería", "Gastronomía / Restaurante",
+  "Gastronomía típica regional", "Herrería artesanal", "Hierbas medicinales y aromáticas",
+  "Hilados y tejidos artesanales", "Indumentaria textil", "Indumentaria deportiva",
+  "Informática y tecnología", "Instrumentos musicales", "Joyería y bijouterie artesanal",
+  "Juguetería y librería", "Kiosco y almacén", "Lácteos artesanales",
+  "Limpieza e higiene", "Mascotas y veterinaria", "Miel y derivados",
+  "Muebles artesanales", "Mueblería y decoración", "Orfebrería y platería",
+  "Panadería y pastelería", "Panificación y pastelería artesanal", "Papelería e imprenta",
+  "Peluquería y barbería", "Plantas y vivero", "Productos regionales",
+  "Quesos artesanales", "Reciclado y reutilización", "Repostería artesanal",
+  "Salud y bienestar", "Servicios culturales", "Servicios turísticos",
+  "Supermercado y autoservicio", "Textiles y bordados tradicionales", "Transporte y logística",
+  "Velas y jabones artesanales", "Venta de combustibles", "Vidriería y cristalería",
+];
+
+export const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+export const CATEGORIAS_HOSPEDAJE = [
+  "Hotel", "Cabaña", "Hostel", "Posada", "Complejo turístico",
+  "Camping", "Departamento temporario", "Casa de campo",
+  "Albergue", "Lodge", "Eco-aldea", "Hostería", "Resort",
+];
+
 export const TIPOS_RELATO = [
   "Leyenda", "Historia", "Memoria", "Testimonio",
   "Tradición oral", "Mitología", "Anécdota", "Crónica",

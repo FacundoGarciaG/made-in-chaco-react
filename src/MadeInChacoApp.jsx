@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "./context/AuthContext";
 import { AuthPublicoProvider } from "./context/AuthPublicoContext";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -22,6 +23,7 @@ const SolicitarSelloPage = lazy(() => import("./pages/SolicitarSelloPage").then(
 const SolicitarEdicionPage = lazy(() => import("./pages/SolicitarEdicionPage").then(m => ({ default: m.SolicitarEdicionPage })));
 const QuienesSomosPage = lazy(() => import("./pages/QuienesSomosPage").then(m => ({ default: m.QuienesSomosPage })));
 const PalabraDetallePage = lazy(() => import("./pages/PalabraDetallePage").then(m => ({ default: m.PalabraDetallePage })));
+const WikiaPage = lazy(() => import("./pages/WikiaPage").then(m => ({ default: m.WikiaPage })));
 const RegisterPage = lazy(() => import("./pages/RegisterPage").then(m => ({ default: m.RegisterPage })));
 const UserLoginPage = lazy(() => import("./pages/UserLoginPage").then(m => ({ default: m.UserLoginPage })));
 const OlvidarContrasenaPage = lazy(() => import("./pages/OlvidarContrasenaPage").then(m => ({ default: m.OlvidarContrasenaPage })));
@@ -96,6 +98,8 @@ function MadeInChacoApp() {
             <Route path="/perfil" element={<PerfilPage />} />
             <Route path="/verificar/:token" element={<VerificarCuentaPage />} />
             <Route path="/palabra/:id" element={<PalabraDetallePage />} />
+            <Route path="/wikia" element={<WikiaPage />} />
+            <Route path="/wikia/:slug" element={<PalabraDetallePage />} />
             <Route path="/*" element={<Navigate to="/" />}></Route>
           </Routes>
         </Suspense>
@@ -104,13 +108,15 @@ function MadeInChacoApp() {
   );
 
   return (
-    <AuthProvider>
-      <AuthPublicoProvider>
-        <NotificationProvider>
-          {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
-        </NotificationProvider>
-      </AuthPublicoProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <AuthPublicoProvider>
+          <NotificationProvider>
+            {isAdmin ? content : <UnderConstruction>{content}</UnderConstruction>}
+          </NotificationProvider>
+        </AuthPublicoProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 }
 

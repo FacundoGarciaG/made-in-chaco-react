@@ -4,6 +4,7 @@ import { motion, useScroll, useSpring } from "motion/react";
 import { FavoritoButton } from "../components/FavoritoButton";
 import "../styles/RecorridoDetallePage.css";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
+import { SEO } from "../components/SEO";
 
 const AnimatedNumber = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0);
@@ -170,12 +171,13 @@ export const RecorridoDetallePage = () => {
 
   return (
     <div className={darkMode ? "dark-mode" : ""}>
+      <SEO title={recorrido?.nombre} description={recorrido?.resumen} image={recorrido?.imagen} url={`/recorrido/${recorrido?.slug}`} />
       <motion.div
         className="rd-progress"
         style={{ scaleX, originX: 0 }}
       />
 
-      <nav className="rd-top-nav-bar">
+      <nav className="rd-top-nav-bar" aria-label="Navegación de recorrido">
         <Link to="/recorridos" className="rd-top-nav-btn">
           <i className="ri-arrow-left-s-line" style={{ fontSize: 18 }} />
           Recorridos
@@ -230,7 +232,7 @@ export const RecorridoDetallePage = () => {
         <div className="rd-hero-bg" />
         {recorrido.imagen && (
           <div className="rd-hero-bg-img">
-            <img src={optimizarUrlCloudinary(recorrido.imagen)} alt="" />
+            <img src={optimizarUrlCloudinary(recorrido.imagen)} alt={recorrido.nombre || ""} />
           </div>
         )}
         <div className="rd-hero-pattern" />

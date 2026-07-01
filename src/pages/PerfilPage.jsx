@@ -5,6 +5,8 @@ import { SelloModal } from "../components/SelloModal";
 import { useSocketEvent } from "../hooks/useSocket";
 import { useNotificationContext } from "../context/NotificationContext";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
+import { SEO } from "../components/SEO";
+import { publicAuthFetch } from "../helpers/publicAuthFetch";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -679,6 +681,7 @@ export const PerfilPage = () => {
   const [pagos, setPagos] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [planModal, setPlanModal] = useState(null);
+  const [diffModal, setDiffModal] = useState(null);
   const [adquiriendo, setAdquiriendo] = useState(false);
   const [customDias, setCustomDias] = useState(1);
 
@@ -735,7 +738,7 @@ export const PerfilPage = () => {
     setSaving(true);
     setMsg("");
     try {
-      const res = await fetch("/api/auth/perfil", {
+      const res = await publicAuthFetch("/api/auth/perfil", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -799,7 +802,7 @@ export const PerfilPage = () => {
       setAvatarPublicId(data.public_id || "");
       const stored = JSON.parse(localStorage.getItem("made_in_chaco_perfil") || "{}");
       localStorage.setItem("made_in_chaco_perfil", JSON.stringify({ ...stored, avatar_url: data.url, avatar_public_id: data.public_id || "" }));
-      await fetch("/api/auth/perfil", {
+      await publicAuthFetch("/api/auth/perfil", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -821,7 +824,7 @@ export const PerfilPage = () => {
     const stored = JSON.parse(localStorage.getItem("made_in_chaco_perfil") || "{}");
     localStorage.setItem("made_in_chaco_perfil", JSON.stringify({ ...stored, avatar_url: "", avatar_public_id: "" }));
     try {
-      await fetch("/api/auth/avatar", {
+      await publicAuthFetch("/api/auth/avatar", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -833,7 +836,7 @@ export const PerfilPage = () => {
   const fetchEntidades = useCallback(async () => {
     setLoadingEntidades(true);
     try {
-      const res = await fetch("/api/mis-entidades", {
+      const res = await publicAuthFetch("/api/mis-entidades", {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) setEntidades(await res.json());
@@ -845,7 +848,7 @@ export const PerfilPage = () => {
   const fetchFavoritos = useCallback(async () => {
     setLoadingFavoritos(true);
     try {
-      const res = await fetch("/api/mis-favoritos", {
+      const res = await publicAuthFetch("/api/mis-favoritos", {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) setFavoritos(await res.json());
@@ -857,7 +860,7 @@ export const PerfilPage = () => {
   const fetchNotificaciones = useCallback(async () => {
     setLoadingNotificaciones(true);
     try {
-      const res = await fetch("/api/notificaciones/verificar-suscripciones", {
+      const res = await publicAuthFetch("/api/notificaciones/verificar-suscripciones", {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -887,7 +890,7 @@ export const PerfilPage = () => {
   const fetchPagos = useCallback(async () => {
     setLoadingPagos(true);
     try {
-      const res = await fetch("/api/suscripciones/mis-pagos", {
+      const res = await publicAuthFetch("/api/suscripciones/mis-pagos", {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) setPagos(await res.json());
@@ -917,10 +920,6 @@ export const PerfilPage = () => {
   });
 
   useEffect(() => {
-    fetchUnreadCount();
-  }, [fetchUnreadCount]);
-
-  useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(""), 5000);
     return () => clearTimeout(t);
@@ -930,7 +929,7 @@ export const PerfilPage = () => {
     if (!cancellingId) return;
     setCancellingLoading(true);
     try {
-      const res = await fetch(`/api/mis-entidades/${cancellingId}`, {
+      const res = await publicAuthFetch(`/api/mis-entidades/${cancellingId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -1036,6 +1035,7 @@ export const PerfilPage = () => {
   if (savedUnverified) {
     return (
       <div style={{ background: "#f5f2e8", minHeight: "100vh", fontFamily: "Epilogue, sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <SEO title="Mi Perfil" description="Gestioná tu perfil y tus entidades en Made in Chaco." />
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
           <div style={{ maxWidth: 480, margin: "0 auto" }}>
             <p style={sLabel}>Cuenta creada</p>
@@ -1122,6 +1122,7 @@ export const PerfilPage = () => {
 
   return (
     <div style={{ background: "#f5f2e8", height: "100vh", overflow: "hidden", fontFamily: "Epilogue, sans-serif", display: "flex", flexDirection: "column" }}>
+      <SEO title="Mi Perfil" description="Gestioná tu perfil y tus entidades en Made in Chaco." />
       <style>{`
         .perfil-content::-webkit-scrollbar {
           width: 6px;
@@ -1164,7 +1165,7 @@ export const PerfilPage = () => {
             </div>
           </div>
 
-          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <nav aria-label="Navegación de perfil" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {SIDEBAR_SECTIONS.map((s) => (
               <button
                 key={s.key}
@@ -1659,7 +1660,7 @@ export const PerfilPage = () => {
                       <button
                         type="button"
                         onClick={async () => {
-                          await fetch("/api/notificaciones/leer-todas", {
+                          await publicAuthFetch("/api/notificaciones/leer-todas", {
                             method: "POST",
                             headers: { Authorization: `Bearer ${getToken()}` },
                           });
@@ -1681,7 +1682,7 @@ export const PerfilPage = () => {
                       <button
                         type="button"
                         onClick={async () => {
-                          await fetch("/api/notificaciones", {
+                          await publicAuthFetch("/api/notificaciones", {
                             method: "DELETE",
                             headers: { Authorization: `Bearer ${getToken()}` },
                           });
@@ -1709,9 +1710,13 @@ export const PerfilPage = () => {
                         suscripcion_por_vencer: "!",
                         suscripcion_vencida: "!",
                         mapa_no_visible: "◌",
+                        mapa_visible: "◎",
                         devolucion_solicitada: "⟳",
                         devolucion_aprobada: "✓",
                         devolucion_rechazada: "✕",
+                        entidad_editada: "✎",
+                        entidad_por_eliminar: "⏳",
+                        entidad_eliminada: "✕",
                       };
                       const COLOR_MAP = {
                         bienvenida: "#863819",
@@ -1722,9 +1727,13 @@ export const PerfilPage = () => {
                         suscripcion_por_vencer: "#f9a825",
                         suscripcion_vencida: "#c62828",
                         mapa_no_visible: "#888",
+                        mapa_visible: "#2e7d32",
                         devolucion_solicitada: "#e65100",
                         devolucion_aprobada: "#2e7d32",
                         devolucion_rechazada: "#c62828",
+                        entidad_editada: "#1565c0",
+                        entidad_por_eliminar: "#e65100",
+                        entidad_eliminada: "#c62828",
                       };
                       return notificaciones.map((n) => (
                         <div
@@ -1735,7 +1744,7 @@ export const PerfilPage = () => {
                               setTourStep(0);
                               setSection("notificaciones");
                               if (!n.leida) {
-                                await fetch(`/api/notificaciones/${n.id}/leer`, {
+                                await publicAuthFetch(`/api/notificaciones/${n.id}/leer`, {
                                   method: "POST",
                                   headers: { Authorization: `Bearer ${getToken()}` },
                                 });
@@ -1745,7 +1754,7 @@ export const PerfilPage = () => {
                               return;
                             }
                             if (!n.leida) {
-                              await fetch(`/api/notificaciones/${n.id}/leer`, {
+                              await publicAuthFetch(`/api/notificaciones/${n.id}/leer`, {
                                 method: "POST",
                                 headers: { Authorization: `Bearer ${getToken()}` },
                               });
@@ -1789,7 +1798,11 @@ export const PerfilPage = () => {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  window.open(`/entidad/${n.entidad_slug}`, "_blank");
+                                  if (n.tipo === "entidad_editada" && n.datos) {
+                                    setDiffModal(n);
+                                  } else {
+                                    window.open(`/entidad/${n.entidad_slug}`, "_blank");
+                                  }
                                 }}
                                 style={{
                                   fontFamily: "inherit", fontSize: 12, fontWeight: 500,
@@ -1797,7 +1810,7 @@ export const PerfilPage = () => {
                                   padding: "4px 0", marginTop: 6, color: "#863819",
                                 }}
                               >
-                                Ver entidad →
+                                {n.tipo === "entidad_editada" ? "Ver detalle →" : "Ver entidad →"}
                               </button>
                             )}
                           </div>
@@ -1810,7 +1823,7 @@ export const PerfilPage = () => {
                               e.stopPropagation();
                               setDeletingNotif((prev) => new Set(prev).add(n.id));
                               try {
-                                await fetch(`/api/notificaciones/${n.id}`, {
+                                await publicAuthFetch(`/api/notificaciones/${n.id}`, {
                                   method: "DELETE",
                                   headers: { Authorization: `Bearer ${getToken()}` },
                                 });
@@ -2102,7 +2115,7 @@ export const PerfilPage = () => {
                             type="button"
                             onClick={async () => {
                               try {
-                                const res = await fetch(`/api/favoritos/${f.id}`, {
+                                const res = await publicAuthFetch(`/api/favoritos/${f.id}`, {
                                   method: "DELETE",
                                   headers: { Authorization: `Bearer ${getToken()}` },
                                 });
@@ -2400,7 +2413,7 @@ export const PerfilPage = () => {
                   onClick={async () => {
                     setDeletingAccount(true);
                     try {
-                      const res = await fetch("/api/auth/perfil", {
+                      const res = await publicAuthFetch("/api/auth/perfil", {
                         method: "DELETE",
                         headers: { Authorization: `Bearer ${getToken()}` },
                       });
@@ -2478,12 +2491,12 @@ export const PerfilPage = () => {
                   onClick={async () => {
                     setDeletingEntity(true);
                     try {
-                      const res = await fetch(`/api/entidades/${deleteEntityConfirm.id}`, {
+                      const res = await publicAuthFetch(`/api/entidades/${deleteEntityConfirm.id}`, {
                         method: "DELETE",
                         headers: { Authorization: `Bearer ${getToken()}` },
                       });
                       if (res.ok) {
-                        const respuesta = await fetch("/api/mis-entidades", { headers: { Authorization: `Bearer ${getToken()}` } });
+                        const respuesta = await publicAuthFetch("/api/mis-entidades", { headers: { Authorization: `Bearer ${getToken()}` } });
                         if (respuesta.ok) setEntidades(await respuesta.json());
                         setDeleteEntityConfirm(null);
                       } else {
@@ -2573,7 +2586,7 @@ export const PerfilPage = () => {
                   onClick={async () => {
                     setCancellingSub(true);
                     try {
-                      const res = await fetch(`/api/suscripciones/reclamar-devolucion/${cancelSubId}`, {
+                        const res = await publicAuthFetch(`/api/suscripciones/reclamar-devolucion/${cancelSubId}`, {
                         method: "POST",
                         headers: { Authorization: `Bearer ${getToken()}` },
                       });
@@ -2814,7 +2827,7 @@ export const PerfilPage = () => {
                       if (planModal.entidadesSeleccionadas.length === 0) return;
                       setAdquiriendo(true);
                       try {
-                        const res = await fetch("/api/suscripciones/adquirir", {
+                        const res = await publicAuthFetch("/api/suscripciones/adquirir", {
                           method: "POST",
                           headers: {
                             "Content-Type": "application/json",
@@ -2858,6 +2871,44 @@ export const PerfilPage = () => {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {diffModal && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)" }}
+            onClick={() => setDiffModal(null)}
+          >
+            <div style={{ background: "white", borderRadius: 12, padding: "28px 32px", maxWidth: 480, width: "90%", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", pointerEvents: "auto" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 500, color: "#1c1c18", margin: "0 0 4px" }}>
+                {diffModal.titulo}
+              </h3>
+              <p style={{ fontSize: 14, color: "#555", margin: "0 0 16px", lineHeight: 1.4 }}>
+                {diffModal.mensaje}
+              </p>
+              {diffModal.datos && diffModal.datos.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                  {diffModal.datos.map((c, i) => {
+                    const displayVal = (v) => {
+                      if (!v) return "—";
+                      if (c.campo === "imagen" || c.campo === "icono") return "(imagen)";
+                      return String(v);
+                    };
+                    return (
+                      <div key={i} style={{ background: "#f9f9f7", borderRadius: 8, padding: "10px 14px" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", marginBottom: 4, textTransform: "capitalize" }}>{c.campo}</div>
+                        <div style={{ fontSize: 13, color: "#888" }}>Anterior: <span style={{ color: "#c62828" }}>{displayVal(c.de)}</span></div>
+                        <div style={{ fontSize: 13, color: "#888" }}>Nuevo: <span style={{ color: "#2e7d32" }}>{displayVal(c.a)}</span></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <button onClick={() => setDiffModal(null)} style={{ fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", background: "#863819", color: "white", padding: "10px 24px", borderRadius: 8, letterSpacing: "0.04em" }}>
+                CERRAR
+              </button>
             </div>
           </div>
         )}

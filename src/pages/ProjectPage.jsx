@@ -6,6 +6,7 @@ import { AutoPageScroll } from "../components/AutoPageScroll";
 import { ProjectMapBackground } from "../components/ProjectMapBackground";
 import { useNavigate } from "react-router-dom";
 import logoHero from "../assets/imagenes/logo-madeinchaco.png";
+import { SEO } from "../components/SEO";
 
 export const ProjectPage = () => {
   const navigate = useNavigate();
@@ -71,6 +72,7 @@ export const ProjectPage = () => {
 
   return (
     <div className="project-page">
+      <SEO title="El Proyecto" description="Conocé el proyecto Made in Chaco: un mapa colaborativo que visibiliza la identidad cultural, emprendedora y turística de la provincia." />
       <div className="project-map-wrapper">
         <ProjectMapBackground scrollYProgress={scrollYProgress} />
         <div className="project-map-overlay" />

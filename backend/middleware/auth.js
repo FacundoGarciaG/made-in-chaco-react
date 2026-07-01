@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
-
-const JWT_SECRET = process.env.JWT_SECRET || "made-in-chaco-secret-dev";
+import { JWT_SECRET } from "../config/env.js";
 
 export const authMiddleware = async (req, res, next) => {
   const header = req.headers.authorization;

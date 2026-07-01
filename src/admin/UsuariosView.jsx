@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { styles, colorMapAdmin } from "./helpers";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
 
 export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, onEditEntity }) {
+  const navigate = useNavigate();
   const [perfiles, setPerfiles] = useState(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -61,7 +63,6 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
             background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#888", padding: "4px 8px",
           }}>←</button>
           <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
-            <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
             {perfil.nombre || "Sin nombre"}
           </h2>
         </div>
@@ -154,17 +155,15 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
                 <p style={{ color: "#aaa", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No tiene entidades.</p>
               ) : (
                 entidades.map((ent) => (
-                  <a
+                  <div
                     key={ent.id}
-                    href={`/entidad/${ent.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: "none", display: "block" }}
+                    onClick={() => { sessionStorage.setItem("fromAdmin", "true"); navigate(`/entidad/${ent.slug}`); }}
+                    style={{ textDecoration: "none", display: "block", cursor: "pointer" }}
                   >
                     <div style={{
                       padding: "12px", border: "1px solid #f0ede8", borderRadius: "8px", marginBottom: "8px",
                       background: ent.visible ? "#fff" : "#f9f9f9", opacity: ent.visible ? 1 : 0.6,
-                      cursor: "pointer", transition: "box-shadow 0.15s",
+                      transition: "box-shadow 0.15s",
                     }}
                       onMouseEnter={(e) => { if (ent.visible) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
@@ -237,7 +236,7 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
                         {new Date(ent.created_at).toLocaleDateString("es-AR")}
                       </div>
                     </div>
-                  </a>
+                  </div>
                 ))
               )}
             </div>
@@ -251,7 +250,6 @@ export function UsuariosView({ authFetch, authHeaders, showConfirm, showPopup, o
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h2 style={styles.sectionTitle}>
-          <img src="/icons/user.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle" }} alt="" />
           Usuarios
         </h2>
         <div style={{ display: "flex", gap: "8px" }}>

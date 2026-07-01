@@ -5,6 +5,8 @@ import TagSelector from "../components/TagSelector";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/SolicitarSelloPage.css";
+import { SEO } from "../components/SEO";
+import { publicAuthFetch } from "../helpers/publicAuthFetch";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -497,11 +499,17 @@ export const SolicitarSelloPage = () => {
       const token = getToken();
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("/api/solicitar-sello", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
+      const res = token
+        ? await publicAuthFetch("/api/solicitar-sello", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/solicitar-sello", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al enviar solicitud");
       setSuccess(true);
@@ -515,6 +523,7 @@ export const SolicitarSelloPage = () => {
   if (success) {
     return (
       <div className="solicitar-success">
+        <SEO title="Solicitar Sello" description="Solicitá el sello de calidad para tu emprendimiento chaqueño." />
         <div className="solicitar-success-inner">
           <div className="solicitar-success-icon">✓</div>
           <h1>Solicitud enviada</h1>
@@ -533,6 +542,7 @@ export const SolicitarSelloPage = () => {
 
   return (
     <div className="solicitar-page">
+      <SEO title="Solicitar Sello" description="Solicitá el sello de calidad para tu emprendimiento chaqueño." />
       <div className="solicitar-form-side">
         <form onSubmit={(e) => { e.preventDefault(); if (step === STEPS.length - 1) { handleSubmit(e); } else { goNext(); } }}>
           {step !== 0 && (

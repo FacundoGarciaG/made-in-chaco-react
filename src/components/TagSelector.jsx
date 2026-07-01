@@ -5,7 +5,7 @@ export default function TagSelector({ value, onChange, suggestions, placeholder 
   const [showDropdown, setShowDropdown] = useState(false);
 
   const selectedItems = useMemo(
-    () => value.split(",").map((s) => s.trim()).filter(Boolean),
+    () => (value || "").split(",").map((s) => s.trim()).filter(Boolean),
     [value],
   );
 

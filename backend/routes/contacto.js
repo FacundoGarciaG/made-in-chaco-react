@@ -1,6 +1,7 @@
 import { Router } from "express";
 import nodemailer from "nodemailer";
 import pool from "../config/db.js";
+import { contactoRules, sanitizarHtml } from "../middleware/validation.js";
 
 const router = Router();
 
@@ -20,36 +21,28 @@ if (mailReady) {
   });
 }
 
-router.post("/contacto", async (req, res) => {
+router.post("/contacto", contactoRules, async (req, res) => {
   try {
-    const { nombre, email, asunto, mensaje } = req.body;
-
-    if (!nombre?.trim() || !email?.trim() || !asunto?.trim() || !mensaje?.trim()) {
-      return res.status(400).json({ error: "Todos los campos son obligatorios" });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({ error: "Email inválido" });
-    }
+    const { nombre, email, asunto, mensaje } = sanitizarHtml(req.body);
 
     await pool.query(
       `INSERT INTO contacto_mensajes (nombre, email, asunto, mensaje) VALUES ($1, $2, $3, $4)`,
-      [nombre.trim(), email.trim(), asunto.trim(), mensaje.trim()],
+      [nombre, email, asunto, mensaje],
     );
 
     if (transporter) {
       transporter
         .sendMail({
           from: `"${nombre}" <${process.env.MAIL_USER}>`,
-          replyTo: email.trim(),
+          replyTo: email,
           to: process.env.MAIL_USER,
-          subject: `[Contacto Web] ${asunto.trim()}`,
+          subject: `[Contacto Web] ${asunto}`,
           html: `
-            <p><strong>Nombre:</strong> ${nombre.trim()}</p>
-            <p><strong>Email:</strong> ${email.trim()}</p>
-            <p><strong>Asunto:</strong> ${asunto.trim()}</p>
+            <p><strong>Nombre:</strong> ${nombre}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Asunto:</strong> ${asunto}</p>
             <hr>
-            <p>${mensaje.trim().replace(/\n/g, "<br>")}</p>
+            <p>${mensaje.replace(/\n/g, "<br>")}</p>
           `,
         })
         .catch((e) => console.warn("Mail no enviado:", e.message));

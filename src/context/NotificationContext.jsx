@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useSocketEvent } from "../hooks/useSocket";
+import { publicAuthFetch } from "../helpers/publicAuthFetch";
 
 const NotificationContext = createContext(null);
 
@@ -13,13 +14,12 @@ export function NotificationProvider({ children }) {
       const token = localStorage.getItem("made_in_chaco_token")
         || localStorage.getItem("made_in_chaco_token_publico");
       if (!token) return;
-      const res = await fetch("/api/notificaciones/verificar-suscripciones", {
-        method: "POST",
+      const res = await publicAuthFetch("/api/notificaciones/unread-count", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
-        setUnreadCount(data.filter((n) => !n.leida).length);
+        setUnreadCount(data.count);
       }
     } catch {}
   }, []);
@@ -27,7 +27,12 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("made_in_chaco_token")
       || localStorage.getItem("made_in_chaco_token_publico");
-    if (token) fetchUnreadCount();
+    if (!token) return;
+    fetchUnreadCount();
+    publicAuthFetch("/api/notificaciones/verificar-suscripciones", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
   }, [fetchUnreadCount]);
 
   useSocketEvent("notificacion:nueva", (data) => {

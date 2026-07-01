@@ -6,16 +6,17 @@ const containerStyle = {
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  minHeight: "60vh",
+  height: "100vh",
   padding: "2rem",
   textAlign: "center",
-  color: "#863819",
+  color: "#1c1c18",
   fontFamily: "Cinzel, serif",
 };
 
 const titleStyle = {
   fontSize: "1.5rem",
   marginBottom: "0.5rem",
+  color: "#1c1c18",
 };
 
 const messageStyle = {

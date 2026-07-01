@@ -37,7 +37,6 @@ export function DashboardView({ authFetch }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-          <img src="/icons/todos.png" style={{ width: 26, height: 26, marginRight: 10, verticalAlign: "middle" }} alt="" />
           Dashboard
         </h2>
       </div>

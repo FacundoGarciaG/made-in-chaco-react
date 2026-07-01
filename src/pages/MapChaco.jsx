@@ -15,6 +15,7 @@ import { useMapConexiones } from "../hooks/useMapConexiones";
 import { useMapRecorridos } from "../hooks/useMapRecorridos";
 import { useMapStore } from "../store/useMapStore";
 import { useSocketEvent } from "../hooks/useSocket";
+import { SEO } from "../components/SEO";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -1606,6 +1607,7 @@ export const MapChaco = () => {
         overflow: "hidden",
       }}
     >
+      <SEO title="Mapa Interactivo" description="Explorá el mapa interactivo de Made in Chaco y descubrí emprendedores, cultura, turismo y tradiciones de toda la provincia." />
       {/* Estilos para animaciones */}
       <style>{`
         @keyframes pulse {

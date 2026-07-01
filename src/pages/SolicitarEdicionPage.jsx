@@ -5,6 +5,8 @@ import TagSelector from "../components/TagSelector";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../styles/SolicitarSelloPage.css";
+import { SEO } from "../components/SEO";
+import { publicAuthFetch } from "../helpers/publicAuthFetch";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const TIPO_COLOR = {
@@ -246,7 +248,7 @@ export const SolicitarEdicionPage = () => {
     (async () => {
       try {
         const [res, locRes] = await Promise.all([
-          fetch(`/api/entidades/${id}/editar`, {
+          publicAuthFetch(`/api/entidades/${id}/editar`, {
             headers: { Authorization: `Bearer ${getToken()}` },
           }),
           fetch("/api/localidades"),
@@ -426,12 +428,18 @@ export const SolicitarEdicionPage = () => {
   const handleUploadIcono = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError("");
+    if (file.type !== "image/png") {
+      setUploadError("El icono debe ser una imagen PNG.");
+      e.target.value = "";
+      return;
+    }
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = async () => {
       URL.revokeObjectURL(url);
       if (img.width !== 24 || img.height !== 24) {
-        alert("El icono debe ser exactamente 24×24 px");
+        setUploadError(`El icono debe ser exactamente 24×24 px. La imagen subida es de ${img.width}×${img.height} px.`);
         e.target.value = "";
         return;
       }
@@ -443,13 +451,14 @@ export const SolicitarEdicionPage = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error al subir");
         setIcono(data.url);
+        setUploadError("");
       } catch (err) {
-        alert(err.message);
+        setUploadError(err.message);
       } finally {
         setSubiendoIcono(false);
       }
     };
-    img.onerror = () => { URL.revokeObjectURL(url); e.target.value = ""; };
+    img.onerror = () => { URL.revokeObjectURL(url); setUploadError("No se pudo leer la imagen."); e.target.value = ""; };
     img.src = url;
   };
 
@@ -465,7 +474,7 @@ export const SolicitarEdicionPage = () => {
       const formData = new FormData();
       formData.append("archivo", file);
       formData.append("tipo_recurso", tipo);
-      const res = await fetch("/api/upload", {
+      const res = await publicAuthFetch("/api/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
         body: formData,
@@ -500,7 +509,7 @@ export const SolicitarEdicionPage = () => {
       if (icono) payload.icono = icono;
       const multimediaNuevas = multimediaItems.filter((m) => m.id === undefined && m.url_recurso);
       if (multimediaNuevas.length > 0) payload.multimedia = multimediaNuevas;
-      const res = await fetch(`/api/entidades/${id}/solicitar-edicion`, {
+      const res = await publicAuthFetch(`/api/entidades/${id}/solicitar-edicion`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(payload),
@@ -521,6 +530,7 @@ export const SolicitarEdicionPage = () => {
   if (saved) {
     return (
       <div className="solicitar-success">
+        <SEO title="Solicitar Edición" description="Solicitá cambios en la información de una entidad en Made in Chaco." />
         <div className="solicitar-success-inner">
           <div className="solicitar-success-icon">✓</div>
           <h1>Edición enviada para revisión</h1>
@@ -658,6 +668,7 @@ export const SolicitarEdicionPage = () => {
 
   return (
     <div className="solicitar-page">
+      <SEO title="Solicitar Edición" description="Solicitá cambios en la información de una entidad en Made in Chaco." />
       <div className="solicitar-form-side" style={{ marginTop: 60, minHeight: "calc(100vh - 60px)" }}>
         <form onSubmit={handleSubmit}>
           <div className="solicitar-header">

@@ -66,7 +66,6 @@ export function PlanesView({ authFetch, showConfirm, showPopup }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h2 style={styles.sectionTitle}>
-          <img src="/icons/card.png" style={{ width: "26px", height: "26px", marginRight: "10px", verticalAlign: "middle", filter: "brightness(0)" }} alt="" />
           Planes
         </h2>
       </div>

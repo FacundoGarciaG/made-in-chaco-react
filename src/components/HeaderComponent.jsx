@@ -746,6 +746,7 @@ export const HeaderComponent = () => {
               />
             </button>
             <nav
+              aria-label="Navegación de categorías"
               className={`header-symbol-train ${symbolMenuOpen ? "open" : ""}`}
             >
               <NavLink
@@ -790,6 +791,12 @@ export const HeaderComponent = () => {
                 {isAuthPublico ? "Perfil" : "Ingresar"}
               </NavLink>
             </nav>
+            {symbolMenuOpen && (
+              <div
+                className="header-symbol-overlay"
+                onClick={() => setSymbolMenuOpen(false)}
+              />
+            )}
           </div>
         )}
 

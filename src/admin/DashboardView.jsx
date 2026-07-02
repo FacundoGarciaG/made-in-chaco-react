@@ -4,6 +4,7 @@ import { styles, colorMapAdmin, authHeaders } from "./helpers";
 export function DashboardView({ authFetch }) {
   const [resumen, setResumen] = useState(null);
   const [diario, setDiario] = useState(null);
+  const [top10Dia, setTop10Dia] = useState(null);
   const [hoverIdx, setHoverIdx] = useState(null);
 
   const cargarDatos = useCallback(async () => {
@@ -15,6 +16,10 @@ export function DashboardView({ authFetch }) {
       if (r.ok) setResumen(await r.json());
       if (d.ok) setDiario(await d.json());
     } catch { /* ignore */ }
+    try {
+      const r = await authFetch("/api/analytics/resumen?periodo=dia", { headers: authHeaders() });
+      if (r.ok) setTop10Dia(await r.json());
+    } catch {}
   }, [authFetch]);
 
   useEffect(() => {
@@ -126,6 +131,40 @@ export function DashboardView({ authFetch }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
+            Top 10 del día
+          </h3>
+          {(top10Dia?.top10?.length ?? 0) === 0 ? (
+            <div style={{ color: "#888", fontSize: 13 }}>Sin datos aún</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {top10Dia.top10.map((e) => (
+                <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6, fontSize: 10, fontWeight: 700,
+                    color: "white", display: "flex", alignItems: "center", justifyContent: "center",
+                    background: colorMapAdmin[e.tipo] || "#888",
+                  }}>
+                    {e.visitas}
+                  </div>
+                  <div style={{ flex: 1, fontSize: 13, color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.nombre}
+                  </div>
+                  <div style={{ width: "60%", background: "#f0ede8", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 6,
+                      background: colorMapAdmin[e.tipo] || "#888",
+                      width: `${(e.visitas / Math.max(...top10Dia.top10.map((x) => x.visitas))) * 100}%`,
+                      transition: "width 0.5s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

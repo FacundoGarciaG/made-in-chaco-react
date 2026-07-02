@@ -29,23 +29,30 @@ router.post("/analytics/track", async (req, res) => {
 });
 
 // GET /api/analytics/resumen — aggregated stats (auth)
-router.get("/analytics/resumen", authMiddleware, async (_req, res) => {
+// Optional ?periodo=dia|semana|mes to filter top10 to a specific period
+router.get("/analytics/resumen", authMiddleware, async (req, res) => {
   try {
     if (!(await tableExists())) {
       return res.json({ totales: 0, hoy: 0, semana: 0, mes: 0, porTipo: [], top10: [] });
     }
 
+    const periodo = req.query.periodo;
+    let top10Filter = "";
+    if (periodo === "dia") top10Filter = "AND a.created_at >= CURRENT_DATE";
+    else if (periodo === "semana") top10Filter = "AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'";
+    else if (periodo === "mes") top10Filter = "AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'";
+
     const results = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events`),
-      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE created_at >= CURRENT_DATE`),
-      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'`),
-      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE tipo = 'visita_entidad'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE tipo = 'visita_entidad' AND created_at >= CURRENT_DATE`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE tipo = 'visita_entidad' AND created_at >= CURRENT_DATE - INTERVAL '7 days'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM analytics_events WHERE tipo = 'visita_entidad' AND created_at >= CURRENT_DATE - INTERVAL '30 days'`),
       pool.query(`SELECT tipo, COUNT(*)::int AS cantidad FROM analytics_events GROUP BY tipo ORDER BY cantidad DESC`),
-      pool.query(`SELECT e.id, e.nombre, e.tipo, COUNT(*)::int AS visitas
+      pool.query(`SELECT e.id, e.nombre, e.slug, e.tipo, COUNT(*)::int AS visitas
                    FROM analytics_events a
                    JOIN entidades e ON e.id = a.entidad_id
-                   WHERE a.entidad_id IS NOT NULL
-                   GROUP BY e.id, e.nombre, e.tipo
+                   WHERE a.entidad_id IS NOT NULL AND a.tipo = 'visita_entidad' ${top10Filter}
+                   GROUP BY e.id, e.nombre, e.slug, e.tipo
                    ORDER BY visitas DESC
                    LIMIT 10`),
     ]);
@@ -61,6 +68,31 @@ router.get("/analytics/resumen", authMiddleware, async (_req, res) => {
   } catch (err) {
     console.error("Error GET /analytics/resumen:", err);
     res.status(500).json({ error: "Error al obtener resumen" });
+  }
+});
+
+// GET /api/analytics/entidad-del-dia — top entity visited today (public, no auth)
+router.get("/analytics/entidad-del-dia", async (_req, res) => {
+  try {
+    if (!(await tableExists())) {
+      return res.json(null);
+    }
+
+    const { rows } = await pool.query(
+      `SELECT e.id, e.nombre, e.slug, e.tipo, COUNT(*)::int AS visitas
+       FROM analytics_events a
+       JOIN entidades e ON e.id = a.entidad_id
+       WHERE a.entidad_id IS NOT NULL AND a.tipo = 'visita_entidad' AND a.created_at >= CURRENT_DATE
+       GROUP BY e.id, e.nombre, e.slug, e.tipo
+       ORDER BY visitas DESC
+       LIMIT 1`,
+    );
+
+    if (rows.length === 0) return res.json(null);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error GET /analytics/entidad-del-dia:", err);
+    res.status(500).json({ error: "Error al obtener entidad del día" });
   }
 });
 

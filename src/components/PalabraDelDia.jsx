@@ -23,48 +23,19 @@ export function PalabraDelDia() {
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ x: 400, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 400, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 22 }}
-          style={{
-            position: "fixed", zIndex: 999, top: "50%", right: 0,
-            transform: "translateY(-50%)",
-          }}
+          className="speech-bubble"
+          initial={{ opacity: 0, y: 150 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 150 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
         >
-          <Link
-            to={`/wikia/${data.slug}`}
-            style={{
-              display: "block", textDecoration: "none", background: "white",
-              border: "2px solid #e0d8cc", borderRadius: "16px 0 0 16px",
-              padding: "20px 24px", maxWidth: 300,
-              boxShadow: "-4px 4px 20px rgba(0,0,0,0.1)",
-              borderRight: "none",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "-4px 6px 28px rgba(0,0,0,0.15)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "-4px 4px 20px rgba(0,0,0,0.1)"; }}
-          >
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", color: "#863819", marginBottom: 4 }}>
-              Palabra del día
-            </div>
-            <div style={{
-              fontFamily: "'Patrick Hand', 'Comic Sans MS', cursive, sans-serif",
-              fontSize: 26, color: "#2D1A12", margin: "0 0 2px",
-            }}>
-              {data.palabra}
-            </div>
+          <Link to={`/wikia/${data.slug}`} className="speech-bubble-link">
+            <span className="speech-bubble-label">Pieza del día</span>
+            <span className="speech-bubble-word">{data.palabra}</span>
             {data.significado && (
-              <p style={{
-                fontFamily: "Merriweather, serif", fontSize: 12, color: "#666",
-                fontStyle: "italic", margin: 0, lineHeight: 1.4,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {data.significado}
-              </p>
+              <span className="speech-bubble-meaning">{data.significado}</span>
             )}
-            <div style={{ fontSize: 10, color: "#aaa", marginTop: 8, fontFamily: "Merriweather, serif" }}>
-              Ver en Wikia →
-            </div>
+            <span className="speech-bubble-cta">Ver en La Colección →</span>
           </Link>
         </motion.div>
       )}

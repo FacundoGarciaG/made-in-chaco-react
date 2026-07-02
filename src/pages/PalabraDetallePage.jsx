@@ -52,7 +52,7 @@ export function PalabraDetallePage() {
             color: "#863819", textDecoration: "none",
             display: "inline-flex", alignItems: "center", gap: 6,
           }}>
-            ← Wikia Chaqueña
+            ← La Colección
           </Link>
           {vieneDelMapa && (
             <button
@@ -181,7 +181,7 @@ export function PalabraDetallePage() {
 
         {data && (
           <div style={{ marginTop: 20, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", color: "#aaa", fontFamily: "Merriweather, serif" }}>
-            Wikia Chaqueña
+            La Colección
           </div>
         )}
       </div>

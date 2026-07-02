@@ -57,7 +57,7 @@ export function WikiaPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f6f3ec" }}>
-      <SEO title="Wikia Chaqueña" description="Explorá el diccionario de palabras, frases y expresiones del Chaco" url="/wikia" />
+      <SEO title="La Colección" description="Explorá las palabras, frases y expresiones del Chaco" url="/wikia" />
 
       <div style={{ padding: "180px 32px 80px" }}>
         <div style={{ marginBottom: 48, textAlign: "center" }}>
@@ -65,7 +65,7 @@ export function WikiaPage() {
             fontFamily: "Cinzel, serif", fontSize: 52, fontWeight: 400, color: "#2D1A12",
             margin: "0 0 8px", letterSpacing: "-1px",
           }}>
-            Wikia Chaqueña
+            La Colección
           </h1>
           <div style={{
             width: 48, height: 3, background: "#863819", borderRadius: 2, marginBottom: 16,

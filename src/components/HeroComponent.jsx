@@ -3,39 +3,72 @@ import backgroundVideo from "../assets/videos/231933_small.mp4";
 import logoHero from "../assets/imagenes/logo-madeinchaco.png";
 import { useRef, useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { Logo3D } from "./Logo3D";
+import { TextScramble } from "./TextScramble";
 
 export const HeroComponent = () => {
   const [hovering, setHovering] = useState(false);
   const timeoutRef = useRef(null);
-  const heroLogoRef = useRef(null);
   const btnRef = useRef(null);
   const navigate = useNavigate();
+  const [entidadCount, setEntidadCount] = useState(null);
+  const countRef = useRef(null);
+  const [displayCount, setDisplayCount] = useState(0);
+  const counted = useRef(false);
+  const animRef = useRef(null);
+
+  useEffect(() => {
+    fetch("/api/entidades")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data)) setEntidadCount(data.length);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (entidadCount === null || counted.current) return;
+    const el = countRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !counted.current) {
+        counted.current = true;
+        const startTime = performance.now();
+        const duration = 2000;
+
+        const animate = (now) => {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setDisplayCount(Math.floor(eased * entidadCount));
+          if (progress < 1) {
+            animRef.current = requestAnimationFrame(animate);
+          }
+        };
+
+        animRef.current = requestAnimationFrame(animate);
+      }
+    }, { threshold: 0.5 });
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [entidadCount]);
 
   const startRedirect = () => {
     setHovering(true);
     timeoutRef.current = setTimeout(() => {
       navigate("/descubre");
-    }, 2000); //duration
+    }, 2000);
   };
 
   const cancelRedirect = () => {
     setHovering(false);
     clearTimeout(timeoutRef.current);
   };
-  // Efecto 3D tilt: la imagen sigue el mouse en toda la página
-  useEffect(() => {
-    const el = heroLogoRef.current;
-    if (!el) return;
-    const handleMouseMove = (e) => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const rotateX = ((e.clientY - h / 2) / (h / 2)) * -6;
-      const rotateY = ((e.clientX - w / 2) / (w / 2)) * 6;
-      el.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
 
   // Efecto imán en el botón Navegar
   useEffect(() => {
@@ -65,13 +98,13 @@ export const HeroComponent = () => {
   return (
     <>
       <section className="hero">
+        <Logo3D src={logoHero} />
         <div className="hero-text">
-          <h5>El interior del mapa</h5>
-          <h1 ref={heroLogoRef}>
-            <img src={logoHero} alt="Made in Chaco" className="hero-logo-img" />
+          <h1 style={{ visibility: "hidden" }}>
+            <img src={logoHero} alt="" className="hero-logo-img" />
           </h1>
           <p>
-            Historias, sonidos y colores del secreto de Argentina
+            <TextScramble text="Historias, sonidos y colores del secreto de Argentina" />
           </p>
         </div>
 
@@ -89,7 +122,9 @@ export const HeroComponent = () => {
           </button>
           <p className="hero-hint">Presioná o mantené el mouse 2 segundos para explorar</p>
         </div>
-        <div className="hero-badge">200+ entidades mapeadas</div>
+        <div className="hero-badge" ref={countRef}>
+          {entidadCount !== null ? `${displayCount}+ entidades mapeadas` : "Cargando..."}
+        </div>
         <video autoPlay muted loop className="video">
           <source src={backgroundVideo} type="video/mp4" />
           Tu navegador no soporta video.

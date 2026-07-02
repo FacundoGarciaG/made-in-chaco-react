@@ -1366,7 +1366,7 @@ export const AdminPanel = () => {
                 {[
                   { key: "entidades", label: "Entidades", count: totalEntidades },
                   { key: "recorridos", label: "Recorridos" },
-                  { key: "palabras", label: "Wikia Chaqueña" },
+                  { key: "palabras", label: "La Colección" },
                 ].map((item) => (
                   <button
                     key={item.key}

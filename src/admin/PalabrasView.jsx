@@ -119,7 +119,7 @@ export function PalabrasView({ authFetch, showConfirm, showPopup }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-          Wikia Chaqueña
+          La Colección
         </h2>
         <button onClick={() => { setShowAddForm(!showAddForm); resetNueva(); }} style={styles.btnPrimary}>
           {showAddForm ? "Cancelar" : "Nueva palabra"}

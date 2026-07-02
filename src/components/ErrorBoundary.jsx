@@ -1,5 +1,4 @@
 import { Component } from "react";
-import { Link } from "react-router-dom";
 
 const containerStyle = {
   display: "flex",
@@ -59,7 +58,7 @@ const homeButton = {
 export class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, retryKey: 0 };
   }
 
   static getDerivedStateFromError(error) {
@@ -71,7 +70,7 @@ export class ErrorBoundary extends Component {
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState(prev => ({ hasError: false, error: null, retryKey: prev.retryKey + 1 }));
   };
 
   render() {
@@ -87,14 +86,14 @@ export class ErrorBoundary extends Component {
             <button style={retryButton} onClick={this.handleRetry}>
               Reintentar
             </button>
-            <Link to="/" style={homeButton}>
+            <a href="/" style={homeButton}>
               Volver al inicio
-            </Link>
+            </a>
           </div>
         </div>
       );
     }
 
-    return this.props.children;
+    return <div key={this.state.retryKey}>{this.props.children}</div>;
   }
 }

@@ -45,7 +45,7 @@ export const OlvidarContrasenaPage = () => {
               borderRadius: "12px", fontSize: "14px", textAlign: "center",
               border: "1px solid #b7ebc5", marginBottom: "16px",
             }}>
-              Si el email está registrado, vas a recibir un link para restablecer tu contraseña.
+              Te enviamos un link para restablecer tu contraseña.
             </div>
             <Link to="/iniciar-sesion" className="login-btn" style={{
               display: "block", textAlign: "center", textDecoration: "none",

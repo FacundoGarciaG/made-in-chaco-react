@@ -407,6 +407,17 @@ router.post("/entidades/:id/conexiones", authMiddleware, async (req, res) => {
     const entityId = parseInt(req.params.id);
     const nuevas = req.body;
 
+    // Verificar ownership si es usuario público
+    if (req.user.tipo === "publico") {
+      const { rows } = await pool.query(
+        "SELECT id FROM entidades WHERE id = $1 AND perfil_id = $2",
+        [entityId, req.user.id],
+      );
+      if (rows.length === 0) {
+        return res.status(403).json({ error: "No tenés permiso para modificar esta entidad" });
+      }
+    }
+
     // Ensure tipo_relacion_inversa column exists (safe to run repeatedly)
     await pool.query(
       "ALTER TABLE conexiones ADD COLUMN IF NOT EXISTS tipo_relacion_inversa TEXT DEFAULT ''",
@@ -431,6 +442,258 @@ router.post("/entidades/:id/conexiones", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Error POST /conexiones:", err);
     res.status(500).json({ error: "Error al guardar conexiones" });
+  }
+});
+
+// --- SOLICITUDES DE CONEXIÓN ---
+
+// POST /api/conexiones/solicitar — enviar solicitud de conexion
+router.post("/conexiones/solicitar", authMiddleware, async (req, res) => {
+  try {
+    const { entidad_origen_id, entidad_destino_id, tipo_relacion, tipo_relacion_inversa } = req.body;
+
+    if (!entidad_origen_id || !entidad_destino_id) {
+      return res.status(400).json({ error: "entidad_origen_id y entidad_destino_id requeridos" });
+    }
+
+    if (entidad_origen_id === entidad_destino_id) {
+      return res.status(400).json({ error: "No se puede conectar una entidad consigo misma" });
+    }
+
+    const { rows: origRows } = await pool.query(
+      "SELECT id, perfil_id, nombre FROM entidades WHERE id = $1",
+      [entidad_origen_id],
+    );
+    if (origRows.length === 0) return res.status(404).json({ error: "Entidad origen no encontrada" });
+    if (origRows[0].perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No tenés permiso sobre la entidad origen" });
+    }
+
+    const { rows: destRows } = await pool.query(
+      "SELECT id, perfil_id, nombre FROM entidades WHERE id = $1",
+      [entidad_destino_id],
+    );
+    if (destRows.length === 0) return res.status(404).json({ error: "Entidad destino no encontrada" });
+
+    if (destRows[0].perfil_id === req.user.id) {
+      return res.status(400).json({ error: "No podés solicitar conexión a tu propia entidad. Usá el editor de conexiones." });
+    }
+
+    const { rows: existentes } = await pool.query(
+      `SELECT id FROM solicitudes_conexion
+       WHERE entidad_origen_id = $1 AND entidad_destino_id = $2 AND estado = 'pendiente'`,
+      [entidad_origen_id, entidad_destino_id],
+    );
+    if (existentes.length > 0) {
+      return res.status(400).json({ error: "Ya existe una solicitud pendiente para esta conexión" });
+    }
+
+    const { rows: yaConectados } = await pool.query(
+      `SELECT id FROM conexiones
+       WHERE (entidad_origen_id = $1 AND entidad_destino_id = $2)
+          OR (entidad_origen_id = $2 AND entidad_destino_id = $1)`,
+      [entidad_origen_id, entidad_destino_id],
+    );
+    if (yaConectados.length > 0) {
+      return res.status(400).json({ error: "Las entidades ya están conectadas" });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO solicitudes_conexion (entidad_origen_id, entidad_destino_id, tipo_relacion, tipo_relacion_inversa)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [entidad_origen_id, entidad_destino_id, tipo_relacion || "", tipo_relacion_inversa || ""],
+    );
+
+    if (destRows[0].perfil_id) {
+      const { crearNotificacion } = await import("./notificaciones.js");
+      await crearNotificacion(
+        destRows[0].perfil_id,
+        "conexion_solicitada",
+        "Solicitud de conexión",
+        `"${origRows[0].nombre}" quiere conectarse a "${destRows[0].nombre}"`,
+        parseInt(entidad_destino_id),
+        { solicitud_id: rows[0].id, entidad_origen_nombre: origRows[0].nombre, entidad_origen_id },
+      );
+    }
+
+    getIO()?.emit("entidad:change");
+    res.status(201).json({ ok: true, id: rows[0].id });
+  } catch (err) {
+    console.error("Error POST /conexiones/solicitar:", err);
+    res.status(500).json({ error: "Error al solicitar conexión" });
+  }
+});
+
+// GET /api/conexiones/solicitudes-recibidas — solicitudes para las entidades del usuario
+router.get("/conexiones/solicitudes-recibidas", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT sc.*,
+              e_o.nombre AS entidad_origen_nombre, e_o.tipo AS entidad_origen_tipo, e_o.slug AS entidad_origen_slug,
+              e_d.nombre AS entidad_destino_nombre, e_d.tipo AS entidad_destino_tipo, e_d.slug AS entidad_destino_slug,
+              p_o.nombre AS entidad_origen_perfil_nombre,
+              p_d.nombre AS entidad_destino_perfil_nombre
+       FROM solicitudes_conexion sc
+       JOIN entidades e_o ON sc.entidad_origen_id = e_o.id
+       JOIN entidades e_d ON sc.entidad_destino_id = e_d.id
+       LEFT JOIN perfiles p_o ON e_o.perfil_id = p_o.id
+       LEFT JOIN perfiles p_d ON e_d.perfil_id = p_d.id
+       WHERE e_d.perfil_id = $1 AND sc.estado = 'pendiente'
+       ORDER BY sc.created_at DESC`,
+      [req.user.id],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /conexiones/solicitudes-recibidas:", err);
+    res.status(500).json({ error: "Error al obtener solicitudes recibidas" });
+  }
+});
+
+// GET /api/conexiones/solicitudes-enviadas — solicitudes enviadas por el usuario
+router.get("/conexiones/solicitudes-enviadas", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT sc.*,
+              e_o.nombre AS entidad_origen_nombre, e_o.tipo AS entidad_origen_tipo, e_o.slug AS entidad_origen_slug,
+              e_d.nombre AS entidad_destino_nombre, e_d.tipo AS entidad_destino_tipo, e_d.slug AS entidad_destino_slug,
+              p_o.nombre AS entidad_origen_perfil_nombre,
+              p_d.nombre AS entidad_destino_perfil_nombre
+       FROM solicitudes_conexion sc
+       JOIN entidades e_o ON sc.entidad_origen_id = e_o.id
+       JOIN entidades e_d ON sc.entidad_destino_id = e_d.id
+       LEFT JOIN perfiles p_o ON e_o.perfil_id = p_o.id
+       LEFT JOIN perfiles p_d ON e_d.perfil_id = p_d.id
+       WHERE e_o.perfil_id = $1
+       ORDER BY sc.created_at DESC`,
+      [req.user.id],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /conexiones/solicitudes-enviadas:", err);
+    res.status(500).json({ error: "Error al obtener solicitudes enviadas" });
+  }
+});
+
+// POST /api/conexiones/solicitudes/:id/aprobar — aprobar solicitud y crear conexion
+router.post("/conexiones/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
+  try {
+    const { rows: solRows } = await pool.query(
+      `SELECT sc.*, e_o.nombre AS origen_nombre, e_d.nombre AS destino_nombre, e_d.perfil_id AS destino_perfil_id
+       FROM solicitudes_conexion sc
+       JOIN entidades e_o ON sc.entidad_origen_id = e_o.id
+       JOIN entidades e_d ON sc.entidad_destino_id = e_d.id
+       WHERE sc.id = $1 AND sc.estado = 'pendiente'`,
+      [req.params.id],
+    );
+    if (solRows.length === 0) return res.status(404).json({ error: "Solicitud no encontrada" });
+
+    const sol = solRows[0];
+    if (sol.destino_perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No tenés permiso para aprobar esta solicitud" });
+    }
+
+    await pool.query(
+      `UPDATE solicitudes_conexion SET estado = 'aprobada', updated_at = NOW() WHERE id = $1`,
+      [req.params.id],
+    );
+
+    await pool.query(
+      `INSERT INTO conexiones (entidad_origen_id, entidad_destino_id, tipo_relacion, tipo_relacion_inversa)
+       VALUES ($1, $2, $3, $4)`,
+      [sol.entidad_origen_id, sol.entidad_destino_id, sol.tipo_relacion, sol.tipo_relacion_inversa],
+    );
+
+    const { rows: origPerfil } = await pool.query(
+      "SELECT perfil_id FROM entidades WHERE id = $1",
+      [sol.entidad_origen_id],
+    );
+    if (origPerfil[0]?.perfil_id) {
+      const { crearNotificacion } = await import("./notificaciones.js");
+      await crearNotificacion(
+        origPerfil[0].perfil_id,
+        "conexion_aprobada",
+        "Conexión aprobada",
+        `"${sol.destino_nombre}" aceptó la conexión con "${sol.origen_nombre}"`,
+        parseInt(sol.entidad_origen_id),
+        { solicitud_id: parseInt(req.params.id), entidad_destino_nombre: sol.destino_nombre },
+      );
+    }
+
+    getIO()?.emit("entidad:change");
+    res.json({ ok: true, message: "Conexión creada" });
+  } catch (err) {
+    console.error("Error POST /conexiones/solicitudes/aprobar:", err);
+    res.status(500).json({ error: "Error al aprobar solicitud" });
+  }
+});
+
+// POST /api/conexiones/solicitudes/:id/rechazar — rechazar solicitud
+router.post("/conexiones/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
+  try {
+    const { rows: solRows } = await pool.query(
+      `SELECT sc.*, e_o.nombre AS origen_nombre, e_d.nombre AS destino_nombre, e_d.perfil_id AS destino_perfil_id
+       FROM solicitudes_conexion sc
+       JOIN entidades e_o ON sc.entidad_origen_id = e_o.id
+       JOIN entidades e_d ON sc.entidad_destino_id = e_d.id
+       WHERE sc.id = $1 AND sc.estado = 'pendiente'`,
+      [req.params.id],
+    );
+    if (solRows.length === 0) return res.status(404).json({ error: "Solicitud no encontrada" });
+
+    const sol = solRows[0];
+    if (sol.destino_perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No tenés permiso para rechazar esta solicitud" });
+    }
+
+    await pool.query(
+      `UPDATE solicitudes_conexion SET estado = 'rechazada', updated_at = NOW() WHERE id = $1`,
+      [req.params.id],
+    );
+
+    const { rows: origPerfil } = await pool.query(
+      "SELECT perfil_id FROM entidades WHERE id = $1",
+      [sol.entidad_origen_id],
+    );
+    if (origPerfil[0]?.perfil_id) {
+      const { crearNotificacion } = await import("./notificaciones.js");
+      await crearNotificacion(
+        origPerfil[0].perfil_id,
+        "conexion_rechazada",
+        "Conexión rechazada",
+        `"${sol.destino_nombre}" rechazó la conexión con "${sol.origen_nombre}"`,
+        parseInt(sol.entidad_origen_id),
+        { solicitud_id: parseInt(req.params.id), entidad_destino_nombre: sol.destino_nombre },
+      );
+    }
+
+    getIO()?.emit("entidad:change");
+    res.json({ ok: true, message: "Solicitud rechazada" });
+  } catch (err) {
+    console.error("Error POST /conexiones/solicitudes/rechazar:", err);
+    res.status(500).json({ error: "Error al rechazar solicitud" });
+  }
+});
+
+// DELETE /api/conexiones/solicitudes/:id — eliminar solicitud propia
+router.delete("/conexiones/solicitudes/:id", authMiddleware, async (req, res) => {
+  try {
+    const { rows: solRows } = await pool.query(
+      `SELECT sc.*, e_o.perfil_id AS origen_perfil_id
+       FROM solicitudes_conexion sc
+       JOIN entidades e_o ON sc.entidad_origen_id = e_o.id
+       WHERE sc.id = $1`,
+      [req.params.id],
+    );
+    if (solRows.length === 0) return res.status(404).json({ error: "Solicitud no encontrada" });
+    if (solRows[0].origen_perfil_id !== req.user.id) {
+      return res.status(403).json({ error: "No tenés permiso para eliminar esta solicitud" });
+    }
+    await pool.query("DELETE FROM solicitudes_conexion WHERE id = $1", [req.params.id]);
+    getIO()?.emit("entidad:change");
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error DELETE /conexiones/solicitudes/:id:", err);
+    res.status(500).json({ error: "Error al eliminar solicitud" });
   }
 });
 
@@ -492,6 +755,7 @@ router.get("/solicitudes", authMiddleware, async (_req, res) => {
                e.fecha_evento, e.duracion_dias, e.actividades_principales,
                e.link_entradas, e.fecha_inicio_suscripcion, e.fecha_fin_suscripcion,
                 e.estado_pago, e.latitud, e.longitud, e.icono,
+                e.estado_sello AS estado,
                p.nombre AS perfil_nombre, p.email AS perfil_email, p.whatsapp AS perfil_whatsapp
         FROM entidades e
         LEFT JOIN perfiles p ON e.perfil_id = p.id

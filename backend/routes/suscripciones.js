@@ -2,6 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { crearNotificacion } from "./notificaciones.js";
+import { getIO } from "../services/socket.js";
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
       }
 
       const finStr = fin.toISOString().split("T")[0];
-      const setClauses = ["plan_tipo = $1", "estado_pago = 'al_dia'"];
+      const setClauses = ["plan_tipo = $1", "estado_pago = 'al_dia'", "visible = true"];
       const params = [planNombre];
       let pIdx = 2;
 
@@ -128,6 +129,8 @@ router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
         [req.user.id, ent.id, plan_id || null, precio, inicio ? inicio.toISOString().split("T")[0] : ent.fecha_inicio_suscripcion, finStr],
       );
     }
+
+    getIO()?.emit("entidad:change");
 
     res.json({
       ok: true,
@@ -197,6 +200,8 @@ router.post("/suscripciones/reclamar-devolucion/:entidad_id", authMiddleware, as
       [req.params.entidad_id],
     );
 
+    getIO()?.emit("entidad:change");
+
     await crearNotificacion(
       req.user.id,
       "devolucion_solicitada",
@@ -230,6 +235,18 @@ router.get("/suscripciones/devoluciones", authMiddleware, async (_req, res) => {
   }
 });
 
+router.get("/suscripciones/devoluciones/count", authMiddleware, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM entidades WHERE estado_pago = 'reembolso_solicitado'`,
+    );
+    res.json({ count: rows[0].count });
+  } catch (err) {
+    console.error("Error GET /suscripciones/devoluciones/count:", err);
+    res.status(500).json({ error: "Error al contar devoluciones" });
+  }
+});
+
 router.post("/suscripciones/aprobar-devolucion/:entidad_id", authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -250,6 +267,8 @@ router.post("/suscripciones/aprobar-devolucion/:entidad_id", authMiddleware, asy
        WHERE id = $1`,
       [req.params.entidad_id],
     );
+
+    getIO()?.emit("entidad:change");
 
     await crearNotificacion(
       rows[0].perfil_id,
@@ -282,6 +301,8 @@ router.post("/suscripciones/rechazar-devolucion/:entidad_id", authMiddleware, as
       [req.params.entidad_id],
     );
 
+    getIO()?.emit("entidad:change");
+
     await crearNotificacion(
       rows[0].perfil_id,
       "devolucion_rechazada",
@@ -294,6 +315,32 @@ router.post("/suscripciones/rechazar-devolucion/:entidad_id", authMiddleware, as
   } catch (err) {
     console.error("Error POST /suscripciones/rechazar-devolucion:", err);
     res.status(500).json({ error: "Error al rechazar devolución" });
+  }
+});
+
+router.get("/suscripciones/todas", authMiddleware, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (e.id)
+              e.id AS entidad_id, e.nombre AS entidad_nombre, e.tipo,
+              e.plan_tipo, e.estado_pago, e.fecha_inicio_suscripcion,
+              e.fecha_fin_suscripcion, e.perfil_id,
+              p.nombre AS perfil_nombre, p.email AS perfil_email,
+              pg.monto AS ultimo_monto, pg.created_at AS ultimo_pago,
+              pl.nombre AS plan_nombre
+       FROM entidades e
+       LEFT JOIN perfiles p ON e.perfil_id = p.id
+       LEFT JOIN pagos pg ON pg.entidad_id = e.id
+       LEFT JOIN planes pl ON pl.id = pg.plan_id
+       WHERE e.plan_tipo IS NOT NULL
+          OR e.estado_pago IS NOT NULL
+          OR pg.id IS NOT NULL
+       ORDER BY e.id, pg.created_at DESC NULLS LAST`,
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /suscripciones/todas:", err);
+    res.status(500).json({ error: "Error al obtener suscripciones" });
   }
 });
 

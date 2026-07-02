@@ -480,7 +480,7 @@ router.post("/auth/olvide-password", emailOnlyRules, async (req, res) => {
     );
 
     if (rows.length === 0 || rows[0].deleted_at) {
-      return res.json({ ok: true, message: mensaje });
+      return res.status(404).json({ error: "No hay ninguna cuenta registrada con ese email." });
     }
 
     const perfil = rows[0];

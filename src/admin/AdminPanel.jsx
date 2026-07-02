@@ -21,6 +21,7 @@ import { DevolucionesView } from "./DevolucionesView";
 import { EdicionesView } from "./EdicionesView";
 import { UsuariosView } from "./UsuariosView";
 import { PlanesView } from "./PlanesView";
+import { SuscripcionesView } from "./SuscripcionesView";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -106,6 +107,9 @@ export const AdminPanel = () => {
   const [pendingDevoluciones, setPendingDevoluciones] = useState(0);
   const [step, setStep] = useState(1);
   const [editingEntityId, setEditingEntityId] = useState(null);
+  const [highlightEntityId, setHighlightEntityId] = useState(null);
+  const entidadListRef = useRef(null);
+  const entityCardRefs = useRef({});
 
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -278,8 +282,20 @@ export const AdminPanel = () => {
       cargarEntidades();
       cargarRecorridos();
       cargarLocalidades();
+      authFetch("/api/suscripciones/devoluciones/count", { headers: authHeaders() })
+        .then((r) => r.ok && r.json().then((d) => setPendingDevoluciones(d.count || 0)))
+        .catch(() => {});
     }
   }, [socketRefresh]);
+
+  useEffect(() => {
+    if (view === "entidades" && highlightEntityId) {
+      setTimeout(() => {
+        const el = document.querySelector(`[data-entity-id="${highlightEntityId}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 200);
+    }
+  }, [view, highlightEntityId]);
 
   const localidadOptions = useMemo(() => {
     const set = new Set(allEntities.map((e) => e.localidad_nombre).filter(Boolean));
@@ -296,7 +312,7 @@ export const AdminPanel = () => {
   }, [allEntities]);
 
   const entidadesFiltradas = useMemo(() => {
-    let items = [...allEntities];
+    let items = [...allEntities].filter((e) => !e.estado_sello || e.estado_sello === "aprobado");
     if (entidadSearch) {
       const q = entidadSearch.toLowerCase();
       items = items.filter((e) => e.nombre.toLowerCase().includes(q));
@@ -321,7 +337,7 @@ export const AdminPanel = () => {
   }, [allEntities]);
 
   const tipos = Object.keys(tipoCounts);
-  const totalEntidades = allEntities.length;
+  const totalEntidades = allEntities.filter((e) => !e.estado_sello || e.estado_sello === "aprobado").length;
 
   // --- MAPA ---
   const mapLat = general.latitud ?? -27.4511;
@@ -1417,7 +1433,7 @@ export const AdminPanel = () => {
                     {item.label}
                     {item.badge != null && (
                       <span style={{
-                        background: item.badge > 0 ? "#863819" : "#f0ede8",
+                        background: item.badge > 0 ? "#b87343" : "#f0ede8",
                       color: item.badge > 0 ? "white" : "#888",
                       fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center",
                     }}>
@@ -1450,6 +1466,7 @@ export const AdminPanel = () => {
                 {[
                   { key: "usuarios", label: "Usuarios" },
                   { key: "planes", label: "Planes" },
+                  { key: "suscripciones", label: "Suscripciones" },
                   { key: "localidades", label: "Localidades" },
                 ].map((item) => (
                   <button
@@ -1501,13 +1518,13 @@ export const AdminPanel = () => {
               {/* Filter + search */}
               <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
                 <input
-                  style={{ ...styles.input, marginBottom: 0, flex: 1, minWidth: 180 }}
+                  style={{ padding: "8px 12px", border: "1px solid #e0ddd5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "white", outline: "none", boxSizing: "border-box", flex: 1, minWidth: 180 }}
                   placeholder="Buscar por nombre..."
                   value={entidadSearch}
                   onChange={(e) => setEntidadSearch(e.target.value)}
                 />
                 <select
-                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
+                  style={{ padding: "8px 12px", border: "1px solid #e0ddd5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "white", outline: "none", boxSizing: "border-box", width: 170, cursor: "pointer" }}
                   value={entidadFilterTipo}
                   onChange={(e) => setEntidadFilterTipo(e.target.value)}
                 >
@@ -1519,7 +1536,7 @@ export const AdminPanel = () => {
                   ))}
                 </select>
                 <select
-                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
+                  style={{ padding: "8px 12px", border: "1px solid #e0ddd5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "white", outline: "none", boxSizing: "border-box", width: 170, cursor: "pointer" }}
                   value={entidadFilterLocalidad}
                   onChange={(e) => setEntidadFilterLocalidad(e.target.value)}
                 >
@@ -1529,7 +1546,7 @@ export const AdminPanel = () => {
                   ))}
                 </select>
                 <select
-                  style={{ ...styles.input, marginBottom: 0, width: 170, cursor: "pointer" }}
+                  style={{ padding: "8px 12px", border: "1px solid #e0ddd5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "white", outline: "none", boxSizing: "border-box", width: 170, cursor: "pointer" }}
                   value={entidadFilterPerfil}
                   onChange={(e) => setEntidadFilterPerfil(e.target.value)}
                 >
@@ -1538,32 +1555,55 @@ export const AdminPanel = () => {
                     <option key={id} value={id}>{nombre}</option>
                   ))}
                 </select>
-                <button
-                  onClick={() => { setEntidadSearch(""); setEntidadFilterTipo(""); setEntidadFilterLocalidad(""); setEntidadFilterPerfil(""); }}
-                  style={{
-                    background: "none", border: "1px solid #e0ddd5", borderRadius: "6px",
-                    padding: "10px 12px", cursor: "pointer", color: "#888", fontSize: "12px",
-                    fontWeight: 500, whiteSpace: "nowrap",
-                  }}
-                >
-                  ✕ Limpiar
-                </button>
+                {(entidadSearch || entidadFilterTipo || entidadFilterLocalidad || entidadFilterPerfil) && (
+                  <button
+                    onClick={() => { setEntidadSearch(""); setEntidadFilterTipo(""); setEntidadFilterLocalidad(""); setEntidadFilterPerfil(""); }}
+                    style={{
+                      padding: "8px 12px", border: "1px solid #863819", borderRadius: 8, fontSize: 13,
+                      fontFamily: "inherit", background: "white", cursor: "pointer", color: "#863819",
+                      fontWeight: 600, whiteSpace: "nowrap",
+                    }}
+                  >
+                    ✕ Limpiar
+                  </button>
+                )}
               </div>
 
               {/* Entity list */}
-              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-                {entidadesFiltradas.map((ent) => (
-                  <div key={ent.id} style={styles.entityCard}>
+              <div ref={entidadListRef} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                {entidadesFiltradas.map((ent, idx) => {
+                  const isHighlighted = ent.id === highlightEntityId;
+                  return (
+                  <div
+                    key={ent.id}
+                    data-entity-id={ent.id}
+                    style={{
+                      ...styles.entityCard,
+                      background: isHighlighted ? "#fff8e1" : "white",
+                      border: isHighlighted ? "2px solid #f9a825" : "1px solid #eee",
+                      transition: "all 0.3s ease",
+                    }}
+                    onClick={() => setHighlightEntityId(null)}
+                  >
                     {ent.imagen && <img src={optimizarUrlCloudinary(ent.imagen)} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <img src={ent.icono || `/icons/${ent.tipo}.png`} alt="" style={{ width: 20, height: 20, borderRadius: 2, objectFit: "contain" }} />
                         <span style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18" }}>{ent.nombre}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: colorMapAdmin[ent.tipo] || "#555", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                           {ent.tipo}
                         </span>
                         {ent.estado_sello === "aprobado" && <span style={{ fontSize: 9, fontWeight: 700, background: "#2e7d32", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>SELLO</span>}
-                        {ent.estado_pago === "al_dia" && <span style={{ fontSize: 9, fontWeight: 700, background: "#d4a017", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>AL DÍA</span>}
-                        {ent.estado_pago === "atrasado" && <span style={{ fontSize: 9, fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>DEUDA</span>}
+                        {(() => {
+                          const hoy = new Date();
+                          const fin = ent.fecha_fin_suscripcion ? new Date(ent.fecha_fin_suscripcion) : null;
+                          const vencida = ent.estado_pago === "al_dia" && fin && fin < hoy;
+                          if (vencida) return <span style={{ fontSize: 9, fontWeight: 700, background: "#c62828", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>VENCIDA</span>;
+                          if (ent.estado_pago === "al_dia") return <span style={{ fontSize: 9, fontWeight: 700, background: "#d4a017", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>AL DÍA</span>;
+                          if (ent.estado_pago === "reembolso_solicitado") return <span style={{ fontSize: 9, fontWeight: 700, background: "#e65100", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>DEVOLUCIÓN</span>;
+                          if (ent.estado_pago === "cancelado") return <span style={{ fontSize: 9, fontWeight: 700, background: "#888", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>CANCELADO</span>;
+                          return null;
+                        })()}
                         {!ent.visible && <span style={{ fontSize: 9, fontWeight: 700, background: "#f39c12", color: "#fff", padding: "2px 8px", borderRadius: 10 }}>OCULTA</span>}
                       </div>
                       <div style={{ fontSize: 12, color: "#888", marginTop: 4, display: "flex", gap: "12px", flexWrap: "wrap" }}>
@@ -1580,10 +1620,10 @@ export const AdminPanel = () => {
                       <button onClick={() => { sessionStorage.setItem("fromAdmin", "true"); navigate(`/entidad/${ent.slug}`); }} className="admin-btn-ghost" style={styles.smallBtn("#863819")}>
                         VER
                       </button>
-                      <button onClick={() => { cargarEntidadParaEditar(ent.id); }} className="admin-btn" style={styles.smallBtn("#863819")}>
+                      <button onClick={() => { cargarEntidadParaEditar(ent.id); setHighlightEntityId(null); }} className="admin-btn" style={styles.smallBtn("#863819")}>
                         EDITAR
                       </button>
-                      <button onClick={async () => { await cargarEntidadParaEditar(ent.id); setStep(4); }} className="admin-btn" style={styles.smallBtn("#5b6abf")}>
+                      <button onClick={async () => { await cargarEntidadParaEditar(ent.id); setStep(4); setHighlightEntityId(null); }} className="admin-btn" style={styles.smallBtn("#5b6abf")}>
                         CONEXIONES
                       </button>
                       <button onClick={() => toggleVisibilidad(ent.id, ent.visible)} className="admin-btn" style={styles.smallBtn(ent.visible ? "#f39c12" : "#2e7d32")}>
@@ -1594,7 +1634,8 @@ export const AdminPanel = () => {
                       </button>
                     </div>
                   </div>
-              ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -1967,10 +2008,6 @@ export const AdminPanel = () => {
                     </span>
                   )}
                 </h2>
-                <button onClick={cargarSolicitudes} className="admin-btn" style={styles.smallBtn("#863819")}>
-                  <img src="/icons/refresh.png" style={{ width: 14, height: 14, verticalAlign: "middle", marginRight: 4 }} alt="" />
-                  RECARGAR
-                </button>
               </div>
 
               {solicitudesLoading ? (
@@ -2195,6 +2232,15 @@ export const AdminPanel = () => {
           {/* PLANES */}
           {view === "planes" && <PlanesView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
 
+          {/* SUSCRIPCIONES */}
+          {view === "suscripciones" && (
+            <SuscripcionesView
+              authFetch={authFetch}
+              showPopup={showPopup}
+              onSelectEntity={(id) => { setHighlightEntityId(id); setView("entidades"); }}
+            />
+          )}
+
           {/* USUARIOS */}
           {view === "usuarios" && (
             <UsuariosView
@@ -2209,6 +2255,7 @@ export const AdminPanel = () => {
           {/* DEVOLUCIONES */}
           {view === "devoluciones" && (
             <DevolucionesView
+              key={socketRefresh}
               authFetch={authFetch}
               authHeaders={authHeaders}
               colorMapAdmin={colorMapAdmin}

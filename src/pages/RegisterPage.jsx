@@ -11,6 +11,8 @@ export const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [mostrarConfirmPassword, setMostrarConfirmPassword] = useState(false);
   const { register } = useAuthPublico();
   const navigate = useNavigate();
 
@@ -56,12 +58,56 @@ export const RegisterPage = () => {
 
           <div className="login-field">
             <label htmlFor="password">Contraseña</label>
-            <input id="password" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <div style={{ position: "relative" }}>
+              <input
+                id="password"
+                type={mostrarPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required minLength={6}
+                style={{ width: "100%", paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPassword(!mostrarPassword)}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: 18,
+                  padding: 4, lineHeight: 1, color: "#1c1c18",
+                }}
+                tabIndex={-1}
+              >
+                <i className={`ri-${mostrarPassword ? "eye-off" : "eye"}-line`} style={{ fontSize: 20, color: "#1c1c18" }}></i>
+              </button>
+            </div>
           </div>
 
           <div className="login-field">
             <label htmlFor="confirmPassword">Repetir contraseña</label>
-            <input id="confirmPassword" type="password" placeholder="Repetí tu contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} />
+            <div style={{ position: "relative" }}>
+              <input
+                id="confirmPassword"
+                type={mostrarConfirmPassword ? "text" : "password"}
+                placeholder="Repetí tu contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required minLength={6}
+                style={{ width: "100%", paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarConfirmPassword(!mostrarConfirmPassword)}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: 18,
+                  padding: 4, lineHeight: 1, color: "#1c1c18",
+                }}
+                tabIndex={-1}
+              >
+                <i className={`ri-${mostrarConfirmPassword ? "eye-off" : "eye"}-line`} style={{ fontSize: 20, color: "#1c1c18" }}></i>
+              </button>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} className="login-btn">

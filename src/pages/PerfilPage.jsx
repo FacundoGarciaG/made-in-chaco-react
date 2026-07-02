@@ -677,6 +677,19 @@ export const PerfilPage = () => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [planes, setPlanes] = useState([]);
   const [planPersonalizado, setPlanPersonalizado] = useState(null);
+
+  const [conexModalEntidad, setConexModalEntidad] = useState(null);
+  const [conexSearch, setConexSearch] = useState("");
+  const [conexFilterTipo, setConexFilterTipo] = useState("");
+  const [conexResults, setConexResults] = useState([]);
+  const [conexTempList, setConexTempList] = useState([]);
+  const [conexSaving, setConexSaving] = useState(false);
+  const [conexAllEntities, setConexAllEntities] = useState([]);
+  const [solicitudesRecibidas, setSolicitudesRecibidas] = useState([]);
+  const [solicitudesEnviadas, setSolicitudesEnviadas] = useState([]);
+  const [loadingSolicitudesConex, setLoadingSolicitudesConex] = useState(false);
+  const [solicitarTarget, setSolicitarTarget] = useState(null);
+  const [solicitarRelacion, setSolicitarRelacion] = useState("");
   const [loadingPlanes, setLoadingPlanes] = useState(false);
   const [pagos, setPagos] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
@@ -899,6 +912,20 @@ export const PerfilPage = () => {
     }
   }, [getToken]);
 
+  const fetchSolicitudesConex = useCallback(async () => {
+    setLoadingSolicitudesConex(true);
+    try {
+      const [recibidas, enviadas] = await Promise.all([
+        publicAuthFetch("/api/conexiones/solicitudes-recibidas", { headers: { Authorization: `Bearer ${getToken()}` } }),
+        publicAuthFetch("/api/conexiones/solicitudes-enviadas", { headers: { Authorization: `Bearer ${getToken()}` } }),
+      ]);
+      if (recibidas.ok) setSolicitudesRecibidas(await recibidas.json());
+      if (enviadas.ok) setSolicitudesEnviadas(await enviadas.json());
+    } catch {} finally {
+      setLoadingSolicitudesConex(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
     if (section === "solicitudes" || section === "entidades" || section === "suscripciones") {
       fetchEntidades();
@@ -913,11 +940,27 @@ export const PerfilPage = () => {
       fetchPlanes();
       fetchPagos();
     }
-  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos]);
+    if (section === "solicitudes-conexion") {
+      fetchSolicitudesConex();
+    }
+  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos, fetchSolicitudesConex, fetchUnreadCount]);
 
   useSocketEvent("notificacion:nueva", () => {
     fetchNotificaciones();
   });
+
+  useSocketEvent("entidad:change", () => {
+    fetchEntidades();
+    if (section === "suscripciones") {
+      fetchPlanes();
+      fetchPagos();
+    }
+    fetchSolicitudesConex();
+  });
+
+  useEffect(() => {
+    fetchSolicitudesConex();
+  }, []);
 
   useEffect(() => {
     if (!msg) return;
@@ -1030,6 +1073,133 @@ export const PerfilPage = () => {
     return true;
   };
 
+  const TIPO_OPTIONS_FILTER = [
+    { value: "", label: "Todos los tipos" },
+    { value: "artesano", label: "Artesano" },
+    { value: "gastronomia", label: "Gastronomía" },
+    { value: "comercio", label: "Comercio" },
+    { value: "evento", label: "Evento" },
+    { value: "patrimonio", label: "Patrimonio" },
+    { value: "personalidad", label: "Personalidad" },
+    { value: "comunidad_indigena", label: "Comunidad indígena" },
+    { value: "lugar_natural", label: "Lugar natural" },
+    { value: "hospedaje", label: "Hospedaje" },
+    { value: "productor", label: "Productor" },
+    { value: "experiencia", label: "Experiencia" },
+    { value: "relato", label: "Relato" },
+    { value: "espacio_cultural", label: "Espacio cultural" },
+  ];
+
+  const openConexModal = async (entidad) => {
+    setConexModalEntidad(entidad);
+    setConexSearch("");
+    setConexFilterTipo("");
+    setConexResults([]);
+    setConexTempList([]);
+
+    try {
+      const res = await fetch("/api/entidades");
+      if (res.ok) setConexAllEntities(await res.json());
+    } catch {}
+
+    try {
+      const res = await fetch(`/api/entidades/${entidad.id}/conexiones`);
+      if (res.ok) {
+        const data = await res.json();
+        setConexTempList(data.map((c) => ({
+          entidad_destino_id: c.entidad_origen_id === entidad.id ? c.entidad_destino_id : c.entidad_origen_id,
+          nombre: c.entidad_origen_id === entidad.id ? c.nombre_destino : c.nombre_origen,
+          tipo: c.entidad_origen_id === entidad.id ? c.tipo_destino : c.tipo_origen,
+          tipo_relacion: c.tipo_relacion || "",
+          tipo_relacion_inversa: c.tipo_relacion_inversa || "",
+        })));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!conexSearch.trim() && !conexFilterTipo) { setConexResults([]); return; }
+    const q = conexSearch.toLowerCase();
+    setConexResults(conexAllEntities.filter(
+      (e) => e.id !== conexModalEntidad?.id && e.nombre?.toLowerCase().includes(q) && (!conexFilterTipo || e.tipo === conexFilterTipo)
+    ));
+  }, [conexSearch, conexFilterTipo, conexAllEntities, conexModalEntidad]);
+
+  const esEntidadPropia = (entidadId) => entidades.some((e) => e.id === entidadId);
+
+  const enviarSolicitudConex = async (entidadDestino, tipoRelacion) => {
+    if (!conexModalEntidad) return;
+    try {
+      const res = await publicAuthFetch("/api/conexiones/solicitar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          entidad_origen_id: conexModalEntidad.id,
+          entidad_destino_id: entidadDestino.id,
+          tipo_relacion: tipoRelacion || "",
+          tipo_relacion_inversa: "",
+        }),
+      });
+      if (res.ok) {
+        setMsg(`Solicitud enviada a "${entidadDestino.nombre}"`);
+        fetchSolicitudesConex();
+      } else {
+        const data = await res.json();
+        setMsg(data.error || "Error al enviar solicitud");
+      }
+    } catch {
+      setMsg("Error al enviar solicitud");
+    }
+    setConexSearch("");
+    setConexResults([]);
+  };
+
+  const agregarConexTemp = (entidad) => {
+    if (conexTempList.some((c) => c.entidad_destino_id === entidad.id)) return;
+    if (!esEntidadPropia(entidad.id)) {
+      setSolicitarTarget(entidad);
+      setSolicitarRelacion("");
+      setConexSearch("");
+      setConexResults([]);
+      return;
+    }
+    setConexTempList((prev) => [...prev, { entidad_destino_id: entidad.id, nombre: entidad.nombre, tipo: entidad.tipo, tipo_relacion: "", tipo_relacion_inversa: "" }]);
+    setConexSearch("");
+    setConexResults([]);
+  };
+
+  const quitarConexTemp = (id) => {
+    setConexTempList((prev) => prev.filter((c) => c.entidad_destino_id !== id));
+  };
+
+  const guardarConexiones = async () => {
+    if (!conexModalEntidad) return;
+    setConexSaving(true);
+    try {
+      await publicAuthFetch(`/api/entidades/${conexModalEntidad.id}/conexiones`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(conexTempList.map((c) => ({
+          entidad_destino_id: c.entidad_destino_id,
+          tipo_relacion: c.tipo_relacion,
+          tipo_relacion_inversa: c.tipo_relacion_inversa,
+        }))),
+      });
+      setMsg("Conexiones guardadas");
+      setConexModalEntidad(null);
+    } catch {
+      setMsg("Error al guardar conexiones");
+    } finally {
+      setConexSaving(false);
+    }
+  };
+
   if (!isAuthenticated || !perfil) return null;
 
   if (savedUnverified) {
@@ -1085,9 +1255,10 @@ export const PerfilPage = () => {
     { key: "solicitar-sello", label: "Solicitar sello", icon: "→" },
     { key: "solicitudes", label: "Mis Solicitudes", icon: "→" },
     { key: "entidades", label: "Mis Entidades", icon: "→" },
+    { key: "solicitudes-conexion", label: "Conexiones", icon: "→" },
     { key: "suscripciones", label: "Planes", icon: "→" },
     { key: "favoritos", label: "Mis Favoritos", icon: "→" },
-  ];
+  ].filter((s) => perfil?.verified || s.key === "profile");
 
   const sSidebarItem = (isActive) => ({
     fontFamily: "inherit",
@@ -1177,6 +1348,12 @@ export const PerfilPage = () => {
               >
                 {s.label}
                 {s.key === "notificaciones" && unreadCount > 0 && (
+                  <span style={{
+                    display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                    background: "#863819", marginLeft: 8, verticalAlign: "middle",
+                  }} />
+                )}
+                {s.key === "solicitudes-conexion" && solicitudesRecibidas.length > 0 && (
                   <span style={{
                     display: "inline-block", width: 8, height: 8, borderRadius: "50%",
                     background: "#863819", marginLeft: 8, verticalAlign: "middle",
@@ -1493,13 +1670,11 @@ export const PerfilPage = () => {
                           background: "#fcf9f4", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                          }}>
                            <div>
-                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                              {e.icono && (
-                                <img src={e.icono} alt="" style={{ width: 16, height: 16, borderRadius: 2, objectFit: "contain" }} />
-                              )}
-                              <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
-                                {TIPOS_LABEL[e.tipo] || e.tipo}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                               <img src={e.icono || `/icons/${e.tipo}.png`} alt="" style={{ width: 20, height: 20, borderRadius: 2, objectFit: "contain" }} />
+                               <span style={{ fontSize: 13, color: TIPO_COLOR[e.tipo] || "#555", fontWeight: 500, letterSpacing: "0.04em" }}>
+                                 {TIPOS_LABEL[e.tipo] || e.tipo}
+                               </span>
                               {(() => {
                                 const st = suscripcionStatus(e);
                                 return st ? (
@@ -1576,6 +1751,20 @@ export const PerfilPage = () => {
                               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#ddd"; }}
                             >
                               Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openConexModal(e)}
+                              style={{
+                                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                cursor: "pointer", border: "1px solid #7b1fa2", background: "transparent",
+                                padding: "8px 16px", borderRadius: 6, color: "#7b1fa2",
+                                whiteSpace: "nowrap", transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#f3e5f5"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              Conexiones
                             </button>
                             {tiposConMembresia.includes(e.tipo) && e.estado_pago !== "reembolso_solicitado" && (
                               <button
@@ -2059,6 +2248,185 @@ export const PerfilPage = () => {
                       </div>
                     ))}
                   </div>
+                )}
+              </>
+            )}
+
+            {section === "solicitudes-conexion" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 32px", letterSpacing: "-0.02em",
+                }}>
+                  Solicitudes de Conexión
+                </h2>
+                {loadingSolicitudesConex ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : (
+                  <>
+                    <h3 style={{
+                      fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 500,
+                      color: "#1c1c18", margin: "0 0 16px",
+                    }}>
+                      Recibidas
+                    </h3>
+                    {solicitudesRecibidas.length === 0 ? (
+                      <p style={{ color: "#aaa", fontSize: 14, marginBottom: 24 }}>
+                        No tenés solicitudes de conexión pendientes.
+                      </p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+                        {solicitudesRecibidas.map((s) => (
+                          <div key={s.id} style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "14px 18px", border: "1px solid #e0dcd0", borderRadius: 10,
+                            background: "#fcf9f4",
+                          }}>
+                            <div style={{ cursor: "pointer" }} onClick={() => window.open(`/entidad/${s.entidad_origen_slug}`, "_blank")}>
+                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", margin: 0 }}>
+                                {s.entidad_origen_nombre}
+                              </p>
+                              <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700,
+                                  color: TIPO_COLOR[s.entidad_origen_tipo] || "#888",
+                                  textTransform: "uppercase",
+                                }}>{s.entidad_origen_tipo}</span>
+                                {" → "}
+                                <span style={{ fontWeight: 500 }}>{s.entidad_destino_nombre}</span>
+                                {s.tipo_relacion && (
+                                  <span style={{ fontSize: 11, fontStyle: "italic", color: "#7b1fa2", marginLeft: 4 }}>
+                                    «{s.tipo_relacion}»
+                                  </span>
+                                )}
+                                <br />
+                                <span style={{ fontSize: 11, color: "#999" }}>por {s.entidad_origen_perfil_nombre}</span>
+                              </p>
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await publicAuthFetch(`/api/conexiones/solicitudes/${s.id}/aprobar`, {
+                                      method: "POST",
+                                      headers: { Authorization: `Bearer ${getToken()}` },
+                                    });
+                                    if (res.ok) fetchSolicitudesConex();
+                                  } catch {}
+                                }}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                                  cursor: "pointer", border: "none", background: "#2e7d32",
+                                  padding: "8px 16px", borderRadius: 6, color: "#fff",
+                                }}
+                              >
+                                Aceptar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await publicAuthFetch(`/api/conexiones/solicitudes/${s.id}/rechazar`, {
+                                      method: "POST",
+                                      headers: { Authorization: `Bearer ${getToken()}` },
+                                    });
+                                    if (res.ok) fetchSolicitudesConex();
+                                  } catch {}
+                                }}
+                                style={{
+                                  fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                                  cursor: "pointer", border: "1px solid #e57373", background: "transparent",
+                                  padding: "8px 16px", borderRadius: 6, color: "#e57373",
+                                }}
+                              >
+                                Rechazar
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <h3 style={{
+                      fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 500,
+                      color: "#1c1c18", margin: "0 0 16px",
+                    }}>
+                      Enviadas
+                    </h3>
+                    {solicitudesEnviadas.length === 0 ? (
+                      <p style={{ color: "#aaa", fontSize: 14 }}>
+                        No enviaste solicitudes de conexión.
+                      </p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {solicitudesEnviadas.slice(0, 5).map((s) => (
+                          <div key={s.id} style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "14px 18px", border: "1px solid #e0dcd0", borderRadius: 10,
+                            background: "#fcf9f4",
+                          }}>
+                            <div style={{ cursor: "pointer" }} onClick={() => window.open(`/entidad/${s.entidad_destino_slug}`, "_blank")}>
+                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", margin: 0 }}>
+                                {s.entidad_destino_nombre}
+                              </p>
+                              <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700,
+                                  color: TIPO_COLOR[s.entidad_origen_tipo] || "#888",
+                                  textTransform: "uppercase",
+                                }}>{s.entidad_origen_tipo}</span>
+                                {" → "}
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700,
+                                  color: TIPO_COLOR[s.entidad_destino_tipo] || "#888",
+                                  textTransform: "uppercase",
+                                }}>{s.entidad_destino_tipo}</span>
+                                {" — "}
+                                {s.estado === "pendiente" ? (
+                                  <span style={{ color: "#f57c00", fontWeight: 600 }}>Pendiente</span>
+                                ) : s.estado === "aprobada" ? (
+                                  <span style={{ color: "#2e7d32", fontWeight: 600 }}>Aprobada</span>
+                                ) : (
+                                  <span style={{ color: "#c62828", fontWeight: 600 }}>Rechazada</span>
+                                )}
+                                {s.tipo_relacion && (
+                                  <span style={{ fontSize: 11, fontStyle: "italic", color: "#7b1fa2", marginLeft: 4 }}>
+                                    «{s.tipo_relacion}»
+                                  </span>
+                                )}
+                                <br />
+                                <span style={{ fontSize: 11, color: "#999" }}>{s.entidad_destino_perfil_nombre}</span>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await publicAuthFetch(`/api/conexiones/solicitudes/${s.id}`, {
+                                    method: "DELETE",
+                                    headers: { Authorization: `Bearer ${getToken()}` },
+                                  });
+                                  fetchSolicitudesConex();
+                                } catch {}
+                              }}
+                              style={{
+                                background: "none", border: "none", color: "#c62828",
+                                cursor: "pointer", fontSize: 16, padding: "4px 4px 4px 8px",
+                                flexShrink: 0, lineHeight: 1,
+                              }}
+                            >✕</button>
+                          </div>
+                        ))}
+                        {solicitudesEnviadas.length > 5 && (
+                          <p style={{ fontSize: 12, color: "#999", textAlign: "center", margin: 0 }}>
+                            y {solicitudesEnviadas.length - 5} más...
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -2742,9 +3110,9 @@ export const PerfilPage = () => {
                                   {st && (
                                     <span style={{ color: st.color, marginLeft: 8 }}>
                                       — {st.label}
+                                          </span>
+                                      )}
                                     </span>
-                                  )}
-                                </span>
                               </div>
                             </label>
                           );
@@ -2909,6 +3277,263 @@ export const PerfilPage = () => {
               <button onClick={() => setDiffModal(null)} style={{ fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", background: "#863819", color: "white", padding: "10px 24px", borderRadius: 8, letterSpacing: "0.04em" }}>
                 CERRAR
               </button>
+            </div>
+          </div>
+        )}
+
+        {conexModalEntidad && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1001, fontFamily: "Epilogue, sans-serif",
+          }} onClick={() => setConexModalEntidad(null)}>
+            <div style={{
+              background: "#fff", padding: "32px", maxWidth: 600, width: "90%",
+              borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              maxHeight: "80vh", overflowY: "auto",
+            }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{
+                fontFamily: "Cinzel, serif", fontSize: 20, fontWeight: 600,
+                color: "#1c1c18", margin: "0 0 4px", letterSpacing: "-0.02em",
+              }}>
+                Conexiones de {conexModalEntidad.nombre}
+              </h3>
+              <p style={{ fontSize: 13, color: "#888", margin: "0 0 20px" }}>
+                Conectá esta entidad con otras del directorio.
+              </p>
+
+              <div style={{ position: "relative", marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <input
+                    style={{
+                      flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: 8,
+                      fontSize: 14, color: "#1c1c18", fontFamily: "inherit", outline: "none",
+                    }}
+                    placeholder="Buscar entidad para conectar..."
+                    value={conexSearch}
+                    onChange={(e) => setConexSearch(e.target.value)}
+                  />
+                  <select
+                    style={{
+                      width: 180, padding: "8px 12px", border: "1px solid #ddd", borderRadius: 8,
+                      fontSize: 14, color: "#1c1c18", fontFamily: "inherit", outline: "none",
+                      flexShrink: 0,
+                    }}
+                    value={conexFilterTipo}
+                    onChange={(e) => setConexFilterTipo(e.target.value)}
+                  >
+                    {TIPO_OPTIONS_FILTER.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {conexResults.length > 0 && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, right: 0, background: "white",
+                    border: "1px solid #eee", borderRadius: 12, zIndex: 10, maxHeight: 200,
+                    overflowY: "auto", boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                  }}>
+                    {conexResults.map((e) => {
+                      const yaSolicitada = solicitudesEnviadas.some((s) => s.entidad_origen_id === conexModalEntidad.id && s.entidad_destino_id === e.id && s.estado === "pendiente");
+                      const yaConectada = conexTempList.some((c) => c.entidad_destino_id === e.id);
+                      const esPropia = esEntidadPropia(e.id);
+                      return (
+                      <div key={e.id} onClick={() => { if (!yaSolicitada && !yaConectada) agregarConexTemp(e); }} style={{
+                        padding: "10px 14px", cursor: (yaSolicitada || yaConectada) ? "default" : "pointer",
+                        fontSize: 14, borderBottom: "1px solid #f5f2eb",
+                        color: yaSolicitada ? "#888" : yaConectada ? "#888" : "#333",
+                        display: "flex", alignItems: "center", gap: 8,
+                      }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, color: TIPO_COLOR[e.tipo] || "#888",
+                          textTransform: "uppercase",
+                        }}>{e.tipo}</span>
+                        <span style={{ color: "#1c1c18" }}>{e.nombre}</span>
+                        {e.perfil_nombre && (
+                          <span style={{ fontSize: 11, color: "#999", marginLeft: 4 }}>
+                            — {e.perfil_nombre}
+                          </span>
+                        )}
+                        {esPropia ? (
+                          <span style={{ fontSize: 10, color: "#7b1fa2", marginLeft: "auto" }}>propia</span>
+                        ) : yaSolicitada ? (
+                          <span style={{ fontSize: 10, color: "#f57c00", marginLeft: "auto" }}>✓ solicitada</span>
+                        ) : yaConectada ? (
+                          <span style={{ fontSize: 10, color: "#388e3c", marginLeft: "auto" }}>conectada</span>
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#7b1fa2", marginLeft: "auto" }}>solicitar</span>
+                        )}
+                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {solicitarTarget && (
+                <div style={{
+                  padding: "12px 14px", background: "#f3edf7", borderRadius: 8, marginBottom: 12,
+                  display: "flex", flexDirection: "column", gap: 8,
+                }}>
+                  <div style={{ fontSize: 13, color: "#1c1c18", fontWeight: 500 }}>
+                    Solicitar conexión a <strong style={{ color: "#1c1c18" }}>{solicitarTarget.nombre}</strong>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      style={{
+                        flex: 1, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 6,
+                        fontSize: 13, fontFamily: "inherit", outline: "none", color: "#1c1c18",
+                      }}
+                      placeholder="Tipo de relación (ej: colabora con)"
+                      value={solicitarRelacion}
+                      onChange={(e) => setSolicitarRelacion(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        enviarSolicitudConex(solicitarTarget, solicitarRelacion);
+                        setSolicitarTarget(null);
+                        setSolicitarRelacion("");
+                      }}
+                      style={{
+                        fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                        cursor: "pointer", border: "none", background: "#7b1fa2",
+                        padding: "8px 16px", borderRadius: 6, color: "#fff",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Enviar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSolicitarTarget(null); setSolicitarRelacion(""); }}
+                      style={{
+                        fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+                        cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                        padding: "8px 16px", borderRadius: 6, color: "#555",
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {solicitudesEnviadas.filter((s) => s.entidad_origen_id === conexModalEntidad.id && s.estado === "pendiente").length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 6, letterSpacing: "0.04em" }}>
+                    Solicitudes enviadas
+                  </div>
+                  {solicitudesEnviadas.filter((s) => s.entidad_origen_id === conexModalEntidad.id && s.estado === "pendiente").map((s) => (
+                    <div key={s.id} style={{
+                      display: "flex", gap: 8, alignItems: "center", marginBottom: 6,
+                      padding: "8px 14px", background: "#fff8e6", borderRadius: 8,
+                      cursor: "pointer",
+                    }} onClick={() => window.open(`/entidad/${s.entidad_destino_slug}`, "_blank")}>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, color: TIPO_COLOR[s.entidad_destino_tipo] || "#888",
+                          textTransform: "uppercase",
+                        }}>{s.entidad_destino_tipo}</span>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{s.entidad_destino_nombre}</span>
+                        {s.entidad_destino_perfil_nombre && (
+                          <span style={{ fontSize: 11, color: "#999" }}>— {s.entidad_destino_perfil_nombre}</span>
+                        )}
+                        {s.tipo_relacion && (
+                          <span style={{ fontSize: 11, fontStyle: "italic", color: "#7b1fa2" }}>«{s.tipo_relacion}»</span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, flexShrink: 0,
+                        color: s.estado === "pendiente" ? "#f57c00" : s.estado === "aprobada" ? "#2e7d32" : "#c62828",
+                      }}>
+                        {s.estado === "pendiente" ? "PENDIENTE" : s.estado === "aprobada" ? "APROBADA" : "RECHAZADA"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {conexTempList.length > 0 ? conexTempList.map((c, i) => {
+                return <div key={c.entidad_destino_id} style={{
+                    display: "flex", gap: 8, alignItems: "center", marginBottom: 8,
+                    padding: "10px 14px", background: "#fafaf8", borderRadius: 8,
+                  }}>
+                    <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: TIPO_COLOR[c.tipo] || "#888",
+                        textTransform: "uppercase",
+                      }}>{c.tipo}</span>
+                      <span style={{ fontWeight: 600, fontSize: 14, color: "#1c1c18" }}>{c.nombre}</span>
+                    </div>
+                    <input
+                      style={{
+                        flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6,
+                        fontSize: 13, color: "#1c1c18", minWidth: 120, fontFamily: "inherit", outline: "none",
+                      }}
+                      placeholder="Tipo de relación (ej: colabora con)"
+                      value={c.tipo_relacion}
+                      onChange={(e) => {
+                        const next = [...conexTempList];
+                        next[i] = { ...next[i], tipo_relacion: e.target.value };
+                        setConexTempList(next);
+                      }}
+                    />
+                    <input
+                      style={{
+                        flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6,
+                        fontSize: 13, color: "#1c1c18", minWidth: 120, fontFamily: "inherit", outline: "none",
+                      }}
+                      placeholder="Relación inversa (ej: es colaborado por)"
+                      value={c.tipo_relacion_inversa}
+                      onChange={(e) => {
+                        const next = [...conexTempList];
+                        next[i] = { ...next[i], tipo_relacion_inversa: e.target.value };
+                        setConexTempList(next);
+                      }}
+                    />
+                    <button onClick={() => quitarConexTemp(c.entidad_destino_id)} style={{
+                      background: "none", border: "none", color: "#c62828",
+                      cursor: "pointer", fontSize: 16, padding: 4, flexShrink: 0,
+                    }}>✕</button>
+                  </div>
+                }) : null
+              }
+              {conexTempList.length === 0 && solicitudesEnviadas.filter((s) => s.entidad_origen_id === conexModalEntidad.id).length === 0 && (
+                <div style={{ textAlign: "center", padding: 32, color: "#999", fontSize: 14 }}>
+                  No hay conexiones. Buscá entidades para conectar arriba.
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 20 }}>
+                <button
+                  type="button"
+                  onClick={() => setConexModalEntidad(null)}
+                  disabled={conexSaving}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                    cursor: "pointer", border: "1px solid #ddd", background: "transparent",
+                    padding: "10px 24px", borderRadius: 8, color: "#555",
+                  }}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={guardarConexiones}
+                  disabled={conexSaving}
+                  style={{
+                    fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+                    cursor: conexSaving ? "not-allowed" : "pointer",
+                    border: "none", background: conexSaving ? "#e0dcd0" : "#7b1fa2",
+                    padding: "10px 24px", borderRadius: 8,
+                    color: conexSaving ? "#aaa" : "#fff",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {conexSaving ? "GUARDANDO..." : "GUARDAR CONEXIONES"}
+                </button>
+              </div>
             </div>
           </div>
         )}

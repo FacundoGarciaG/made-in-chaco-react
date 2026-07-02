@@ -43,6 +43,11 @@ export const FooterComponent = ({
   const setFiltro = useMapStore((s) => s.setFiltro);
   const setFiltroLocalidad = useMapStore((s) => s.setFiltroLocalidad);
   const setDarkMode = useMapStore((s) => s.setDarkMode);
+  const historicalPanelOpen = useMapStore((s) => s.historicalPanelOpen);
+  const setHistoricalPanelOpen = useMapStore((s) => s.setHistoricalPanelOpen);
+  const capasHistoricas = useMapStore((s) => s.capasHistoricas);
+  const anyHistoricalActive = Object.values(capasHistoricas).some(Boolean);
+
 
   useEffect(() => {
     const handler = () => {
@@ -238,6 +243,23 @@ export const FooterComponent = ({
                 <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5" />
                 <line x1="12" y1="22" x2="12" y2="15.5" />
                 <polyline points="22 8.5 12 15.5 2 8.5" />
+              </svg>
+            </button>
+            <button
+              className={`footer-map__ctrl-btn ${anyHistoricalActive ? "footer-map__ctrl-btn--active" : ""}`}
+              onClick={() => setHistoricalPanelOpen(!historicalPanelOpen)}
+              aria-label="Mapa histórico"
+              title="Mapa histórico"
+              type="button"
+              style={anyHistoricalActive ? { background: "#2E7D32" } : {}}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={anyHistoricalActive ? "#fff" : "#2d1a12"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+                <line x1="12" y1="2" x2="12" y2="4" />
+                <line x1="12" y1="20" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="4" y2="12" />
+                <line x1="20" y1="12" x2="22" y2="12" />
               </svg>
             </button>
             <button

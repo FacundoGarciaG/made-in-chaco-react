@@ -1,7 +1,7 @@
-import { useRef, useState, Suspense, useEffect } from "react";
+import { useRef, useState, Suspense, useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
-import { DoubleSide, LinearMipmapLinearFilter } from "three";
+import { DoubleSide, LinearMipmapLinearFilter, Points, PointsMaterial, BufferGeometry, Float32BufferAttribute } from "three";
 
 function LogoMesh({ imgSrc, onLoad, mouse }) {
   const meshRef = useRef(null);
@@ -46,9 +46,70 @@ function LogoMesh({ imgSrc, onLoad, mouse }) {
   );
 }
 
+function Particles({ mouse }) {
+  const meshRef = useRef(null);
+  const count = 200;
+  const viewport = useThree((s) => s.viewport);
+
+  const [geometry] = useState(() => {
+    const g = new BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const radius = 0.5 + Math.random() * 2.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      positions[i * 3] = Math.sin(phi) * Math.cos(theta) * radius;
+      positions[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * radius * 0.6 + 0.1;
+      positions[i * 3 + 2] = Math.cos(phi) * radius * 0.3 - 0.5;
+      sizes[i] = 0.005 + Math.random() * 0.015;
+    }
+    g.setAttribute("position", new Float32BufferAttribute(positions, 3));
+    g.setAttribute("size", new Float32BufferAttribute(sizes, 1));
+    return g;
+  });
+
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.elapsedTime;
+    const positions = geometry.attributes.position.array;
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      const baseX = positions[i3];
+      const baseY = positions[i3 + 1];
+      const baseZ = positions[i3 + 2];
+      const offset = i * 0.1;
+      positions[i3] = baseX + Math.sin(t * 0.3 + offset) * 0.02;
+      positions[i3 + 1] = baseY + Math.cos(t * 0.4 + offset) * 0.02;
+      positions[i3 + 2] = baseZ + Math.sin(t * 0.2 + offset * 2) * 0.015;
+    }
+    geometry.attributes.position.needsUpdate = true;
+
+    const rx = mouse.current.y * 0.05;
+    const ry = mouse.current.x * 0.08;
+    meshRef.current.rotation.x += (rx - meshRef.current.rotation.x) * 0.02;
+    meshRef.current.rotation.y += (ry - meshRef.current.rotation.y) * 0.02;
+  });
+
+  return (
+    <points ref={meshRef} geometry={geometry}>
+      <pointsMaterial
+        size={0.02}
+        color="white"
+        transparent
+        opacity={0.4}
+        sizeAttenuation
+        depthWrite={false}
+        blending={2}
+      />
+    </points>
+  );
+}
+
 function Scene({ imgSrc, onLoad, mouse }) {
   return (
     <Suspense fallback={null}>
+      <Particles mouse={mouse} />
       <LogoMesh imgSrc={imgSrc} onLoad={onLoad} mouse={mouse} />
     </Suspense>
   );

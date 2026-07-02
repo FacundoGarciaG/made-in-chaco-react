@@ -17,6 +17,7 @@ import { DashboardView } from "./DashboardView";
 import logoAdm from "../assets/imagenes/logo-madeinchaco.png";
 import { SEO } from "../components/SEO";
 import { PalabrasView } from "./PalabrasView";
+import { CapasHistoricasView } from "./CapasHistoricasView";
 import { DevolucionesView } from "./DevolucionesView";
 import { EdicionesView } from "./EdicionesView";
 import { UsuariosView } from "./UsuariosView";
@@ -1367,6 +1368,7 @@ export const AdminPanel = () => {
                   { key: "entidades", label: "Entidades", count: totalEntidades },
                   { key: "recorridos", label: "Recorridos" },
                   { key: "palabras", label: "La Colección" },
+                  { key: "capas-historicas", label: "Capas Históricas" },
                 ].map((item) => (
                   <button
                     key={item.key}
@@ -2228,6 +2230,7 @@ export const AdminPanel = () => {
 
           {/* PALABRAS */}
           {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}
+          {view === "capas-historicas" && <CapasHistoricasView />}
 
           {/* PLANES */}
           {view === "planes" && <PlanesView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}

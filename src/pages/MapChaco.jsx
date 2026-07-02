@@ -11,9 +11,11 @@ import { EscHint } from "../components/map/EscHint";
 import { RecorridoPopup } from "../components/map/RecorridoPopup";
 import { SpeechBubble } from "../components/map/SpeechBubble";
 import { LocalidadDetailPanel } from "../components/map/LocalidadDetailPanel";
+import { HistoricalPanel } from "../components/map/HistoricalPanel";
 import { useMapConexiones } from "../hooks/useMapConexiones";
 import { useMapRecorridos } from "../hooks/useMapRecorridos";
-import { useMapStore } from "../store/useMapStore";
+import { useMapCapasHistoricas } from "../hooks/useMapCapasHistoricas";
+import { useMapStore, HISTORICAL_KEYS } from "../store/useMapStore";
 import { useSocketEvent } from "../hooks/useSocket";
 import { SEO } from "../components/SEO";
 
@@ -41,11 +43,15 @@ export const MapChaco = () => {
   const searchSelectToken = useMapStore((s) => s._searchSelectToken);
   const resetMapToken = useMapStore((s) => s._resetMapToken);
   const recorridoFlyToken = useMapStore((s) => s._recorridoFlyToken);
+  const histCapas = useMapStore((s) => s.capasHistoricas);
+  const histAño = useMapStore((s) => s.añoHistorico);
 
   const [localidades, setLocalidades] = useState([]);
   const [departamentos, setDepartamentos] = useState(null);
   const [provincia, setProvincia] = useState(null);
   const [showDepartamentos, setShowDepartamentos] = useState(false);
+  const [capasGeoData, setCapasGeoData] = useState(null);
+  const [historicalLayersReady, setHistoricalLayersReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showStartOverlay, setShowStartOverlay] = useState(true);
@@ -67,6 +73,7 @@ export const MapChaco = () => {
 
   const { limpiarConexiones, dibujarConexiones } = useMapConexiones(entidadCoordsRef, entidadDataRef, popupRef);
   const { limpiarRutaRecorrido, recorridoRouteDataRef, savedPuntosFilterRef, prevRecorridoRef, recorridoLayerRef, recorridoGlowLayerRef, recorridoSourceRef, routeAnimRef } = useMapRecorridos();
+  const { inicializar: initCapas, actualizar: updateCapas, limpiar: limpiarCapas } = useMapCapasHistoricas();
 
   const [socketRefresh, setSocketRefresh] = useState(0);
   useSocketEvent("entidad:change", () => setSocketRefresh((t) => t + 1));
@@ -165,6 +172,7 @@ export const MapChaco = () => {
         popupRef.current.remove();
         popupRef.current = null;
       }
+      limpiarCapas(map);
       map.remove();
       window.__mapInstance = null;
       setMapInstance(null);
@@ -344,6 +352,15 @@ export const MapChaco = () => {
         window.__geoData = geojson;
       })
       .catch((err) => console.error("Error cargando GeoJSON:", err));
+
+    // Cargar capas históricas
+    fetch("/api/capas-historicas")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setCapasGeoData(data);
+      })
+      .catch((err) => console.error("Error cargando capas históricas:", err));
+
     return () => {
       cancelled = true;
     };
@@ -361,6 +378,29 @@ export const MapChaco = () => {
     entidadCoordsRef.current = coords;
     entidadDataRef.current = data;
   }, [geoData]);
+
+  // Inicializar capas históricas cuando llegan los datos
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !capasGeoData || !showControls) return;
+    const init = () => {
+      initCapas(map, capasGeoData);
+      setHistoricalLayersReady(true);
+      updateCapas(map);
+    };
+    if (map.isStyleLoaded()) {
+      init();
+    } else {
+      map.once("idle", init);
+    }
+  }, [capasGeoData, showControls]);
+
+  // Actualizar capas históricas cuando cambian toggles o año
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !historicalLayersReady) return;
+    updateCapas(map);
+  }, [histCapas, histAño, historicalLayersReady]);
 
   // (limpiarConexiones, limpiarRutaRecorrido, dibujarConexiones movidas a hooks)
 
@@ -1893,6 +1933,8 @@ export const MapChaco = () => {
       <div ref={mapContainer} className="map-container" style={{ width: "100%", height: "100vh" }} />
 
       {showControls && provincia && <SpeechBubble mapRef={mapRef} provincia={provincia} />}
+
+      {showControls && capasGeoData && <HistoricalPanel />}
     </div>
   );
 };

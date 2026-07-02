@@ -87,15 +87,17 @@
 }
 
 .step-content h2 {
+  font-family: "Cinzel", serif;
   font-size: clamp(40px, 5vw, 72px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: #1a1a1a;
   margin: 0 0 12px;
 }
 
 .step-content .step-hint {
+  font-family: "Manrope", sans-serif;
   font-size: clamp(16px, 1.4vw, 20px);
   font-weight: 400;
   color: #777;
@@ -122,7 +124,7 @@
   border-bottom: 1px solid #e8e8e8;
   background: transparent;
   color: #1a1a1a;
-  font-family: inherit;
+  font-family: "Manrope", sans-serif;
   outline: none;
   border-radius: 0;
   transition: border-color 0.25s ease;
@@ -192,7 +194,7 @@
 }
 
 .btn {
-  font-family: inherit;
+  font-family: "Manrope", sans-serif;
   font-size: clamp(15px, 1.2vw, 18px);
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -260,6 +262,7 @@
 }
 
 .review-item-label {
+  font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
@@ -268,6 +271,7 @@
 }
 
 .review-item-value {
+  font-family: "Manrope", sans-serif;
   font-size: clamp(22px, 2.6vw, 36px);
   font-weight: 400;
   letter-spacing: -0.02em;
@@ -286,15 +290,17 @@
 }
 
 .success-screen h2 {
+  font-family: "Cinzel", serif;
   font-size: clamp(40px, 5vw, 72px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: #1a1a1a;
   margin: 0 0 16px;
 }
 
 .success-screen p {
+  font-family: "Manrope", sans-serif;
   font-size: clamp(16px, 1.4vw, 20px);
   font-weight: 400;
   color: #777;

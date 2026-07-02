@@ -33,6 +33,35 @@ header {
     box-shadow 0.3s ease;
 }
 
+.header--hero {
+  justify-content: center;
+}
+
+.header-left {
+  min-width: 0;
+  transition:
+    width 0.45s ease,
+    opacity 0.45s ease,
+    transform 0.45s ease,
+    padding 0.45s ease,
+    margin 0.45s ease;
+}
+
+.header--hero .header-left {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-30px);
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+.header--hero .menu-icon-action,
+.header--hero #menu-toggle {
+  display: none !important;
+}
+
 .header--hidden {
   opacity: 0;
   pointer-events: none;

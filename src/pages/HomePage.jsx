@@ -1,11 +1,15 @@
 import { useEffect } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuthPublico } from "../context/AuthPublicoContext";
 import { HeroComponent } from "../components/HeroComponent";
 import { PalabraDelDia } from "../components/PalabraDelDia";
 import { EntidadDelDia } from "../components/EntidadDelDia";
 import { CursorGlow } from "../components/CursorGlow";
 import { SEO } from "../components/SEO";
+import { HomeMapBlob } from "../components/HomeMapBlob";
+import { HomePalabrasBlob } from "../components/HomePalabrasBlob";
+import madeInChacoLogo from "../assets/imagenes/logo-madeinchaco.png";
 import "../styles/HomePage.css";
 
 const ScrollSection = ({ children, className = "", ...props }) => (
@@ -23,6 +27,7 @@ const ScrollSection = ({ children, className = "", ...props }) => (
 
 export const HomePage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthPublico();
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -69,26 +74,18 @@ export const HomePage = () => {
             </div>
             <div className="scroll-section__media">
               <div className="blob blob--map">
-                <div className="blob__inner">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                </div>
+                <HomeMapBlob />
               </div>
             </div>
           </div>
         </ScrollSection>
 
         <ScrollSection>
-          <div className="scroll-section__content scroll-section__content--reverse">
+          <div className="scroll-section__content">
             <div className="scroll-section__media">
               <div className="blob blob--book">
-                <div className="blob__inner">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                  </svg>
+                <div className="blob__shape">
+                  <HomePalabrasBlob />
                 </div>
               </div>
             </div>
@@ -117,7 +114,7 @@ export const HomePage = () => {
               <p className="scroll-section__body">
                 ¿Sos emprendedor, artesano o productor chaqueño? Obtené el sello que certifica tu origen y da visibilidad a tu emprendimiento. Conectá con otros actores locales y formá parte de este mapa cultural.
               </p>
-              <button className="scroll-section__btn" onClick={() => navigate("/solicitar-sello")}>
+              <button className="scroll-section__btn" onClick={() => navigate(isAuthenticated ? "/solicitar-sello" : "/iniciar-sesion")}>
                 Solicitar el sello
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" />
@@ -127,10 +124,12 @@ export const HomePage = () => {
             </div>
             <div className="scroll-section__media">
               <div className="blob blob--shield">
-                <div className="blob__inner">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
+                <div className="blob__shape">
+                  <img
+                    src={madeInChacoLogo}
+                    alt="Made in Chaco"
+                    className="blob__logo"
+                  />
                 </div>
               </div>
             </div>
@@ -162,6 +161,14 @@ export const HomePage = () => {
         <div className="home-footer">
           <div className="home-footer__divider" />
           <p className="home-footer__text">Hecho con amor por chaqueños, para el mundo.</p>
+          <div className="home-footer__icons">
+            <a href="https://www.instagram.com/madeinchacoargentina/" target="_blank" rel="noopener noreferrer">
+              <i className="ri-instagram-line"></i>
+            </a>
+            <a href="https://www.youtube.com/@MadeinChacoArgentina" target="_blank" rel="noopener noreferrer">
+              <i className="ri-youtube-line"></i>
+            </a>
+          </div>
         </div>
       </div>
     </>

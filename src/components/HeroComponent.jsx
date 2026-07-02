@@ -1,8 +1,8 @@
 import "../styles/HeroComponent.css";
 import backgroundVideo from "../assets/videos/231933_small.mp4";
-import logoHero from "../assets/imagenes/logo-madeinchaco.png";
+import logoHero from "../assets/imagenes/madeinchacoclaro.png";
 import { useRef, useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Logo3D } from "./Logo3D";
 import { TextScramble } from "./TextScramble";
 
@@ -100,9 +100,7 @@ export const HeroComponent = () => {
       <section className="hero">
         <Logo3D src={logoHero} />
         <div className="hero-text">
-          <h1 style={{ visibility: "hidden" }}>
-            <img src={logoHero} alt="" className="hero-logo-img" />
-          </h1>
+          <div className="hero-logo-spacer" />
           <p>
             <TextScramble text="Historias, sonidos y colores del secreto de Argentina" />
           </p>
@@ -130,21 +128,6 @@ export const HeroComponent = () => {
           Tu navegador no soporta video.
         </video>
       </section>
-      <div className="icons">
-        <NavLink
-          to="https://www.instagram.com/madeinchacoargentina/"
-          target="_blank"
-        >
-          <i className="ri-instagram-line"></i>
-        </NavLink>
-
-        <NavLink
-          to="https://www.youtube.com/@MadeinChacoArgentina"
-          target="_blank"
-        >
-          <i className="ri-youtube-line"></i>
-        </NavLink>
-      </div>
     </>
   );
 };

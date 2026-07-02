@@ -37,6 +37,10 @@ export const HeaderComponent = () => {
   const [showSelloModal, setShowSelloModal] = useState(false);
   const [filterPanelClosing, setFilterPanelClosing] = useState(false);
   const [rutasPanelClosing, setRutasPanelClosing] = useState(false);
+  const [isHero, setIsHero] = useState(
+    location.pathname === "/" && window.scrollY < window.innerHeight * 0.85
+  );
+  const isHomePage = location.pathname === "/";
   const navigate = useNavigate();
   const logoRef = useRef(null);
   const { perfil: perfilPublico, logout: logoutPublico, isAuthenticated: isAuthPublico } = useAuthPublico();
@@ -76,6 +80,21 @@ export const HeaderComponent = () => {
       setRecorridoActivo(null);
     }
   }, [isMapPage, setFiltro, setFiltroLocalidad, setSearchTerm, setRecorridoActivo]);
+
+  // Hero detection for home page header
+  useEffect(() => {
+    if (!isHomePage) {
+      setIsHero(false);
+      return;
+    }
+    const onScroll = () => {
+      const heroBottom = window.innerHeight * 0.85;
+      setIsHero(window.scrollY < heroBottom);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isHomePage]);
 
   const categorias = [
     { id: "todos", label: "Todos", color: "#333" },
@@ -187,7 +206,7 @@ export const HeaderComponent = () => {
   return (
     <>
       <header
-        className={`${isMapPage ? "header--map-view" : ""} ${isMapPage && !headerVisible ? "header--hidden" : ""} ${darkMode && isMapPage ? "dark-mode" : ""}`}
+        className={`${isMapPage ? "header--map-view" : ""} ${isMapPage && !headerVisible ? "header--hidden" : ""} ${darkMode && isMapPage ? "dark-mode" : ""} ${isHomePage && isHero ? "header--hero" : ""}`}
       >
         <div className="header-left">
           {/* LOGO  */}

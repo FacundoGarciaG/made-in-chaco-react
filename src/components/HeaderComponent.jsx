@@ -382,6 +382,11 @@ export const HeaderComponent = () => {
                 Quienes somos
               </NavLink>
             </li>
+            <li>
+              <NavLink to="/ranking" aria-current="page">
+                Ranking
+              </NavLink>
+            </li>
 
             <li>
               <NavLink to="/contacto" aria-current="page">
@@ -783,9 +788,16 @@ export const HeaderComponent = () => {
                 Quienes somos
               </NavLink>
               <NavLink
+                to="/ranking"
+                className="train-item"
+                style={{ transitionDelay: "0.12s" }}
+              >
+                Ranking
+              </NavLink>
+              <NavLink
                 to="/contacto"
                 className="train-item"
-                style={{ transitionDelay: "0.16s" }}
+                style={{ transitionDelay: "0.20s" }}
               >
                 Contacto
               </NavLink>
@@ -793,7 +805,7 @@ export const HeaderComponent = () => {
                 <NavLink
                   to="/solicitar-sello"
                   className="train-item"
-                  style={{ transitionDelay: "0.24s" }}
+                  style={{ transitionDelay: "0.28s" }}
                   onClick={(e) => {
                     e.preventDefault();
                     setShowSelloModal(true);
@@ -805,7 +817,7 @@ export const HeaderComponent = () => {
               <NavLink
                 to={isAuthPublico ? "/perfil" : "/iniciar-sesion"}
                 className="train-item"
-                style={{ transitionDelay: "0.32s" }}
+                style={{ transitionDelay: "0.36s" }}
               >
                 {isAuthPublico ? "Perfil" : "Ingresar"}
               </NavLink>

@@ -71,7 +71,7 @@ section {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.2);
-  font-family: var(--font-body);
+  font-family: "Cinzel", serif;
   margin: 0;
   animation: fadeInHint 2s ease 1.5s both;
 }
@@ -89,7 +89,7 @@ section {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.5);
-  font-family: var(--font-body);
+  font-family: "Cinzel", serif;
   padding: 8px 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(6px);
@@ -100,35 +100,117 @@ section {
 }
 
 .hero-btn-wrapper .discover-link {
+  --glow-color: rgba(199, 110, 60, 0.6);
   position: relative;
-  overflow: hidden;
-  padding: 0.9rem 2.2rem;
-  transition: transform 0.1s ease-out;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  background: transparent;
-  color: white;
-  cursor: pointer;
-  font-size: 1.1rem;
+  background: linear-gradient(135deg, rgba(134, 56, 25, 0.35), rgba(0, 0, 0, 0.5));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   font-family: "Cinzel", serif;
-  font-weight: 400;
-  letter-spacing: 2px;
-  border-radius: 50px;
-  transition: all 0.3s ease;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: white;
+  padding: 1.1rem 3rem;
+  border: none;
+  border-radius: 60px;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+  gap: 10px;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  text-shadow: 0 0 12px rgba(199, 110, 60, 0.5);
+  box-shadow:
+    0 0 20px rgba(199, 110, 60, 0.15),
+    0 0 60px rgba(199, 110, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: discoverPulse 3s ease-in-out infinite;
+  isolation: isolate;
+}
+
+.hero-btn-wrapper .discover-link::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 62px;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    rgba(199, 110, 60, 0.8),
+    rgba(255, 255, 255, 0.15),
+    rgba(199, 110, 60, 0.6),
+    rgba(255, 255, 255, 0.08),
+    rgba(199, 110, 60, 0.8)
+  );
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderRotate 4s linear infinite;
+  z-index: -1;
+}
+
+.hero-btn-wrapper .discover-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 60px;
+  background: linear-gradient(90deg, rgba(199, 110, 60, 0.7), rgba(255, 180, 120, 0.45));
+  transform: scaleX(0);
+  transform-origin: left center;
+  z-index: -2;
+  pointer-events: none;
 }
 
 .hero-btn-wrapper .discover-link:hover {
-  background: rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 0 30px rgba(199, 110, 60, 0.35),
+    0 0 80px rgba(199, 110, 60, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  letter-spacing: 4px;
+}
+
+.hero-btn-wrapper .discover-link:active {
+  box-shadow:
+    0 0 15px rgba(199, 110, 60, 0.4),
+    0 0 40px rgba(199, 110, 60, 0.1);
+}
+
+.hero-btn-wrapper .discover-link.hovering::after {
+  animation: discoverFill 2s linear forwards;
+}
+
+@keyframes discoverFill {
+  0%   { transform: scaleX(0); }
+  85%  { transform: scaleX(0.88); }
+  95%  { transform: scaleX(1); filter: brightness(1.4); }
+  100% { transform: scaleX(1); filter: brightness(1.15); }
+}
+
+@keyframes discoverPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(199, 110, 60, 0.15),
+      0 0 60px rgba(199, 110, 60, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(199, 110, 60, 0.25),
+      0 0 80px rgba(199, 110, 60, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+}
+
+@keyframes borderRotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .hero-btn-wrapper .discover-link span {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -317,14 +399,10 @@ section {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.hero-btn-wrapper .discover-link span::after {
-  content: "→";
-  font-size: 1.1rem;
-  transition: transform 0.3s ease;
-}
-
-.hero-btn-wrapper .discover-link:hover span::after {
-  transform: translateX(4px);
+.hero-btn-wrapper .discover-link span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .hero video {

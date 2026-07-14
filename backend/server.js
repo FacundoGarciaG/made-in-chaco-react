@@ -31,6 +31,7 @@ import suscripcionesRoutes from "./routes/suscripciones.js";
 import adminPerfilesRoutes from "./routes/admin_perfiles.js";
 import capasHistoricasRoutes from "./routes/capas_historicas.js";
 import capasHistoricasAdminRoutes from "./routes/capas_historicas_admin.js";
+import sellosRoutes from "./routes/sellos.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -107,6 +108,7 @@ app.use("/api", suscripcionesRoutes);
 app.use("/api", adminPerfilesRoutes);
 app.use("/api", capasHistoricasRoutes);
 app.use("/api", capasHistoricasAdminRoutes);
+app.use("/api", sellosRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

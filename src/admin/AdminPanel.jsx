@@ -23,6 +23,7 @@ import { EdicionesView } from "./EdicionesView";
 import { UsuariosView } from "./UsuariosView";
 import { PlanesView } from "./PlanesView";
 import { SuscripcionesView } from "./SuscripcionesView";
+import { QrAdminView } from "./QrAdminView";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -1369,6 +1370,7 @@ export const AdminPanel = () => {
                   { key: "recorridos", label: "Recorridos" },
                   { key: "palabras", label: "La Colección" },
                   { key: "capas-historicas", label: "Capas Históricas" },
+                  { key: "codigos-qr", label: "Códigos QR" },
                 ].map((item) => (
                   <button
                     key={item.key}
@@ -2227,6 +2229,13 @@ export const AdminPanel = () => {
 
           {/* EDICIONES */}
           {view === "ediciones" && <EdicionesView authFetch={authFetch} authHeaders={authHeaders} colorMapAdmin={colorMapAdmin} setPendingEdiciones={setPendingEdiciones} showConfirm={showConfirm} showPopup={showPopup} />}
+
+          {/* CÓDIGOS QR */}
+          {view === "codigos-qr" && (
+            <QrAdminView
+              entidades={allEntities}
+            />
+          )}
 
           {/* PALABRAS */}
           {view === "palabras" && <PalabrasView authFetch={authFetch} showConfirm={showConfirm} showPopup={showPopup} />}

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import { useAuthPublico } from "../context/AuthPublicoContext";
 import { SelloModal } from "../components/SelloModal";
 import { useSocketEvent } from "../hooks/useSocket";
@@ -7,6 +9,7 @@ import { useNotificationContext } from "../context/NotificationContext";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
 import { SEO } from "../components/SEO";
 import { publicAuthFetch } from "../helpers/publicAuthFetch";
+import "../styles/QrPrint.css";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -698,6 +701,18 @@ export const PerfilPage = () => {
   const [adquiriendo, setAdquiriendo] = useState(false);
   const [customDias, setCustomDias] = useState(1);
 
+  // QR codes state
+  const [qrEntidadSeleccionada, setQrEntidadSeleccionada] = useState(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [qrStats, setQrStats] = useState({});
+
+  // Sellos collection state
+  const [sellos, setSellos] = useState([]);
+  const [loadingSellos, setLoadingSellos] = useState(false);
+  const [totalPuntos, setTotalPuntos] = useState(0);
+  const [logros, setLogros] = useState([]);
+  const [loadingLogros, setLoadingLogros] = useState(false);
+
   const { unreadCount, fetchUnreadCount } = useNotificationContext();
 
   useEffect(() => {
@@ -926,8 +941,46 @@ export const PerfilPage = () => {
     }
   }, [getToken]);
 
+  const fetchSellos = useCallback(async () => {
+    setLoadingSellos(true);
+    try {
+      const res = await publicAuthFetch("/api/sellos/mis-sellos", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSellos(data.sellos || []);
+        setTotalPuntos(data.total_puntos || 0);
+      }
+    } catch {} finally {
+      setLoadingSellos(false);
+    }
+  }, [getToken]);
+
+  const fetchLogros = useCallback(async () => {
+    setLoadingLogros(true);
+    try {
+      const res = await publicAuthFetch("/api/sellos/logros", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setLogros(await res.json());
+    } catch {} finally {
+      setLoadingLogros(false);
+    }
+  }, [getToken]);
+
+  const fetchQrStats = useCallback(async (entidadId) => {
+    try {
+      const res = await fetch(`/api/sellos/stats/${entidadId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setQrStats((prev) => ({ ...prev, [entidadId]: data }));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    if (section === "solicitudes" || section === "entidades" || section === "suscripciones") {
+    if (section === "solicitudes" || section === "entidades" || section === "suscripciones" || section === "qr-codigos") {
       fetchEntidades();
     }
     if (section === "favoritos") {
@@ -943,7 +996,14 @@ export const PerfilPage = () => {
     if (section === "solicitudes-conexion") {
       fetchSolicitudesConex();
     }
-  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos, fetchSolicitudesConex, fetchUnreadCount]);
+    if (section === "mis-sellos") {
+      fetchSellos();
+      fetchLogros();
+    }
+    if (section === "qr-codigos" && qrEntidadSeleccionada) {
+      fetchQrStats(qrEntidadSeleccionada.id);
+    }
+  }, [section, fetchEntidades, fetchFavoritos, fetchNotificaciones, fetchPlanes, fetchPagos, fetchSolicitudesConex, fetchUnreadCount, fetchSellos, fetchLogros, fetchQrStats, qrEntidadSeleccionada]);
 
   useSocketEvent("notificacion:nueva", () => {
     fetchNotificaciones();
@@ -1255,6 +1315,8 @@ export const PerfilPage = () => {
     { key: "solicitar-sello", label: "Solicitar sello", icon: "→" },
     { key: "solicitudes", label: "Mis Solicitudes", icon: "→" },
     { key: "entidades", label: "Mis Entidades", icon: "→" },
+    { key: "qr-codigos", label: "Códigos QR", icon: "→" },
+    { key: "mis-sellos", label: "Mis Sellos", icon: "→" },
     { key: "solicitudes-conexion", label: "Conexiones", icon: "→" },
     { key: "suscripciones", label: "Planes", icon: "→" },
     { key: "favoritos", label: "Mis Favoritos", icon: "→" },
@@ -1824,6 +1886,475 @@ export const PerfilPage = () => {
                         </div>
                       ))}
                   </div>
+                )}
+              </>
+            )}
+
+            {/* === QR CODES SECTION === */}
+            {section === "qr-codigos" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 8px", letterSpacing: "-0.02em",
+                }}>
+                  Códigos QR
+                </h2>
+                <p style={{ fontSize: 14, color: "#888", margin: "0 0 32px", lineHeight: 1.6 }}>
+                  Generá códigos QR para tus entidades. Imprimilos y pegalos en tu local para que los visitantes escaneen y conozcan tu historia.
+                </p>
+
+                {loadingEntidades ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando...</p>
+                ) : entidades.filter((e) => e.estado_sello === "aprobado").length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>
+                    No tenés entidades aprobadas para generar QR.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    {/* Entity selector */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {entidades
+                        .filter((e) => e.estado_sello === "aprobado")
+                        .map((e) => {
+                          const isSelected = qrEntidadSeleccionada?.id === e.id;
+                          const catColor = TIPO_COLOR[e.tipo] || "#863819";
+                          return (
+                            <button
+                              key={e.id}
+                              type="button"
+                              onClick={() => {
+                                setQrEntidadSeleccionada(isSelected ? null : e);
+                                if (!isSelected) fetchQrStats(e.id);
+                              }}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 12,
+                                padding: "14px 18px", border: `2px solid ${isSelected ? catColor : "#e0dcd0"}`,
+                                borderRadius: 10, background: isSelected ? `${catColor}08` : "#fcf9f4",
+                                cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              <img
+                                src={e.icono || `/icons/${e.tipo}.png`}
+                                alt=""
+                                style={{ width: 24, height: 24, borderRadius: 4, objectFit: "contain" }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: "#1c1c18" }}>{e.nombre}</span>
+                                <span style={{
+                                  display: "inline-block", marginLeft: 8,
+                                  fontSize: 11, fontWeight: 600, color: catColor,
+                                  letterSpacing: "0.04em", textTransform: "uppercase",
+                                }}>
+                                  {TIPOS_LABEL[e.tipo] || e.tipo}
+                                </span>
+                              </div>
+                              <span style={{
+                                fontSize: 13, color: isSelected ? catColor : "#bbb",
+                                transition: "color 0.2s",
+                              }}>
+                                {isSelected ? "−" : "+"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {/* QR display */}
+                    {qrEntidadSeleccionada && (
+                      <div style={{
+                        display: "flex", flexDirection: "column", alignItems: "center",
+                        padding: "32px 24px", background: "#fcf9f4", border: "1px solid #e0dcd0",
+                        borderRadius: 16, gap: 20,
+                      }}>
+                        <div style={{ textAlign: "center" }}>
+                          <img
+                            src={qrEntidadSeleccionada.icono || `/icons/${qrEntidadSeleccionada.tipo}.png`}
+                            alt=""
+                            style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", marginBottom: 8 }}
+                          />
+                          <h3 style={{
+                            fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                            color: "#1c1c18", margin: 0,
+                          }}>
+                            {qrEntidadSeleccionada.nombre}
+                          </h3>
+                        </div>
+
+                        {/* QR Code */}
+                        <div style={{
+                          padding: 20, background: "#fff", borderRadius: 16,
+                          border: "1px solid #e0dcd0", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                        }}>
+                          <QRCodeSVG
+                            value={`${window.location.origin}/qr/${qrEntidadSeleccionada.slug}`}
+                            size={200}
+                            bgColor="#ffffff"
+                            fgColor="#1c1c18"
+                            level="H"
+                            includeMargin={false}
+                          />
+                        </div>
+
+                        <p style={{ fontSize: 13, color: "#888", textAlign: "center", margin: 0, maxWidth: 300, lineHeight: 1.5 }}>
+                          Escaneá para ver la ficha animada de esta entidad
+                        </p>
+
+                        {/* Stats */}
+                        {qrStats[qrEntidadSeleccionada.id] && (
+                          <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
+                            <div style={{ textAlign: "center" }}>
+                              <span style={{ display: "block", fontSize: 22, fontWeight: 700, color: "#863819", fontFamily: "Cinzel, serif" }}>
+                                {qrStats[qrEntidadSeleccionada.id].unique_users}
+                              </span>
+                              <span style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                Sellos coleccionados
+                              </span>
+                            </div>
+                            <div style={{ textAlign: "center" }}>
+                              <span style={{ display: "block", fontSize: 22, fontWeight: 700, color: "#863819", fontFamily: "Cinzel, serif" }}>
+                                {qrStats[qrEntidadSeleccionada.id].total_scans}
+                              </span>
+                              <span style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                Total escaneos
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowPrintModal(true)}
+                            style={{
+                              fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                              cursor: "pointer", border: "none", background: "#863819",
+                              padding: "12px 28px", borderRadius: 10, color: "#fff",
+                              letterSpacing: "0.02em", transition: "background 0.2s",
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "#6b2d13"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "#863819"}
+                          >
+                            Imprimir en A4
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => window.open(`/qr/${qrEntidadSeleccionada.slug}`, "_blank")}
+                            style={{
+                              fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                              cursor: "pointer", border: "1px solid #e0dcd0", background: "transparent",
+                              padding: "12px 28px", borderRadius: 10, color: "#555",
+                              letterSpacing: "0.02em", transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f2e8"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                          >
+                            Ver vista de escaneo
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Print Modal */}
+                {showPrintModal && qrEntidadSeleccionada && (
+                  <>
+                    <div className="qr-print-overlay" onClick={() => setShowPrintModal(false)}>
+                      <div className="qr-print-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="qr-print-modal-header">
+                          <h3>Imprimir código QR</h3>
+                          <button
+                            className="qr-print-modal-close"
+                            onClick={() => setShowPrintModal(false)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="qr-print-preview">
+                          <p style={{ fontSize: 14, color: "#666", textAlign: "center", margin: 0, lineHeight: 1.6 }}>
+                            Se abrirá la diálogo de impresión del navegador.<br />
+                            Seleccioná "Guardar como PDF" para descargar el archivo.
+                          </p>
+                        </div>
+                        <button
+                          className="qr-print-btn"
+                          onClick={() => window.print()}
+                        >
+                          Imprimir
+                        </button>
+                      </div>
+                    </div>
+                    {/* A4 print sheet — portal to body for consistent print layout */}
+                    {createPortal(
+                      <div className="qr-print-a4" id="qr-print-area">
+                        <div className="qr-print-a4-bar" />
+
+                        <div className="qr-print-a4-hero">
+                          <img
+                            className="qr-print-a4-hero-img"
+                            src="/imagenes/logo-madeinchaco.png"
+                            alt="Made in Chaco"
+                          />
+                          <span className="qr-print-a4-brand-sub">Hecho en Chaco · Hecho con orgullo</span>
+                        </div>
+
+                        <div className="qr-print-a4-content">
+                          <img
+                            className="qr-print-a4-entity-icon"
+                            src={qrEntidadSeleccionada.icono || `/icons/${qrEntidadSeleccionada.tipo}.png`}
+                            alt=""
+                          />
+                          <h2 className="qr-print-a4-entity-name">{qrEntidadSeleccionada.nombre}</h2>
+                          <span
+                            className="qr-print-a4-entity-type"
+                            style={{ background: TIPO_COLOR[qrEntidadSeleccionada.tipo] || "#863819" }}
+                          >
+                            {TIPOS_LABEL[qrEntidadSeleccionada.tipo] || qrEntidadSeleccionada.tipo}
+                          </span>
+
+                          <div className="qr-print-a4-qr-section">
+                            <div className="qr-print-a4-qr-corners">
+                              <span /><span /><span /><span />
+                            </div>
+                            <div className="qr-print-a4-qr-frame">
+                              <QRCodeSVG
+                                value={`${window.location.origin}/qr/${qrEntidadSeleccionada.slug}`}
+                                size={220}
+                                bgColor="#ffffff"
+                                fgColor="#1c1c18"
+                                level="H"
+                                includeMargin={false}
+                              />
+                            </div>
+                          </div>
+
+                          {qrEntidadSeleccionada.resumen && (
+                            <p className="qr-print-a4-entity-summary">
+                              {qrEntidadSeleccionada.resumen}
+                            </p>
+                          )}
+
+                          <p className="qr-print-a4-scan-text">Escaneá el código para conocer mi historia</p>
+                          <p className="qr-print-a4-scan-sub">Descubrí productos, sabores y experiencias únicas del Chaco</p>
+                        </div>
+
+                        <div className="qr-print-a4-footer">
+                          <span className="qr-print-a4-footer-line" />
+                          <span className="qr-print-a4-footer-text">Made in Chaco</span>
+                          <span className="qr-print-a4-footer-dot" />
+                          <span className="qr-print-a4-footer-text">www.madeinchaco.com.ar</span>
+                          <span className="qr-print-a4-footer-line" />
+                        </div>
+
+                        <div className="qr-print-a4-bar" />
+                      </div>,
+                      document.body
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* === MI COLECCIÓN DE SELLOS === */}
+            {section === "mis-sellos" && (
+              <>
+                <div style={sDivider} />
+                <h2 style={{
+                  fontFamily: "Cinzel, serif", fontSize: 26, fontWeight: 600,
+                  color: "#1c1c18", margin: "0 0 8px", letterSpacing: "-0.02em",
+                }}>
+                  Mis Sellos
+                </h2>
+                <p style={{ fontSize: 14, color: "#888", margin: "0 0 24px", lineHeight: 1.6 }}>
+                  Escaneá códigos QR de entidades en persona para coleccionar sellos y ganar puntos.
+                </p>
+
+                {/* Stats summary */}
+                {sellos.length > 0 && (
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12,
+                    marginBottom: 28,
+                  }}>
+                    <div style={{
+                      padding: "16px", background: "#fcf9f4", border: "1px solid #e0dcd0",
+                      borderRadius: 12, textAlign: "center",
+                    }}>
+                      <span style={{ display: "block", fontSize: 28, fontWeight: 800, color: "#863819", fontFamily: "Cinzel, serif" }}>
+                        {sellos.length}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        Sellos
+                      </span>
+                    </div>
+                    <div style={{
+                      padding: "16px", background: "#fcf9f4", border: "1px solid #e0dcd0",
+                      borderRadius: 12, textAlign: "center",
+                    }}>
+                      <span style={{ display: "block", fontSize: 28, fontWeight: 800, color: "#863819", fontFamily: "Cinzel, serif" }}>
+                        {totalPuntos}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        Puntos
+                      </span>
+                    </div>
+                    <div style={{
+                      padding: "16px", background: "#fcf9f4", border: "1px solid #e0dcd0",
+                      borderRadius: 12, textAlign: "center",
+                    }}>
+                      <span style={{ display: "block", fontSize: 28, fontWeight: 800, color: "#863819", fontFamily: "Cinzel, serif" }}>
+                        {logros.filter((l) => l.desbloqueado).length}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        Logros
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Link to ranking */}
+                <a
+                  href="/ranking"
+                  onClick={(e) => { e.preventDefault(); navigate("/ranking"); }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "14px 18px", background: "#fffdf8", border: "1px solid #e0dcd0",
+                    borderRadius: 10, marginBottom: 28, cursor: "pointer",
+                    textDecoration: "none", transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#863819"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e0dcd0"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>🏆</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18" }}>Ver ranking de exploradores</span>
+                  </div>
+                  <span style={{ fontSize: 16, color: "#863819" }}>→</span>
+                </a>
+
+                {/* Logros */}
+                {logros.length > 0 && !loadingLogros && (
+                  <div style={{ marginBottom: 32 }}>
+                    <h3 style={{
+                      fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                      color: "#1c1c18", margin: "0 0 14px", letterSpacing: "-0.01em",
+                    }}>
+                      Logros
+                    </h3>
+                    <div style={{
+                      display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10,
+                    }}>
+                      {logros.map((logro) => (
+                        <div key={logro.id} style={{
+                          padding: "14px 12px", borderRadius: 10,
+                          border: `1px solid ${logro.desbloqueado ? "#863819" : "#e8e4da"}`,
+                          background: logro.desbloqueado ? "#fffdf8" : "#f9f7f2",
+                          opacity: logro.desbloqueado ? 1 : 0.5,
+                          textAlign: "center", transition: "all 0.2s ease",
+                        }}>
+                          <span style={{ display: "block", fontSize: 28, marginBottom: 6 }}>
+                            {logro.icono}
+                          </span>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: "#1c1c18", margin: 0, fontFamily: "Cinzel, serif" }}>
+                            {logro.nombre}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0", lineHeight: 1.4 }}>
+                            {logro.descripcion}
+                          </p>
+                          {logro.desbloqueado && (
+                            <span style={{
+                              display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700,
+                              color: "#863819", letterSpacing: "0.04em",
+                            }}>
+                              ✓ DESBLOQUEADO
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sellos grid */}
+                {loadingSellos ? (
+                  <p style={{ color: "#aaa", fontSize: 14 }}>Cargando sellos...</p>
+                ) : sellos.length === 0 ? (
+                  <div style={{
+                    textAlign: "center", padding: "48px 24px", background: "#fcf9f4",
+                    border: "1px solid #e0dcd0", borderRadius: 16,
+                  }}>
+                    <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>◇</div>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "#1c1c18", margin: "0 0 8px", fontFamily: "Cinzel, serif" }}>
+                      Sin sellos todavía
+                    </p>
+                    <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.5 }}>
+                      Escaneá códigos QR de entidades desde tu celular para empezar a coleccionar.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <h3 style={{
+                      fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 600,
+                      color: "#1c1c18", margin: "0 0 14px", letterSpacing: "-0.01em",
+                    }}>
+                      Mis sellos ({sellos.length})
+                    </h3>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                      gap: 16,
+                    }}>
+                      {sellos.map((sello) => {
+                        const selloColor = TIPO_COLOR[sello.tipo] || "#863819";
+                        return (
+                          <div key={sello.id} style={{
+                            padding: "20px 16px", background: "#fcf9f4",
+                            border: "1px solid #e0dcd0", borderRadius: 12,
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+                            textAlign: "center", transition: "all 0.2s ease",
+                          }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.boxShadow = `0 8px 30px ${selloColor}15`;
+                              e.currentTarget.style.borderColor = selloColor;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.boxShadow = "none";
+                              e.currentTarget.style.borderColor = "#e0dcd0";
+                            }}
+                          >
+                            <div style={{
+                              width: 48, height: 48, borderRadius: 12,
+                              background: `${selloColor}15`, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                            }}>
+                              <span style={{ fontSize: 22, color: selloColor }}>✦</span>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c18", margin: 0 }}>
+                                {sello.nombre}
+                              </p>
+                              <span style={{
+                                fontSize: 11, fontWeight: 600, color: selloColor,
+                                letterSpacing: "0.04em", textTransform: "uppercase",
+                              }}>
+                                {sello.tipo}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: "#863819" }}>
+                                +{sello.puntos || 10} pts
+                              </span>
+                              <span style={{ fontSize: 11, color: "#aaa" }}>
+                                {new Date(sello.scanned_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </>
             )}

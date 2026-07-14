@@ -4,7 +4,7 @@
   padding: 0;
   margin: 0;
   box-sizing: border-box;
-  font-family: "Merriweather", serif;
+  font-family: inherit;
   list-style: none;
   text-decoration: none;
   color: white;
@@ -52,6 +52,11 @@ body {
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior: none;
+}
+
+#root {
+  overscroll-behavior: none;
 }
 
 /* === FULLSCREEN TOGGLE (global) === */

@@ -66,7 +66,7 @@ export const HomePage = () => {
               </p>
               <button className="scroll-section__btn" onClick={() => navigate("/descubre")}>
                 Explorar el mapa
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1c1c18" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
@@ -116,7 +116,7 @@ export const HomePage = () => {
               </p>
               <button className="scroll-section__btn" onClick={() => navigate(isAuthenticated ? "/solicitar-sello" : "/iniciar-sesion")}>
                 Solicitar el sello
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1c1c18" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>

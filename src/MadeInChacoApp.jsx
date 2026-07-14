@@ -30,6 +30,8 @@ const OlvidarContrasenaPage = lazy(() => import("./pages/OlvidarContrasenaPage")
 const ReestablecerContrasenaPage = lazy(() => import("./pages/ReestablecerContrasenaPage").then(m => ({ default: m.ReestablecerContrasenaPage })));
 const PerfilPage = lazy(() => import("./pages/PerfilPage").then(m => ({ default: m.PerfilPage })));
 const VerificarCuentaPage = lazy(() => import("./pages/VerificarCuentaPage").then(m => ({ default: m.VerificarCuentaPage })));
+const QrScanPage = lazy(() => import("./pages/QrScanPage").then(m => ({ default: m.QrScanPage })));
+const RankingPage = lazy(() => import("./pages/RankingPage").then(m => ({ default: m.RankingPage })));
 
 function RouteFallback() {
   return (
@@ -97,6 +99,8 @@ function MadeInChacoApp() {
             <Route path="/reestablecer-contrasena/:token" element={<ReestablecerContrasenaPage />} />
             <Route path="/perfil" element={<PerfilPage />} />
             <Route path="/verificar/:token" element={<VerificarCuentaPage />} />
+            <Route path="/qr/:slug" element={<QrScanPage />} />
+            <Route path="/ranking" element={<RankingPage />} />
             <Route path="/palabra/:id" element={<PalabraDetallePage />} />
             <Route path="/wikia" element={<WikiaPage />} />
             <Route path="/wikia/:slug" element={<PalabraDetallePage />} />

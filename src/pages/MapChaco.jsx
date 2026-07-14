@@ -45,6 +45,7 @@ export const MapChaco = () => {
   const recorridoFlyToken = useMapStore((s) => s._recorridoFlyToken);
   const histCapas = useMapStore((s) => s.capasHistoricas);
   const histAño = useMapStore((s) => s.añoHistorico);
+  const anyHistoricalActive = useMapStore((s) => Object.values(s.capasHistoricas).some(Boolean));
 
   const [localidades, setLocalidades] = useState([]);
   const [departamentos, setDepartamentos] = useState(null);
@@ -155,7 +156,7 @@ export const MapChaco = () => {
       const target = JSON.parse(flyTarget);
       sessionStorage.removeItem("flyToTarget");
       map.once("style.load", () => {
-        map.flyTo({
+        flyToLocked({
           center: target.center,
           zoom: target.zoom || 14,
           speed: 0.3,
@@ -188,6 +189,59 @@ export const MapChaco = () => {
     };
   }, []);
 
+  // Helpers para bloquear/desbloquear interacciones durante flyTo/easeTo/fitBounds
+  const disableMapInteractions = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.boxZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoomRotate.disable();
+  }, []);
+
+  const enableMapInteractions = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.boxZoom.enable();
+    map.doubleClickZoom.enable();
+    map.touchZoomRotate.enable();
+  }, []);
+
+  const animLockRef = useRef(null);
+
+  const flyToLocked = useCallback((opts) => {
+    const map = mapRef.current;
+    if (!map) return;
+    disableMapInteractions();
+    if (animLockRef.current) clearTimeout(animLockRef.current);
+    map.flyTo(opts);
+    const duration = opts.duration || 1000;
+    animLockRef.current = setTimeout(() => enableMapInteractions(), duration + 200);
+  }, [disableMapInteractions, enableMapInteractions]);
+
+  const easeToLocked = useCallback((opts) => {
+    const map = mapRef.current;
+    if (!map) return;
+    disableMapInteractions();
+    if (animLockRef.current) clearTimeout(animLockRef.current);
+    map.easeTo(opts);
+    const duration = opts.duration || 1000;
+    animLockRef.current = setTimeout(() => enableMapInteractions(), duration + 200);
+  }, [disableMapInteractions, enableMapInteractions]);
+
+  const fitBoundsLocked = useCallback((bounds, opts) => {
+    const map = mapRef.current;
+    if (!map) return;
+    disableMapInteractions();
+    if (animLockRef.current) clearTimeout(animLockRef.current);
+    map.fitBounds(bounds, opts);
+    const duration = (opts && opts.duration) || 1000;
+    animLockRef.current = setTimeout(() => enableMapInteractions(), duration + 200);
+  }, [disableMapInteractions, enableMapInteractions]);
+
   // Mantener refs actualizadas para usar en event handlers del mapa
   useEffect(() => {
     filtroRef.current = filtro;
@@ -207,11 +261,7 @@ export const MapChaco = () => {
     introStartedRef.current = true;
 
     // 1. BLOQUEAR interacción del usuario
-    map.dragPan.disable();
-    map.scrollZoom.disable();
-    map.boxZoom.disable();
-    map.doubleClickZoom.disable();
-    map.touchZoomRotate.disable();
+    disableMapInteractions();
 
     // Crear elemento de audio
     const audio = new Audio("/audios/Intro.wav");
@@ -262,11 +312,7 @@ export const MapChaco = () => {
       canvas.style.transition = "none";
       map.off("move", onMove);
 
-      map.dragPan.enable();
-      map.scrollZoom.enable();
-      map.boxZoom.enable();
-      map.doubleClickZoom.enable();
-      map.touchZoomRotate.enable();
+      enableMapInteractions();
 
       if (map.getLayer("capa-puntos")) {
         map.setLayoutProperty("capa-puntos", "visibility", "visible");
@@ -284,7 +330,7 @@ export const MapChaco = () => {
         setHeaderVisible(true);
       }, 100);
     });
-  }, []);
+  }, [disableMapInteractions, enableMapInteractions]);
 
   // Función para iniciar la experiencia
   const handleStartExperience = () => {
@@ -402,6 +448,34 @@ export const MapChaco = () => {
     updateCapas(map);
   }, [histCapas, histAño, historicalLayersReady]);
 
+  // Transformar el mapa al activar modo histórico: ocultar entidades y aplicar filtro vintage
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const canvas = map.getCanvas();
+
+    if (anyHistoricalActive) {
+      if (map.getLayer("capa-puntos")) {
+        map.setLayoutProperty("capa-puntos", "visibility", "none");
+      }
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+      limpiarConexiones(map);
+      setEntityActive(false);
+      canvas.style.filter = "sepia(0.5) saturate(0.7) brightness(0.85) contrast(1.15)";
+      canvas.style.transition = "filter 0.8s ease";
+    } else {
+      if (map.getLayer("capa-puntos")) {
+        map.setLayoutProperty("capa-puntos", "visibility", "visible");
+      }
+      canvas.style.filter = "";
+      canvas.style.transition = "";
+    }
+  }, [anyHistoricalActive, limpiarConexiones]);
+
   // (limpiarConexiones, limpiarRutaRecorrido, dibujarConexiones movidas a hooks)
 
   // 3. Efecto para manejar el zoom cuando se selecciona una localidad
@@ -419,7 +493,7 @@ export const MapChaco = () => {
         (loc) => loc.id === parseInt(filtroLocalidad),
       );
       if (localidad) {
-        map.flyTo({
+        flyToLocked({
           center: [localidad.longitud, localidad.latitud],
           zoom: 12,
           essential: true,
@@ -428,7 +502,7 @@ export const MapChaco = () => {
       }
     } else {
       // Volver al zoom original de la provincia
-        map.flyTo({
+        flyToLocked({
           center: [-60.44, -26],
           zoom: 7,
           essential: true,
@@ -716,7 +790,7 @@ export const MapChaco = () => {
 
           // Segundo click → zoom cercano siempre
           if (isSameEntity) {
-            map.easeTo({
+            easeToLocked({
               center: coordinates,
               zoom: 14,
               duration: 2500,
@@ -733,10 +807,10 @@ export const MapChaco = () => {
               const otherCoords = lookup[otherId];
               if (otherCoords) bounds.extend(otherCoords);
             }
-            map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
+            fitBoundsLocked(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
           } else {
             // Primer click sin conexiones → zoom cercano
-            map.easeTo({
+            easeToLocked({
               center: coordinates,
               zoom: 14,
               duration: 2500,
@@ -1134,7 +1208,7 @@ export const MapChaco = () => {
       const otherCoords = lookup[otherId];
       if (otherCoords) bounds.extend(otherCoords);
     }
-    map.fitBounds(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
+    fitBoundsLocked(bounds, { padding: 120, maxZoom: 15, speed: 0.5 });
 
     const {
       nombre: n,
@@ -1458,7 +1532,7 @@ export const MapChaco = () => {
       // Fit bounds to all route entities
       const bounds = new mapboxgl.LngLatBounds();
       routeCoords.forEach((c) => bounds.extend(c));
-      map.fitBounds(bounds, { padding: 120, maxZoom: 14, speed: 0.8 });
+      fitBoundsLocked(bounds, { padding: 120, maxZoom: 14, speed: 0.8 });
 
       // Mostrar popup del recorrido tras el zoom
       map.once("moveend", () => {
@@ -1505,7 +1579,7 @@ export const MapChaco = () => {
         setRecorridoActivo(null);
         limpiarRutaRecorrido(map);
         // Volar a la vista general de Chaco
-        map.flyTo({
+        flyToLocked({
           center: [-60.44, -26.05],
           zoom: 7,
           speed: 0.8,
@@ -1534,7 +1608,7 @@ export const MapChaco = () => {
     setTerminoBusqueda("");
     setRecorridoActivo(null);
     limpiarRutaRecorrido(map);
-    map.flyTo({
+    flyToLocked({
       center: [-60.44, -26.05],
       zoom: 7,
       speed: 0.8,
@@ -1545,7 +1619,7 @@ export const MapChaco = () => {
   const handleRecorridoFly = useCallback(() => {
     const map = mapRef.current;
     if (map) {
-      map.flyTo({
+      flyToLocked({
         center: [-60.44, -26.05],
         zoom: 7,
         speed: 0.8,

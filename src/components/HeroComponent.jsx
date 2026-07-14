@@ -5,12 +5,14 @@ import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo3D } from "./Logo3D";
 import { TextScramble } from "./TextScramble";
+import { useMapStore } from "../store/useMapStore";
 
 export const HeroComponent = () => {
   const [hovering, setHovering] = useState(false);
   const timeoutRef = useRef(null);
   const btnRef = useRef(null);
   const navigate = useNavigate();
+  const setHeaderVisible = useMapStore((s) => s.setHeaderVisible);
   const [entidadCount, setEntidadCount] = useState(null);
   const countRef = useRef(null);
   const [displayCount, setDisplayCount] = useState(0);
@@ -61,6 +63,8 @@ export const HeroComponent = () => {
   const startRedirect = () => {
     setHovering(true);
     timeoutRef.current = setTimeout(() => {
+      sessionStorage.removeItem("return-to-map");
+      setHeaderVisible(false);
       navigate("/descubre");
     }, 2000);
   };
@@ -114,9 +118,9 @@ export const HeroComponent = () => {
             onMouseLeave={cancelRedirect}
             onTouchStart={startRedirect}
             onTouchEnd={cancelRedirect}
-            onClick={() => navigate("/descubre")}
+            onClick={() => { sessionStorage.removeItem("return-to-map"); setHeaderVisible(false); navigate("/descubre"); }}
           >
-            <span>Descubrir el mapa</span>
+            <span>Descubrir el mapa →</span>
           </button>
           <p className="hero-hint">Presioná o mantené el mouse 2 segundos para explorar</p>
         </div>

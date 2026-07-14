@@ -322,6 +322,7 @@ const inputStyle = {
   boxSizing: "border-box",
   fontFamily: "inherit",
   background: "#fff",
+  color: "#1c1c18",
 };
 
 const btnPrimary = {
@@ -362,6 +363,7 @@ const thStyle = {
 const tdStyle = {
   padding: "10px",
   verticalAlign: "middle",
+  color: "#1c1c18",
 };
 
 const actionBtn = {

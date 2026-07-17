@@ -11,7 +11,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "cd backend && node server.js",
-    "postinstall": "cd backend && npm install"
+    "postinstall": "cd backend && npm install",
+    "db:migrate": "node backend/db/migrate.js",
+    "db:migrate:status": "node backend/db/migrate.js --status",
+    "db:migrate:init": "node backend/db/migrate.js --init"
   },
   "dependencies": {
     "mapbox-gl": "^3.20.0",

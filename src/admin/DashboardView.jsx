@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { styles, colorMapAdmin, authHeaders } from "./helpers";
 
 export function DashboardView({ authFetch }) {
@@ -6,6 +6,15 @@ export function DashboardView({ authFetch }) {
   const [diario, setDiario] = useState(null);
   const [top10Dia, setTop10Dia] = useState(null);
   const [hoverIdx, setHoverIdx] = useState(null);
+
+  const [entidadDiaModo, setEntidadDiaModo] = useState("auto");
+  const [entidadDiaId, setEntidadDiaId] = useState(null);
+  const [entidadDiaNombre, setEntidadDiaNombre] = useState("");
+  const [entidadSearch, setEntidadSearch] = useState("");
+  const [entidadResults, setEntidadResults] = useState([]);
+  const [entidadSearching, setEntidadSearching] = useState(false);
+  const [configGuardada, setConfigGuardada] = useState(false);
+  const searchTimerRef = useRef(null);
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -22,18 +31,85 @@ export function DashboardView({ authFetch }) {
     } catch {}
   }, [authFetch]);
 
+  const cargarConfig = useCallback(async () => {
+    try {
+      const r = await authFetch("/api/admin/site-config", { headers: authHeaders() });
+      if (r.ok) {
+        const cfg = await r.json();
+        const modo = cfg.entidad_dia_modo;
+        if (modo === "off" || modo === "manual" || modo === "auto") {
+          setEntidadDiaModo(modo);
+        }
+        if (cfg.entidad_dia_entidad_id && cfg.entidad_dia_entidad_id !== null) {
+          setEntidadDiaId(cfg.entidad_dia_entidad_id);
+          try {
+            const er = await authFetch(`/api/admin/entidades-buscar?id=${cfg.entidad_dia_entidad_id}`, { headers: authHeaders() });
+            if (er.ok) {
+              const results = await er.json();
+              if (results.length > 0) setEntidadDiaNombre(results[0].nombre);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }, [authFetch]);
+
   useEffect(() => {
     cargarDatos();
+    cargarConfig();
     const timeout = setTimeout(() => {
       setResumen((prev) => prev ?? { totales: 0, hoy: 0, semana: 0, mes: 0, porTipo: [], top10: [] });
       setDiario((prev) => prev ?? []);
     }, 8000);
     return () => clearTimeout(timeout);
-  }, [cargarDatos]);
+  }, [cargarDatos, cargarConfig]);
 
   if (!resumen) {
     return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando dashboard…</div>;
   }
+
+  const handleEntidadSearch = (val) => {
+    setEntidadSearch(val);
+    setEntidadResults([]);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (val.length < 1) return;
+    setEntidadSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const r = await authFetch(`/api/admin/entidades-buscar?q=${encodeURIComponent(val)}`, { headers: authHeaders() });
+        if (r.ok) setEntidadResults(await r.json());
+      } catch {}
+      setEntidadSearching(false);
+    }, 300);
+  };
+
+  const seleccionarEntidad = (ent) => {
+    setEntidadDiaId(ent.id);
+    setEntidadDiaNombre(ent.nombre);
+    setEntidadSearch("");
+    setEntidadResults([]);
+  };
+
+  const guardarConfigEntidadDia = async () => {
+    try {
+      const r1 = await authFetch("/api/admin/site-config", {
+        method: "PUT",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "entidad_dia_modo", value: entidadDiaModo }),
+      });
+      if (!r1.ok) return;
+      if (entidadDiaModo === "manual") {
+        const r2 = await authFetch("/api/admin/site-config", {
+          method: "PUT",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "entidad_dia_entidad_id", value: entidadDiaId }),
+        });
+        if (!r2.ok) return;
+      }
+      setConfigGuardada(true);
+      setTimeout(() => setConfigGuardada(false), 2000);
+    } catch {}
+  };
 
   const maxVisitas = Math.max(...(resumen.top10?.map((e) => e.visitas) || [1]));
   const maxDiario = Math.max(...(diario?.map((d) => d.total) || [1]));
@@ -65,6 +141,125 @@ export function DashboardView({ authFetch }) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ENTIDAD DEL DÍA - CONFIGURACIÓN */}
+      <div style={{ background: "white", borderRadius: 12, border: "1px solid #eee", padding: 20, marginBottom: 32 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#863819", margin: "0 0 16px", letterSpacing: "0.5px" }}>
+          Entidad del día
+        </h3>
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
+          {/* MODOS */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { value: "auto", label: "Automática", desc: "Entidad más visitada del día (mín. 3 clicks)" },
+              { value: "manual", label: "Manual", desc: "Elegir una entidad para mostrar" },
+              { value: "off", label: "Deshabilitada", desc: "No mostrar entidad del día" },
+            ].map((opt) => (
+              <label
+                key={opt.value}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                  padding: "8px 12px", borderRadius: 8,
+                  background: entidadDiaModo === opt.value ? "rgba(134,56,25,0.06)" : "transparent",
+                  border: `1px solid ${entidadDiaModo === opt.value ? "#863819" : "#e0ddd5"}`,
+                  transition: "all 0.15s",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="entidadDiaModo"
+                  value={opt.value}
+                  checked={entidadDiaModo === opt.value}
+                  onChange={() => setEntidadDiaModo(opt.value)}
+                  style={{ accentColor: "#863819" }}
+                />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18" }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {/* SELECTOR DE ENTIDAD (solo en modo manual) */}
+          {entidadDiaModo === "manual" && (
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 6 }}>Buscar entidad:</div>
+              <input
+                type="text"
+                value={entidadSearch}
+                onChange={(e) => handleEntidadSearch(e.target.value)}
+                placeholder="Nombre de la entidad..."
+                style={{
+                  width: "100%", padding: "8px 12px", border: "1px solid #e0ddd5",
+                  borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box",
+                }}
+              />
+              {entidadSearching && <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>Buscando...</div>}
+              {entidadResults.length > 0 && (
+                <div style={{
+                  border: "1px solid #e0ddd5", borderRadius: 8, marginTop: 4,
+                  maxHeight: 160, overflowY: "auto", background: "white",
+                }}>
+                  {entidadResults.map((ent) => (
+                    <button
+                      key={ent.id}
+                      onClick={() => seleccionarEntidad(ent)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        padding: "8px 12px", border: "none", borderBottom: "1px solid #f0ede8",
+                        background: "transparent", cursor: "pointer", textAlign: "left",
+                      }}
+                    >
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: colorMapAdmin[ent.tipo] || "#888", flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 13, color: "#333" }}>{ent.nombre}</span>
+                      <span style={{ fontSize: 10, color: "#888", marginLeft: "auto" }}>{ent.tipo}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {entidadDiaId && (
+                <div style={{
+                  marginTop: 8, padding: "8px 12px", background: "rgba(134,56,25,0.06)",
+                  borderRadius: 8, display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <span style={{ fontSize: 12, color: "#555" }}>Seleccionada:</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1c1c18" }}>{entidadDiaNombre}</span>
+                  <button
+                    onClick={() => { setEntidadDiaId(null); setEntidadDiaNombre(""); }}
+                    style={{
+                      marginLeft: "auto", background: "none", border: "none",
+                      color: "#888", cursor: "pointer", fontSize: 14, padding: "0 4px",
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* BOTÓN GUARDAR */}
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={guardarConfigEntidadDia}
+            style={{
+              ...styles.btnPrimary,
+              opacity: entidadDiaModo === "manual" && !entidadDiaId ? 0.5 : 1,
+            }}
+            disabled={entidadDiaModo === "manual" && !entidadDiaId}
+          >
+            Guardar
+          </button>
+          {configGuardada && (
+            <span style={{ fontSize: 12, color: "#4caf50", fontWeight: 600 }}>✓ Guardado</span>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>

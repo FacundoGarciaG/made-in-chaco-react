@@ -3,6 +3,7 @@ import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { crearNotificacion } from "./notificaciones.js";
 import { getIO } from "../services/socket.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -138,7 +139,7 @@ router.post("/suscripciones/adquirir", authMiddleware, async (req, res) => {
       entidades_actualizadas: entRows.length,
     });
   } catch (err) {
-    console.error("Error POST /suscripciones/adquirir:", err);
+    logger.error("Error POST /suscripciones/adquirir:", err);
     res.status(500).json({ error: "Error al adquirir suscripción" });
   }
 });
@@ -156,7 +157,7 @@ router.get("/suscripciones/mis-pagos", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /suscripciones/mis-pagos:", err);
+    logger.error("Error GET /suscripciones/mis-pagos:", err);
     res.status(500).json({ error: "Error al obtener pagos" });
   }
 });
@@ -174,7 +175,7 @@ router.get("/suscripciones/entidad/:id", authMiddleware, async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /suscripciones/entidad/:id:", err);
+    logger.error("Error GET /suscripciones/entidad/:id:", err);
     res.status(500).json({ error: "Error al obtener suscripción" });
   }
 });
@@ -213,7 +214,7 @@ router.post("/suscripciones/reclamar-devolucion/:entidad_id", authMiddleware, as
 
     res.json({ ok: true, message: "Solicitud de devolución enviada. El administrador la revisará." });
   } catch (err) {
-    console.error("Error POST /suscripciones/reclamar-devolucion:", err);
+    logger.error("Error POST /suscripciones/reclamar-devolucion:", err);
     res.status(500).json({ error: "Error al solicitar devolución" });
   }
 });
@@ -231,7 +232,7 @@ router.get("/suscripciones/devoluciones", authMiddleware, async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /suscripciones/devoluciones:", err);
+    logger.error("Error GET /suscripciones/devoluciones:", err);
     res.status(500).json({ error: "Error al obtener solicitudes de devolución" });
   }
 });
@@ -243,7 +244,7 @@ router.get("/suscripciones/devoluciones/count", authMiddleware, async (_req, res
     );
     res.json({ count: rows[0].count });
   } catch (err) {
-    console.error("Error GET /suscripciones/devoluciones/count:", err);
+    logger.error("Error GET /suscripciones/devoluciones/count:", err);
     res.status(500).json({ error: "Error al contar devoluciones" });
   }
 });
@@ -282,7 +283,7 @@ router.post("/suscripciones/aprobar-devolucion/:entidad_id", authMiddleware, asy
 
     res.json({ ok: true, message: "Devolución aprobada, suscripción cancelada" });
   } catch (err) {
-    console.error("Error POST /suscripciones/aprobar-devolucion:", err);
+    logger.error("Error POST /suscripciones/aprobar-devolucion:", err);
     res.status(500).json({ error: "Error al aprobar devolución" });
   }
 });
@@ -316,7 +317,7 @@ router.post("/suscripciones/rechazar-devolucion/:entidad_id", authMiddleware, as
 
     res.json({ ok: true, message: "Devolución rechazada, suscripción continúa activa" });
   } catch (err) {
-    console.error("Error POST /suscripciones/rechazar-devolucion:", err);
+    logger.error("Error POST /suscripciones/rechazar-devolucion:", err);
     res.status(500).json({ error: "Error al rechazar devolución" });
   }
 });
@@ -342,7 +343,7 @@ router.get("/suscripciones/todas", authMiddleware, async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /suscripciones/todas:", err);
+    logger.error("Error GET /suscripciones/todas:", err);
     res.status(500).json({ error: "Error al obtener suscripciones" });
   }
 });

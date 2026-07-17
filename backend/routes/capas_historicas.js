@@ -1,5 +1,6 @@
 import { Router } from "express";
 import pool from "../config/db.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.get("/capas-historicas", async (req, res) => {
 
     res.json(geojson);
   } catch (err) {
-    console.error("Error GET /capas-historicas:", err);
+    logger.error("Error GET /capas-historicas:", err);
     res.status(500).json({ error: "Error al obtener capas históricas" });
   }
 });
@@ -78,7 +79,7 @@ router.get("/capas-historicas/rangos", async (_req, res) => {
       año_max: rows[0].año_max || 2024,
     });
   } catch (err) {
-    console.error("Error GET /capas-historicas/rangos:", err);
+    logger.error("Error GET /capas-historicas/rangos:", err);
     res.status(500).json({ error: "Error al obtener rangos" });
   }
 });

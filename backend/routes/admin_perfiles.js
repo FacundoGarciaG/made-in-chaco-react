@@ -3,6 +3,7 @@ import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
 import { cloudinary, publicIdDesdeUrl } from "../config/cloudinary.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.get("/admin/perfiles", authMiddleware, async (req, res) => {
     const { rows } = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /admin/perfiles:", err);
+    logger.error("Error GET /admin/perfiles:", err);
     res.status(500).json({ error: "Error al obtener perfiles" });
   }
 });
@@ -87,7 +88,7 @@ router.get("/admin/perfiles/:id", authMiddleware, async (req, res) => {
 
     res.json({ perfil: perfiles[0], entidades });
   } catch (err) {
-    console.error("Error GET /admin/perfiles/:id:", err);
+    logger.error("Error GET /admin/perfiles/:id:", err);
     res.status(500).json({ error: "Error al obtener perfil" });
   }
 });
@@ -132,7 +133,7 @@ router.put("/admin/perfiles/:id/ban", authMiddleware, async (req, res) => {
 
     res.json({ ...rows[0], entidades_actualizadas: entidades });
   } catch (err) {
-    console.error("Error PUT /admin/perfiles/:id/ban:", err);
+    logger.error("Error PUT /admin/perfiles/:id/ban:", err);
     res.status(500).json({ error: "Error al actualizar perfil" });
   }
 });
@@ -194,7 +195,7 @@ router.post("/admin/perfiles/purge", authMiddleware, async (req, res) => {
 
     res.json({ ok: true, purgados: perfiles.length });
   } catch (err) {
-    console.error("Error purge perfiles:", err);
+    logger.error("Error purge perfiles:", err);
     res.status(500).json({ error: "Error al purgar perfiles" });
   }
 });

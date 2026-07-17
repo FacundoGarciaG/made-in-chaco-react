@@ -2,6 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { cloudinary } from "../config/cloudinary.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get("/entidades/:id/multimedia", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /entidades/:id/multimedia:", err);
+    logger.error("Error GET /entidades/:id/multimedia:", err);
     res.status(500).json({ error: "Error al obtener multimedia" });
   }
 });
@@ -47,7 +48,7 @@ router.post("/multimedia", authMiddleware, async (req, res) => {
 
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
-    console.error("Error POST /multimedia:", err);
+    logger.error("Error POST /multimedia:", err);
     res.status(500).json({ error: "Error al crear multimedia" });
   }
 });
@@ -57,7 +58,7 @@ async function eliminarDeCloudinary(publicId) {
   try {
     await cloudinary.v2.uploader.destroy(publicId, { invalidate: true });
   } catch (err) {
-    console.warn("Cloudinary delete warning:", err.message);
+    logger.warn("Cloudinary delete warning:", err.message);
   }
 }
 
@@ -74,7 +75,7 @@ router.delete("/multimedia/:id", authMiddleware, async (req, res) => {
     await pool.query("DELETE FROM multimedia WHERE id = $1", [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /multimedia/:id:", err);
+    logger.error("Error DELETE /multimedia/:id:", err);
     res.status(500).json({ error: "Error al eliminar multimedia" });
   }
 });
@@ -114,7 +115,7 @@ router.get("/multimedia/etiquetas", async (req, res) => {
 
     res.json(grouped);
   } catch (err) {
-    console.error("Error GET /multimedia/etiquetas:", err);
+    logger.error("Error GET /multimedia/etiquetas:", err);
     res.status(500).json({ error: "Error al obtener etiquetas" });
   }
 });
@@ -146,7 +147,7 @@ router.put("/multimedia/:id/etiquetas", authMiddleware, async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PUT /multimedia/:id/etiquetas:", err);
+    logger.error("Error PUT /multimedia/:id/etiquetas:", err);
     res.status(500).json({ error: "Error al guardar etiquetas" });
   }
 });

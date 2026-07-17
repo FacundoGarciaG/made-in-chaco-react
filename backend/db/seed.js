@@ -1,6 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
+import { logger } from "../config/logger.js";
 
 const palabrasIniciales = [
   "¡Che!", "Mba'eichapa", "Piojento", "Chivo", "Gurí", "Chipá",
@@ -25,14 +26,14 @@ const palabrasIniciales = [
 
 async function seed() {
   try {
-    console.log("Seeding database...");
+    logger.info("Seeding database...");
 
     const hash = await bcrypt.hash("admin123", 10);
     await pool.query(
       "INSERT INTO usuarios (username, password) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING",
       ["admin", hash],
     );
-    console.log("✓ Usuario admin creado (admin / admin123)");
+    logger.info("✓ Usuario admin creado (admin / admin123)");
 
     for (const p of palabrasIniciales) {
       await pool.query(
@@ -40,12 +41,12 @@ async function seed() {
         [p],
       );
     }
-    console.log(`✓ ${palabrasIniciales.length} palabras chaqueñas agregadas`);
+    logger.info(`✓ ${palabrasIniciales.length} palabras chaqueñas agregadas`);
 
-    console.log("Seed completo ✓");
+    logger.info("Seed completo ✓");
     process.exit(0);
   } catch (err) {
-    console.error("Seed error:", err);
+    logger.error("Seed error:", err);
     process.exit(1);
   }
 }

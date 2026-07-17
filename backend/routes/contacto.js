@@ -2,6 +2,7 @@ import { Router } from "express";
 import nodemailer from "nodemailer";
 import pool from "../config/db.js";
 import { contactoRules, sanitizarHtml } from "../middleware/validation.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -45,12 +46,12 @@ router.post("/contacto", contactoRules, async (req, res) => {
             <p>${mensaje.replace(/\n/g, "<br>")}</p>
           `,
         })
-        .catch((e) => console.warn("Mail no enviado:", e.message));
+        .catch((e) => logger.warn("Mail no enviado:", e.message));
     }
 
     res.json({ success: true });
   } catch (err) {
-    console.error("Error al enviar mensaje de contacto:", err);
+    logger.error("Error al enviar mensaje de contacto:", err);
     res.status(500).json({ error: "Error al enviar el mensaje" });
   }
 });

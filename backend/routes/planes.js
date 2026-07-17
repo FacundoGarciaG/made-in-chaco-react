@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.get("/planes", async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /planes:", err);
+    logger.error("Error GET /planes:", err);
     res.status(500).json({ error: "Error al obtener planes" });
   }
 });
@@ -24,7 +25,7 @@ router.get("/planes/personalizado", async (_req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: "Plan personalizado no encontrado" });
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /planes/personalizado:", err);
+    logger.error("Error GET /planes/personalizado:", err);
     res.status(500).json({ error: "Error al obtener plan personalizado" });
   }
 });
@@ -34,7 +35,7 @@ router.get("/planes/admin", authMiddleware, async (_req, res) => {
     const { rows } = await pool.query("SELECT * FROM planes ORDER BY precio ASC");
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /planes/admin:", err);
+    logger.error("Error GET /planes/admin:", err);
     res.status(500).json({ error: "Error al obtener planes" });
   }
 });
@@ -45,7 +46,7 @@ router.get("/planes/:id", async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: "Plan no encontrado" });
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /planes/:id:", err);
+    logger.error("Error GET /planes/:id:", err);
     res.status(500).json({ error: "Error al obtener plan" });
   }
 });
@@ -60,7 +61,7 @@ router.post("/planes", authMiddleware, async (req, res) => {
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error("Error POST /planes:", err);
+    logger.error("Error POST /planes:", err);
     res.status(500).json({ error: "Error al crear plan" });
   }
 });
@@ -76,7 +77,7 @@ router.put("/planes/:id", authMiddleware, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: "Plan no encontrado" });
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error PUT /planes/:id:", err);
+    logger.error("Error PUT /planes/:id:", err);
     res.status(500).json({ error: "Error al actualizar plan" });
   }
 });
@@ -90,7 +91,7 @@ router.delete("/planes/:id", authMiddleware, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: "Plan no encontrado" });
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /planes/:id:", err);
+    logger.error("Error DELETE /planes/:id:", err);
     res.status(500).json({ error: "Error al eliminar plan" });
   }
 });

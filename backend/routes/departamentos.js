@@ -1,5 +1,6 @@
 import { Router } from "express";
 import pool from "../config/db.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get("/departamentos", async (_req, res) => {
       })),
     });
   } catch (err) {
-    console.error("Error GET /departamentos:", err);
+    logger.error("Error GET /departamentos:", err);
     res.status(500).json({ error: "Error al obtener departamentos" });
   }
 });
@@ -39,7 +40,7 @@ router.get("/provincia", async (_req, res) => {
       properties: { nombre: "Chaco" },
     });
   } catch (err) {
-    console.error("Error GET /provincia:", err);
+    logger.error("Error GET /provincia:", err);
     res.status(500).json({ error: "Error al obtener provincia" });
   }
 });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { authMiddleware } from "../middleware/auth.js";
 import { cloudinary } from "../config/cloudinary.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.post("/upload", authMiddleware, uploadFields, async (req, res) => {
       thumbnail_url: thumbnailUrl,
     });
   } catch (err) {
-    console.error("Cloudinary upload error:", err);
+    logger.error("Cloudinary upload error:", err);
     res.status(500).json({ error: "Error al subir archivo a Cloudinary" });
   }
 });
@@ -115,13 +116,13 @@ router.post("/upload-public", uploadPublic.single("archivo"), async (req, res) =
       try {
         await cloudinary.v2.uploader.destroy(oldPublicId, { invalidate: true });
       } catch (err) {
-        console.warn("No se pudo borrar imagen anterior:", err.message);
+        logger.warn("No se pudo borrar imagen anterior:", err.message);
       }
     }
 
     res.status(201).json({ url: result.secure_url, public_id: result.public_id });
   } catch (err) {
-    console.error("Public upload error:", err);
+    logger.error("Public upload error:", err);
     res.status(500).json({ error: "Error al subir archivo" });
   }
 });
@@ -133,7 +134,7 @@ router.post("/delete-public-image", authMiddleware, async (req, res) => {
     await cloudinary.v2.uploader.destroy(public_id, { invalidate: true });
     res.json({ success: true });
   } catch (err) {
-    console.error("Delete public image error:", err);
+    logger.error("Delete public image error:", err);
     res.status(500).json({ error: "Error al borrar imagen" });
   }
 });

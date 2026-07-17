@@ -3,6 +3,7 @@ import pool from "../config/db.js";
 import { buildSetClause } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get("/localidades", async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /localidades:", err);
+    logger.error("Error GET /localidades:", err);
     res.status(500).json({ error: "Error al obtener localidades" });
   }
 });
@@ -35,7 +36,7 @@ router.put("/localidades/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("localidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PUT /localidades/:id:", err);
+    logger.error("Error PUT /localidades/:id:", err);
     res.status(500).json({ error: "Error al actualizar localidad" });
   }
 });

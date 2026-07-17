@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.post("/analytics/track", async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /analytics/track:", err);
+    logger.error("Error POST /analytics/track:", err);
     res.status(500).json({ error: "Error al registrar evento" });
   }
 });
@@ -66,7 +67,7 @@ router.get("/analytics/resumen", authMiddleware, async (req, res) => {
       top10: results[5].rows,
     });
   } catch (err) {
-    console.error("Error GET /analytics/resumen:", err);
+    logger.error("Error GET /analytics/resumen:", err);
     res.status(500).json({ error: "Error al obtener resumen" });
   }
 });
@@ -91,7 +92,7 @@ router.get("/analytics/entidad-del-dia", async (_req, res) => {
     if (rows.length === 0) return res.json(null);
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /analytics/entidad-del-dia:", err);
+    logger.error("Error GET /analytics/entidad-del-dia:", err);
     res.status(500).json({ error: "Error al obtener entidad del día" });
   }
 });
@@ -125,7 +126,7 @@ router.get("/analytics/diario", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /analytics/diario:", err);
+    logger.error("Error GET /analytics/diario:", err);
     res.status(500).json({ error: "Error al obtener diario" });
   }
 });

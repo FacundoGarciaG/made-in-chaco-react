@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -201,7 +202,7 @@ router.post("/sellos/scan", authMiddleware, async (req, res) => {
       });
     }
   } catch (err) {
-    console.error("Error POST /sellos/scan:", err);
+    logger.error("Error POST /sellos/scan:", err);
     res.status(500).json({ error: "Error al coleccionar sello" });
   }
 });
@@ -227,7 +228,7 @@ router.get("/sellos/mis-sellos", authMiddleware, async (req, res) => {
 
     res.json({ sellos: rows, total_puntos: pts[0].total_puntos });
   } catch (err) {
-    console.error("Error GET /sellos/mis-sellos:", err);
+    logger.error("Error GET /sellos/mis-sellos:", err);
     res.status(500).json({ error: "Error al obtener sellos" });
   }
 });
@@ -261,7 +262,7 @@ router.get("/sellos/logros", authMiddleware, async (req, res) => {
 
     res.json(resultado);
   } catch (err) {
-    console.error("Error GET /sellos/logros:", err);
+    logger.error("Error GET /sellos/logros:", err);
     res.status(500).json({ error: "Error al obtener logros" });
   }
 });
@@ -293,7 +294,7 @@ router.get("/sellos/ranking", async (req, res) => {
 
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /sellos/ranking:", err);
+    logger.error("Error GET /sellos/ranking:", err);
     res.status(500).json({ error: "Error al obtener ranking" });
   }
 });
@@ -311,7 +312,7 @@ router.get("/sellos/stats/:entidadId", async (req, res) => {
     );
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /sellos/stats:", err);
+    logger.error("Error GET /sellos/stats:", err);
     res.status(500).json({ error: "Error al obtener stats" });
   }
 });
@@ -325,7 +326,7 @@ router.get("/sellos/check/:entidadId", authMiddleware, async (req, res) => {
     );
     res.json({ collected: rows.length > 0 });
   } catch (err) {
-    console.error("Error GET /sellos/check:", err);
+    logger.error("Error GET /sellos/check:", err);
     res.status(500).json({ error: "Error al verificar sello" });
   }
 });

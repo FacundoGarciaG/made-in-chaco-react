@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { logger } from "../config/logger.js";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
@@ -64,7 +65,7 @@ router.post("/auth/registro", registroRules, async (req, res) => {
       perfil: { id: perfil.id, email: perfil.email, nombre: perfil.nombre, verified: false },
     });
   } catch (err) {
-    console.error("Registro error:", err);
+    logger.error("Registro error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -88,7 +89,7 @@ router.get("/auth/verificar/:token", async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("Verificar error:", err);
+    logger.error("Verificar error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -128,7 +129,7 @@ router.post("/auth/reenviar-verificacion", authMiddleware, async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("Reenviar verificacion error:", err);
+    logger.error("Reenviar verificacion error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -196,7 +197,7 @@ router.post("/auth/login-publico", loginRules, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Login público error:", err);
+    logger.error("Login público error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -214,7 +215,7 @@ router.get("/auth/perfil", authMiddleware, async (req, res) => {
 
     res.json(rows[0]);
   } catch (err) {
-    console.error("Get perfil error:", err);
+    logger.error("Get perfil error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -287,13 +288,13 @@ router.put("/auth/perfil", authMiddleware, perfilRules, async (req, res) => {
           `,
         });
       } catch (err) {
-        console.warn("Email de verificación no enviado:", err.message);
+        logger.warn("Email de verificación no enviado:", err.message);
       }
     }
 
     res.json(updated);
   } catch (err) {
-    console.error("Update perfil error:", err);
+    logger.error("Update perfil error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -326,7 +327,7 @@ router.delete("/auth/avatar", authMiddleware, async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("Delete avatar error:", err);
+    logger.error("Delete avatar error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -379,12 +380,12 @@ router.delete("/auth/perfil", authMiddleware, async (req, res) => {
         `,
       });
     } catch (mailErr) {
-      console.warn("Email de eliminación no enviado:", mailErr.message);
+      logger.warn("Email de eliminación no enviado:", mailErr.message);
     }
 
     res.json({ ok: true, message: "Cuenta marcada para eliminación. Tenés 30 días para restaurarla." });
   } catch (err) {
-    console.error("Delete perfil error:", err);
+    logger.error("Delete perfil error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -451,12 +452,12 @@ router.post("/auth/restaurar", loginRules, async (req, res) => {
         `,
       });
     } catch (mailErr) {
-      console.warn("Email de restauración no enviado:", mailErr.message);
+      logger.warn("Email de restauración no enviado:", mailErr.message);
     }
 
     res.json({ ok: true, message: "Cuenta restaurada exitosamente. Ya podés iniciar sesión." });
   } catch (err) {
-    console.error("Restaurar perfil error:", err);
+    logger.error("Restaurar perfil error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -528,12 +529,12 @@ router.post("/auth/olvide-password", emailOnlyRules, async (req, res) => {
         `,
       });
     } catch (mailErr) {
-      console.warn("Email de restablecimiento no enviado:", mailErr.message);
+      logger.warn("Email de restablecimiento no enviado:", mailErr.message);
     }
 
     res.json({ ok: true, message: mensaje });
   } catch (err) {
-    console.error("Olvide password error:", err);
+    logger.error("Olvide password error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -563,7 +564,7 @@ router.post("/auth/reestablecer-password", resetPasswordRules, async (req, res) 
 
     res.json({ ok: true, message: "Contraseña actualizada exitosamente. Ya podés iniciar sesión." });
   } catch (err) {
-    console.error("Reestablecer password error:", err);
+    logger.error("Reestablecer password error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -29,7 +30,7 @@ export async function crearNotificacion(perfilId, tipo, titulo, mensaje, entidad
       created_at: notif.created_at,
     });
   } catch (err) {
-    console.error("Error al crear notificacion:", err);
+    logger.error("Error al crear notificacion:", err);
   }
 }
 
@@ -46,7 +47,7 @@ router.get("/notificaciones", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /notificaciones:", err);
+    logger.error("Error GET /notificaciones:", err);
     res.status(500).json({ error: "Error al cargar notificaciones" });
   }
 });
@@ -60,7 +61,7 @@ router.post("/notificaciones/:id/leer", authMiddleware, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /notificaciones/leer:", err);
+    logger.error("Error POST /notificaciones/leer:", err);
     res.status(500).json({ error: "Error al marcar notificacion" });
   }
 });
@@ -73,7 +74,7 @@ router.post("/notificaciones/leer-todas", authMiddleware, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /notificaciones/leer-todas:", err);
+    logger.error("Error POST /notificaciones/leer-todas:", err);
     res.status(500).json({ error: "Error al marcar notificaciones" });
   }
 });
@@ -86,7 +87,7 @@ router.delete("/notificaciones", authMiddleware, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /notificaciones:", err);
+    logger.error("Error DELETE /notificaciones:", err);
     res.status(500).json({ error: "Error al eliminar notificaciones" });
   }
 });
@@ -102,7 +103,7 @@ router.delete("/notificaciones/:id", authMiddleware, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /notificaciones/:id:", err);
+    logger.error("Error DELETE /notificaciones/:id:", err);
     res.status(500).json({ error: "Error al eliminar notificación" });
   }
 });
@@ -115,7 +116,7 @@ router.get("/notificaciones/unread-count", authMiddleware, async (req, res) => {
     );
     res.json({ count: rows[0].count });
   } catch (err) {
-    console.error("Error GET /notificaciones/unread-count:", err);
+    logger.error("Error GET /notificaciones/unread-count:", err);
     res.status(500).json({ error: "Error al obtener conteo" });
   }
 });
@@ -190,7 +191,7 @@ router.post("/notificaciones/verificar-suscripciones", authMiddleware, async (re
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error POST /notificaciones/verificar-suscripciones:", err);
+    logger.error("Error POST /notificaciones/verificar-suscripciones:", err);
     res.status(500).json({ error: "Error al verificar suscripciones" });
   }
 });

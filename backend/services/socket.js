@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../config/env.js";
+import { logger } from "../config/logger.js";
 let io = null;
 
 function getRoomFromToken(decoded) {
@@ -24,14 +25,14 @@ export function initSocket(httpServer) {
         socket.room = getRoomFromToken(decoded);
         return next();
       } catch (err) {
-        console.warn("⚡ Token inválido en auth:", err.message);
+        logger.warn("⚡ Token inválido en auth:", err.message);
       }
     }
     next();
   });
 
   io.on("connection", (socket) => {
-    console.log("⚡ Cliente conectado:", socket.id, socket.room ? `(sala ${socket.room})` : "(anónimo)");
+    logger.info("⚡ Cliente conectado:", socket.id, socket.room ? `(sala ${socket.room})` : "(anónimo)");
 
     if (socket.room) {
       socket.join(socket.room);
@@ -43,14 +44,14 @@ export function initSocket(httpServer) {
         const room = getRoomFromToken(decoded);
         socket.room = room;
         socket.join(room);
-        console.log(`⚡ Autenticado en sala ${room} (socket ${socket.id})`);
+        logger.info(`⚡ Autenticado en sala ${room} (socket ${socket.id})`);
       } catch (err) {
-        console.warn("⚡ Token inválido en socket:", err.message);
+        logger.warn("⚡ Token inválido en socket:", err.message);
       }
     });
 
     socket.on("disconnect", () => {
-      console.log("⚡ Cliente desconectado:", socket.id);
+      logger.info("⚡ Cliente desconectado:", socket.id);
     });
   });
 

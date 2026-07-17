@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.get("/palabras", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error fetching palabras:", err);
+    logger.error("Error fetching palabras:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -74,7 +75,7 @@ router.get("/palabras/random", async (_req, res) => {
     if (rows.length === 0) return res.json(null);
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error fetching random palabra:", err);
+    logger.error("Error fetching random palabra:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -90,7 +91,7 @@ router.get("/palabras/del-dia", async (_req, res) => {
     if (rows.length === 0) return res.json(null);
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error fetching palabra del día:", err);
+    logger.error("Error fetching palabra del día:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -108,7 +109,7 @@ router.get("/palabras/:id", async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error fetching palabra:", err);
+    logger.error("Error fetching palabra:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -141,7 +142,7 @@ router.post("/palabras", authMiddleware, async (req, res) => {
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error("Error creating palabra:", err);
+    logger.error("Error creating palabra:", err);
     if (err.code === "23505") {
       return res.status(409).json({ error: "Ya existe una palabra con ese slug" });
     }
@@ -176,7 +177,7 @@ router.put("/palabras/:id", authMiddleware, async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error updating palabra:", err);
+    logger.error("Error updating palabra:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });
@@ -193,7 +194,7 @@ router.delete("/palabras/:id", authMiddleware, async (req, res) => {
     }
     res.json({ message: "Palabra eliminada" });
   } catch (err) {
-    console.error("Error deleting palabra:", err);
+    logger.error("Error deleting palabra:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });

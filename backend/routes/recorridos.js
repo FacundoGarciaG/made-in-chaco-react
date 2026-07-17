@@ -2,6 +2,7 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getIO } from "../services/socket.js";
+import { logger } from "../config/logger.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get("/recorridos", async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /recorridos:", err);
+    logger.error("Error GET /recorridos:", err);
     res.status(500).json({ error: "Error al obtener recorridos" });
   }
 });
@@ -50,7 +51,7 @@ router.get("/recorridos/:slug", async (req, res) => {
     recorrido.pasos = pasos;
     res.json(recorrido);
   } catch (err) {
-    console.error("Error GET /recorridos/:slug:", err);
+    logger.error("Error GET /recorridos/:slug:", err);
     res.status(500).json({ error: "Error al obtener recorrido" });
   }
 });
@@ -71,7 +72,7 @@ router.post("/recorridos", authMiddleware, async (req, res) => {
     getIO()?.emit("recorrido:change");
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
-    console.error("Error POST /recorridos:", err);
+    logger.error("Error POST /recorridos:", err);
     res.status(500).json({ error: "Error al crear recorrido" });
   }
 });
@@ -87,7 +88,7 @@ router.put("/recorridos/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PUT /recorridos/:id:", err);
+    logger.error("Error PUT /recorridos/:id:", err);
     res.status(500).json({ error: "Error al actualizar recorrido" });
   }
 });
@@ -99,7 +100,7 @@ router.delete("/recorridos/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /recorridos/:id:", err);
+    logger.error("Error DELETE /recorridos/:id:", err);
     res.status(500).json({ error: "Error al eliminar recorrido" });
   }
 });
@@ -123,7 +124,7 @@ router.post("/recorridos/:id/pasos", authMiddleware, async (req, res) => {
     getIO()?.emit("recorrido:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /recorridos/:id/pasos:", err);
+    logger.error("Error POST /recorridos/:id/pasos:", err);
     res.status(500).json({ error: "Error al guardar pasos" });
   }
 });

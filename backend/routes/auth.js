@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
 import { adminLoginRules } from "../middleware/validation.js";
+import { logger } from "../config/logger.js";
 import { JWT_SECRET, JWT_EXPIRY } from "../config/env.js";
 
 const router = Router();
@@ -35,7 +36,7 @@ router.post("/auth/login", adminLoginRules, async (req, res) => {
 
     res.json({ token, username: user.username });
   } catch (err) {
-    console.error("Login error:", err);
+    logger.error("Login error:", err);
     res.status(500).json({ error: "Error del servidor" });
   }
 });

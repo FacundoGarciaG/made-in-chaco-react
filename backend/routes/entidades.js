@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { buildSetClause, CAMPOS_ENTIDAD } from "../config/helpers.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logger } from "../config/logger.js";
 import { crearNotificacion } from "./notificaciones.js";
 import { cloudinary, publicIdDesdeUrl } from "../config/cloudinary.js";
 import { getIO } from "../services/socket.js";
@@ -37,7 +38,7 @@ router.get("/entidades", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /entidades:", err);
+    logger.error("Error GET /entidades:", err);
     res.status(500).json({ error: "Error al obtener entidades" });
   }
 });
@@ -56,7 +57,7 @@ router.get("/entidad/:slug", async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /entidad/:slug:", err);
+    logger.error("Error GET /entidad/:slug:", err);
     res.status(500).json({ error: "Error al obtener entidad" });
   }
 });
@@ -73,7 +74,7 @@ router.get("/entidades/:id", async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /entidades/:id:", err);
+    logger.error("Error GET /entidades/:id:", err);
     res.status(500).json({ error: "Error al obtener entidad" });
   }
 });
@@ -113,7 +114,7 @@ router.post("/entidades", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.status(201).json({ id });
   } catch (err) {
-    console.error("Error POST /entidades:", err);
+    logger.error("Error POST /entidades:", err);
     if (err.code === "23505") {
       return res.status(409).json({ error: "Ya existe una entidad con ese slug" });
     }
@@ -197,7 +198,7 @@ router.post("/solicitar-sello", async (req, res) => {
     getIO()?.emit("solicitud:change");
     res.status(201).json({ id: entityId, slug });
   } catch (err) {
-    console.error("Error POST /solicitar-sello:", err);
+    logger.error("Error POST /solicitar-sello:", err);
     res.status(500).json({ error: "Error al procesar la solicitud" });
   }
 });
@@ -218,7 +219,7 @@ router.put("/entidades/:id", authMiddleware, async (req, res) => {
     if (icono && oldEntity[0].icono && oldEntity[0].icono !== icono) {
       const pid = publicIdDesdeUrl(oldEntity[0].icono);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -270,7 +271,7 @@ router.put("/entidades/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PUT /entidades/:id:", err);
+    logger.error("Error PUT /entidades/:id:", err);
     res.status(500).json({ error: "Error al actualizar entidad" });
   }
 });
@@ -292,7 +293,7 @@ router.put("/entidades/:id/detalles", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PUT /entidades/:id/detalles:", err);
+    logger.error("Error PUT /entidades/:id/detalles:", err);
     res.status(500).json({ error: "Error al actualizar detalles" });
   }
 });
@@ -324,7 +325,7 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
         try {
           await cloudinary.v2.uploader.destroy(m.public_id, { invalidate: true });
         } catch (e) {
-          console.warn("Cloudinary delete warning:", e.message);
+          logger.warn("Cloudinary delete warning:", e.message);
         }
       }
     }
@@ -333,7 +334,7 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
     if (ent[0]?.imagen) {
       const pid = publicIdDesdeUrl(ent[0].imagen);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -341,7 +342,7 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
     if (ent[0]?.icono) {
       const pid = publicIdDesdeUrl(ent[0].icono);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -371,7 +372,7 @@ router.delete("/entidades/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /entidades/:id:", err);
+    logger.error("Error DELETE /entidades/:id:", err);
     res.status(500).json({ error: "Error al eliminar entidad" });
   }
 });
@@ -397,7 +398,7 @@ router.get("/entidades/:id/conexiones", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /conexiones:", err);
+    logger.error("Error GET /conexiones:", err);
     res.status(500).json({ error: "Error al obtener conexiones" });
   }
 });
@@ -441,7 +442,7 @@ router.post("/entidades/:id/conexiones", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /conexiones:", err);
+    logger.error("Error POST /conexiones:", err);
     res.status(500).json({ error: "Error al guardar conexiones" });
   }
 });
@@ -520,7 +521,7 @@ router.post("/conexiones/solicitar", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.status(201).json({ ok: true, id: rows[0].id });
   } catch (err) {
-    console.error("Error POST /conexiones/solicitar:", err);
+    logger.error("Error POST /conexiones/solicitar:", err);
     res.status(500).json({ error: "Error al solicitar conexión" });
   }
 });
@@ -545,7 +546,7 @@ router.get("/conexiones/solicitudes-recibidas", authMiddleware, async (req, res)
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /conexiones/solicitudes-recibidas:", err);
+    logger.error("Error GET /conexiones/solicitudes-recibidas:", err);
     res.status(500).json({ error: "Error al obtener solicitudes recibidas" });
   }
 });
@@ -570,7 +571,7 @@ router.get("/conexiones/solicitudes-enviadas", authMiddleware, async (req, res) 
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /conexiones/solicitudes-enviadas:", err);
+    logger.error("Error GET /conexiones/solicitudes-enviadas:", err);
     res.status(500).json({ error: "Error al obtener solicitudes enviadas" });
   }
 });
@@ -623,7 +624,7 @@ router.post("/conexiones/solicitudes/:id/aprobar", authMiddleware, async (req, r
     getIO()?.emit("entidad:change");
     res.json({ ok: true, message: "Conexión creada" });
   } catch (err) {
-    console.error("Error POST /conexiones/solicitudes/aprobar:", err);
+    logger.error("Error POST /conexiones/solicitudes/aprobar:", err);
     res.status(500).json({ error: "Error al aprobar solicitud" });
   }
 });
@@ -670,7 +671,7 @@ router.post("/conexiones/solicitudes/:id/rechazar", authMiddleware, async (req, 
     getIO()?.emit("entidad:change");
     res.json({ ok: true, message: "Solicitud rechazada" });
   } catch (err) {
-    console.error("Error POST /conexiones/solicitudes/rechazar:", err);
+    logger.error("Error POST /conexiones/solicitudes/rechazar:", err);
     res.status(500).json({ error: "Error al rechazar solicitud" });
   }
 });
@@ -693,7 +694,7 @@ router.delete("/conexiones/solicitudes/:id", authMiddleware, async (req, res) =>
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /conexiones/solicitudes/:id:", err);
+    logger.error("Error DELETE /conexiones/solicitudes/:id:", err);
     res.status(500).json({ error: "Error al eliminar solicitud" });
   }
 });
@@ -712,7 +713,7 @@ router.get("/entidades/:id/recorridos", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /entidades/:id/recorridos:", err);
+    logger.error("Error GET /entidades/:id/recorridos:", err);
     res.status(500).json({ error: "Error al obtener recorridos" });
   }
 });
@@ -736,7 +737,7 @@ router.get("/mapa-puntos", async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /mapa-puntos:", err);
+    logger.error("Error GET /mapa-puntos:", err);
     res.status(500).json({ error: "Error al obtener puntos del mapa" });
   }
 });
@@ -765,7 +766,7 @@ router.get("/solicitudes", authMiddleware, async (_req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /solicitudes:", err);
+    logger.error("Error GET /solicitudes:", err);
     res.status(500).json({ error: "Error al obtener solicitudes" });
   }
 });
@@ -798,7 +799,7 @@ router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
     getIO()?.emit("solicitud:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /solicitudes/:id/aprobar:", err);
+    logger.error("Error POST /solicitudes/:id/aprobar:", err);
     res.status(500).json({ error: "Error al aprobar solicitud" });
   }
 });
@@ -821,7 +822,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
     );
     for (const m of mm) {
       try { await cloudinary.v2.uploader.destroy(m.public_id); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -829,7 +830,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
     if (entPre[0]?.imagen) {
       const pid = publicIdDesdeUrl(entPre[0].imagen);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -837,7 +838,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
     if (entPre[0]?.icono) {
       const pid = publicIdDesdeUrl(entPre[0].icono);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -850,7 +851,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
     getIO()?.emit("solicitud:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /solicitudes/:id/rechazar:", err);
+    logger.error("Error POST /solicitudes/:id/rechazar:", err);
     res.status(500).json({ error: "Error al rechazar solicitud" });
   }
 });
@@ -879,7 +880,7 @@ router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
     );
     for (const m of mm) {
       try { await cloudinary.v2.uploader.destroy(m.public_id); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -887,7 +888,7 @@ router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
     if (rows[0].imagen) {
       const pid = publicIdDesdeUrl(rows[0].imagen);
       if (pid) try { await cloudinary.v2.uploader.destroy(pid); } catch (e) {
-        console.warn("Cloudinary delete warning:", e.message);
+        logger.warn("Cloudinary delete warning:", e.message);
       }
     }
 
@@ -895,7 +896,7 @@ router.delete("/mis-entidades/:id", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /mis-entidades/:id:", err);
+    logger.error("Error DELETE /mis-entidades/:id:", err);
     res.status(500).json({ error: "Error al cancelar solicitud" });
   }
 });
@@ -914,7 +915,7 @@ router.get("/entidades/:id/editar", authMiddleware, async (req, res) => {
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error("Error GET /entidades/:id/editar:", err);
+    logger.error("Error GET /entidades/:id/editar:", err);
     res.status(500).json({ error: "Error al cargar entidad" });
   }
 });
@@ -939,7 +940,7 @@ router.post("/entidades/:id/solicitar-edicion", authMiddleware, async (req, res)
 
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
-    console.error("Error POST /entidades/:id/solicitar-edicion:", err);
+    logger.error("Error POST /entidades/:id/solicitar-edicion:", err);
     res.status(500).json({ error: "Error al solicitar edición" });
   }
 });
@@ -954,7 +955,7 @@ router.get("/solicitudes-edicion/count", authMiddleware, async (req, res) => {
     );
     res.json({ count: rows[0].count });
   } catch (err) {
-    console.error("Error GET /solicitudes-edicion/count:", err);
+    logger.error("Error GET /solicitudes-edicion/count:", err);
     res.status(500).json({ error: "Error al contar solicitudes" });
   }
 });
@@ -978,7 +979,7 @@ router.get("/solicitudes-edicion", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /solicitudes-edicion:", err);
+    logger.error("Error GET /solicitudes-edicion:", err);
     res.status(500).json({ error: "Error al cargar solicitudes" });
   }
 });
@@ -1067,7 +1068,7 @@ router.post("/solicitudes-edicion/:id/aprobar", authMiddleware, async (req, res)
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /solicitudes-edicion/:id/aprobar:", err);
+    logger.error("Error POST /solicitudes-edicion/:id/aprobar:", err);
     res.status(500).json({ error: "Error al aprobar edición" });
   }
 });
@@ -1099,7 +1100,7 @@ router.post("/solicitudes-edicion/:id/rechazar", authMiddleware, async (req, res
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error POST /solicitudes-edicion/:id/rechazar:", err);
+    logger.error("Error POST /solicitudes-edicion/:id/rechazar:", err);
     res.status(500).json({ error: "Error al rechazar edición" });
   }
 });
@@ -1126,7 +1127,7 @@ router.patch("/entidades/:id/visible", authMiddleware, async (req, res) => {
     getIO()?.emit("entidad:change");
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error PATCH /entidades/:id/visible:", err);
+    logger.error("Error PATCH /entidades/:id/visible:", err);
     res.status(500).json({ error: "Error al cambiar visibilidad" });
   }
 });
@@ -1148,7 +1149,7 @@ router.get("/mis-entidades", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /mis-entidades:", err);
+    logger.error("Error GET /mis-entidades:", err);
     res.status(500).json({ error: "Error al obtener entidades" });
   }
 });
@@ -1171,7 +1172,7 @@ router.get("/mis-favoritos", authMiddleware, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("Error GET /mis-favoritos:", err);
+    logger.error("Error GET /mis-favoritos:", err);
     res.status(500).json({ error: "Error al obtener favoritos" });
   }
 });
@@ -1194,7 +1195,7 @@ router.get("/favoritos/check", authMiddleware, async (req, res) => {
       res.json({ favorited: false });
     }
   } catch (err) {
-    console.error("Error GET /favoritos/check:", err);
+    logger.error("Error GET /favoritos/check:", err);
     res.status(500).json({ error: "Error al verificar favorito" });
   }
 });
@@ -1213,7 +1214,7 @@ router.post("/favoritos", authMiddleware, async (req, res) => {
     const id = rows.length > 0 ? rows[0].id : null;
     res.status(201).json({ ok: true, id });
   } catch (err) {
-    console.error("Error POST /favoritos:", err);
+    logger.error("Error POST /favoritos:", err);
     res.status(500).json({ error: "Error al guardar favorito" });
   }
 });
@@ -1228,7 +1229,7 @@ router.delete("/favoritos/:id", authMiddleware, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: "Favorito no encontrado" });
     res.json({ ok: true });
   } catch (err) {
-    console.error("Error DELETE /favoritos/:id:", err);
+    logger.error("Error DELETE /favoritos/:id:", err);
     res.status(500).json({ error: "Error al eliminar favorito" });
   }
 });

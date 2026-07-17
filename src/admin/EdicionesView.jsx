@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { styles } from "./helpers";
 import { RevisarModal } from "./RevisarModal";
+import { useSocketEvent } from "../hooks/useSocket";
 
 export function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendingEdiciones, showConfirm, showPopup }) {
   const [ediciones, setEdiciones] = useState(null);
@@ -9,14 +10,17 @@ export function EdicionesView({ authFetch, authHeaders, colorMapAdmin, setPendin
     setEdiciones(data);
     if (setPendingEdiciones) setPendingEdiciones(data ? data.length : 0);
   }, [setPendingEdiciones]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
-        if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
-      } catch {}
-    })();
+
+  const cargarEdiciones = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/solicitudes-edicion", { headers: authHeaders() });
+      if (res.ok) { const data = await res.json(); setEdicionesCount(data); }
+    } catch {}
   }, [authFetch, authHeaders, setEdicionesCount]);
+
+  useEffect(() => { cargarEdiciones(); }, [cargarEdiciones]);
+
+  useSocketEvent("solicitud-edicion:change", () => { cargarEdiciones(); });
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>

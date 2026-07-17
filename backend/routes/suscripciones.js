@@ -201,6 +201,7 @@ router.post("/suscripciones/reclamar-devolucion/:entidad_id", authMiddleware, as
     );
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("devolucion:change");
 
     await crearNotificacion(
       req.user.id,
@@ -269,6 +270,7 @@ router.post("/suscripciones/aprobar-devolucion/:entidad_id", authMiddleware, asy
     );
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("devolucion:change");
 
     await crearNotificacion(
       rows[0].perfil_id,
@@ -302,6 +304,7 @@ router.post("/suscripciones/rechazar-devolucion/:entidad_id", authMiddleware, as
     );
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("devolucion:change");
 
     await crearNotificacion(
       rows[0].perfil_id,

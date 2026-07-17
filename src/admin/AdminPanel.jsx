@@ -210,6 +210,20 @@ export const AdminPanel = () => {
   useSocketEvent("localidad:change", () => setSocketRefresh((t) => t + 1));
   useSocketEvent("perfil:change", () => setSocketRefresh((t) => t + 1));
 
+  useSocketEvent("solicitud-edicion:change", () => {
+    authFetch("/api/solicitudes-edicion/count", { headers: authHeaders() })
+      .then((r) => r.ok && r.json().then((d) => setPendingEdiciones(d.count || 0)))
+      .catch(() => {});
+  });
+  useSocketEvent("solicitud:change", () => {
+    cargarSolicitudes();
+  });
+  useSocketEvent("devolucion:change", () => {
+    authFetch("/api/suscripciones/devoluciones/count", { headers: authHeaders() })
+      .then((r) => r.ok && r.json().then((d) => setPendingDevoluciones(d.count || 0)))
+      .catch(() => {});
+  });
+
   const [popup, setPopup] = useState(null);
   const [confirmEmailInput, setConfirmEmailInput] = useState("");
   const pendingConfirm = useRef(null);

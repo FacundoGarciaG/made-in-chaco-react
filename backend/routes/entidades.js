@@ -194,6 +194,7 @@ router.post("/solicitar-sello", async (req, res) => {
     }
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("solicitud:change");
     res.status(201).json({ id: entityId, slug });
   } catch (err) {
     console.error("Error POST /solicitar-sello:", err);
@@ -794,6 +795,7 @@ router.post("/solicitudes/:id/aprobar", authMiddleware, async (req, res) => {
     }
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("solicitud:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /solicitudes/:id/aprobar:", err);
@@ -845,6 +847,7 @@ router.post("/solicitudes/:id/rechazar", authMiddleware, async (req, res) => {
     }
 
     getIO()?.emit("entidad:change");
+    getIO()?.emit("solicitud:change");
     res.json({ ok: true });
   } catch (err) {
     console.error("Error POST /solicitudes/:id/rechazar:", err);
@@ -931,10 +934,28 @@ router.post("/entidades/:id/solicitar-edicion", authMiddleware, async (req, res)
        VALUES ($1, $2, $3, 'pendiente') RETURNING id`,
       [req.params.id, req.user.id, JSON.stringify(req.body)],
     );
+
+    getIO()?.emit("solicitud-edicion:change");
+
     res.status(201).json({ id: rows[0].id });
   } catch (err) {
     console.error("Error POST /entidades/:id/solicitar-edicion:", err);
     res.status(500).json({ error: "Error al solicitar edición" });
+  }
+});
+
+// GET /api/solicitudes-edicion/count — admin: contar pendientes
+router.get("/solicitudes-edicion/count", authMiddleware, async (req, res) => {
+  const isAdmin = !req.user.tipo || req.user.tipo !== "publico";
+  if (!isAdmin) return res.status(403).json({ error: "Solo administradores" });
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM solicitudes_edicion WHERE estado = 'pendiente'`,
+    );
+    res.json({ count: rows[0].count });
+  } catch (err) {
+    console.error("Error GET /solicitudes-edicion/count:", err);
+    res.status(500).json({ error: "Error al contar solicitudes" });
   }
 });
 

@@ -47,6 +47,9 @@ export const RankingPage = () => {
         description="Los exploradores que más sellos coleccionaron en el directorio de Made in Chaco."
       />
 
+      <div className="ranking-spacer" />
+
+      <div className="ranking-content">
       <div className="ranking-header">
         <Link to="/" className="ranking-back">← Volver</Link>
         <h1 className="ranking-title">
@@ -74,16 +77,17 @@ export const RankingPage = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="ranking-loading">Cargando ranking...</div>
-      ) : ranking.length === 0 ? (
-        <div className="ranking-empty">
-          <div className="ranking-empty-icon">🏆</div>
-          <p>Todavía no hay exploradores en el ranking.</p>
-          <p>Escaneá códigos QR para empezar a coleccionar sellos.</p>
-        </div>
-      ) : (
-        <div className="ranking-list">
+      <div style={{ position: "relative" }}>
+        {loading ? (
+          <div className="ranking-loading">Cargando ranking...</div>
+        ) : ranking.length === 0 ? (
+          <div className="ranking-empty">
+            <div className="ranking-empty-icon">🏆</div>
+            <p>Todavía no hay exploradores en el ranking.</p>
+            <p>Escaneá códigos QR para empezar a coleccionar sellos.</p>
+          </div>
+        ) : (
+          <div className="ranking-list">
           {ranking.map((r, i) => {
             const medal = medalInfo(i);
             return (
@@ -123,7 +127,9 @@ export const RankingPage = () => {
             );
           })}
         </div>
-      )}
+        )}
+      </div>
+      </div>
     </div>
   );
 };

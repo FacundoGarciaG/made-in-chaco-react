@@ -1,138 +1,59 @@
-import { useRef, useState, Suspense, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
-import { DoubleSide, LinearMipmapLinearFilter, Points, PointsMaterial, BufferGeometry, Float32BufferAttribute } from "three";
+import { useRef, useEffect, useMemo } from "react";
 
-function LogoMesh({ texture, mouse }) {
-  const meshRef = useRef(null);
-  const viewport = useThree((s) => s.viewport);
-  const rotRef = useRef({ x: 0, y: 0 });
-
-  const img = texture.image;
-  const aspect = img ? img.height / img.width : 1;
-  const baseScale = viewport.width * 0.7;
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-
-    const t = clock.elapsedTime;
-    const breathe = 1 + Math.sin(t * 0.5) * 0.05;
-    const s = baseScale * breathe;
-
-    rotRef.current.x += (mouse.current.y * 0.15 - rotRef.current.x) * 0.05;
-    rotRef.current.y += (mouse.current.x * 0.25 - rotRef.current.y) * 0.05;
-
-    meshRef.current.scale.set(s, s * aspect, 1);
-    meshRef.current.position.x = viewport.width * 0.04;
-    meshRef.current.position.y = viewport.height * 0.07 + Math.sin(t * 0.7) * 0.06;
-    meshRef.current.rotation.x = rotRef.current.x - Math.sin(t * 0.4) * 0.01;
-    meshRef.current.rotation.y = rotRef.current.y + Math.cos(t * 0.5) * 0.01;
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <planeGeometry args={[1, 1]} />
-      <meshBasicMaterial map={texture} transparent side={DoubleSide} />
-    </mesh>
-  );
-}
-
-function Particles({ mouse }) {
-  const meshRef = useRef(null);
-  const count = 200;
-  const viewport = useThree((s) => s.viewport);
-
-  const [geometry] = useState(() => {
-    const g = new BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      const radius = 0.5 + Math.random() * 2.5;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      positions[i * 3] = Math.sin(phi) * Math.cos(theta) * radius;
-      positions[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * radius * 0.6 + 0.1;
-      positions[i * 3 + 2] = Math.cos(phi) * radius * 0.3 - 0.5;
-      sizes[i] = 0.005 + Math.random() * 0.015;
+function Particles() {
+  const particles = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < 60; i++) {
+      const radius = 20 + Math.random() * 45;
+      const theta = Math.random() * 360;
+      const x = 50 + radius * Math.cos((theta * Math.PI) / 180);
+      const y = 50 + radius * Math.sin((theta * Math.PI) / 180) * 0.6;
+      arr.push({
+        left: `${x}%`,
+        top: `${y}%`,
+        size: 1.5 + Math.random() * 3,
+        opacity: 0.15 + Math.random() * 0.35,
+        delay: Math.random() * 6,
+        duration: 3 + Math.random() * 4,
+        drift: -4 + Math.random() * 8,
+      });
     }
-    g.setAttribute("position", new Float32BufferAttribute(positions, 3));
-    g.setAttribute("size", new Float32BufferAttribute(sizes, 1));
-    return g;
-  });
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const t = clock.elapsedTime;
-    const positions = geometry.attributes.position.array;
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const baseX = positions[i3];
-      const baseY = positions[i3 + 1];
-      const baseZ = positions[i3 + 2];
-      const offset = i * 0.1;
-      positions[i3] = baseX + Math.sin(t * 0.3 + offset) * 0.02;
-      positions[i3 + 1] = baseY + Math.cos(t * 0.4 + offset) * 0.02;
-      positions[i3 + 2] = baseZ + Math.sin(t * 0.2 + offset * 2) * 0.015;
-    }
-    geometry.attributes.position.needsUpdate = true;
-
-    const rx = mouse.current.y * 0.05;
-    const ry = mouse.current.x * 0.08;
-    meshRef.current.rotation.x += (rx - meshRef.current.rotation.x) * 0.02;
-    meshRef.current.rotation.y += (ry - meshRef.current.rotation.y) * 0.02;
-  });
+    return arr;
+  }, []);
 
   return (
-    <points ref={meshRef} geometry={geometry}>
-      <pointsMaterial
-        size={0.02}
-        color="white"
-        transparent
-        opacity={0.4}
-        sizeAttenuation
-        depthWrite={false}
-        blending={2}
-      />
-    </points>
-  );
-}
-
-function InnerScene({ imgSrc, onLoad, mouse }) {
-  const texture = useTexture(imgSrc);
-  texture.minFilter = LinearMipmapLinearFilter;
-  texture.generateMipmaps = true;
-  texture.anisotropy = 4;
-
-  const done = useRef(false);
-  if (!done.current && texture.image) {
-    done.current = true;
-    onLoad(texture.image.width, texture.image.height);
-  }
-
-  return (
-    <>
-      <Particles mouse={mouse} />
-      <LogoMesh texture={texture} mouse={mouse} />
-    </>
-  );
-}
-
-function Scene({ imgSrc, onLoad, mouse }) {
-  return (
-    <Suspense fallback={null}>
-      <InnerScene imgSrc={imgSrc} onLoad={onLoad} mouse={mouse} />
-    </Suspense>
+    <div className="logo3d-particles" aria-hidden="true">
+      {particles.map((p, i) => (
+        <span
+          key={i}
+          className="logo3d-particle"
+          style={{
+            left: p.left,
+            top: p.top,
+            width: p.size,
+            height: p.size,
+            opacity: p.opacity,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            "--drift": `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
 export const Logo3D = ({ src }) => {
   const containerRef = useRef(null);
+  const logoRef = useRef(null);
+  const rafRef = useRef(null);
   const mouseRef = useRef({ x: 0, y: 0 });
-  const [, setSize] = useState(null);
+  const currentRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    const logo = logoRef.current;
+    if (!el || !logo) return;
 
     const onMouse = (e) => {
       const rect = el.getBoundingClientRect();
@@ -140,34 +61,31 @@ export const Logo3D = ({ src }) => {
       mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     };
 
+    const animate = () => {
+      const cur = currentRef.current;
+      const tgt = mouseRef.current;
+      cur.x += (tgt.y * 12 - cur.x) * 0.06;
+      cur.y += (tgt.x * 18 - cur.y) * 0.06;
+      logo.style.setProperty("--rx", `${cur.x}deg`);
+      logo.style.setProperty("--ry", `${cur.y}deg`);
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
     window.addEventListener("mousemove", onMouse);
-    return () => window.removeEventListener("mousemove", onMouse);
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      window.removeEventListener("mousemove", onMouse);
+      cancelAnimationFrame(rafRef.current);
+    };
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    >
-      <Canvas
-        dpr={[1, 2]}
-        camera={{ position: [0, 0, 5], fov: 40 }}
-        gl={{ alpha: true, antialias: true }}
-        style={{ display: "block", width: "100%", height: "100%" }}
-      >
-        <Scene
-          imgSrc={src}
-          mouse={mouseRef}
-          onLoad={(w, h) => setSize({ w, h })}
-        />
-      </Canvas>
+    <div ref={containerRef} className="logo3d-container">
+      <Particles />
+      <div ref={logoRef} className="logo3d-logo">
+        <img src={src} alt="Made in Chaco" draggable={false} />
+      </div>
     </div>
   );
 };

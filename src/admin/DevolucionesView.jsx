@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { styles, colorMapAdmin, parseSocialList, authHeaders } from "./helpers";
 import { SOCIAL_PLATFORMS } from "./constants";
 import { optimizarUrlCloudinary } from "../utils/imageUrl";
+import { useSocketEvent } from "../hooks/useSocket";
 
 export function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPendingDevoluciones, cargarEntidades, showPopup, showConfirm }) {
   const [devoluciones, setDevoluciones] = useState(null);
@@ -15,6 +16,8 @@ export function DevolucionesView({ authFetch, authHeaders, colorMapAdmin, setPen
   }, [authFetch, authHeaders, setPendingDevoluciones]);
 
   useEffect(() => { cargarDevoluciones(); }, [cargarDevoluciones]);
+
+  useSocketEvent("devolucion:change", () => { cargarDevoluciones(); });
 
   const verDetalle = async (id) => {
     try {

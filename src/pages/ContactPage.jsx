@@ -25,18 +25,25 @@ export const ContactPage = () => {
   };
 
   const canGoNext = () => {
-    if (step === 1) return form.nombre.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
-    if (step === 2) return form.asunto.trim();
-    if (step === 3) return form.mensaje.trim();
+    if (step === 1) return form.nombre.trim().length >= 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+    if (step === 2) return form.asunto.trim().length >= 3;
+    if (step === 3) return form.mensaje.trim().length >= 10;
     return true;
   };
 
   const next = () => {
     setError("");
     if (!canGoNext()) {
-      if (step === 1) setError("Completá tu nombre y un email válido");
-      else if (step === 2) setError("Escribí un asunto");
-      else if (step === 3) setError("Escribí un mensaje");
+      if (step === 1) {
+        const errors = [];
+        if (form.nombre.trim().length < 2) errors.push("Nombre (mínimo 2 caracteres)");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.push("Email inválido");
+        setError(errors.join(". "));
+      } else if (step === 2) {
+        setError("Asunto (mínimo 3 caracteres)");
+      } else if (step === 3) {
+        setError("Mensaje (mínimo 10 caracteres)");
+      }
       return;
     }
     setStep((s) => Math.min(s + 1, 4));
@@ -49,6 +56,10 @@ export const ContactPage = () => {
 
   const handleSubmit = async () => {
     setError("");
+    if (!canGoNext()) {
+      setError("Revisá los campos antes de enviar");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/contacto", {

@@ -493,6 +493,15 @@ export const SolicitarEdicionPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errors = [];
+    if (!form.nombre?.trim()) errors.push("Nombre");
+    if (!form.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.push("Email válido");
+    if (!form.resumen?.trim()) errors.push("Descripción");
+    if (!form.localidad_id) errors.push("Localidad");
+    if (errors.length > 0) {
+      alert("Completá los campos obligatorios: " + errors.join(", "));
+      return;
+    }
     setSaving(true);
     try {
       const payload = { ...form };

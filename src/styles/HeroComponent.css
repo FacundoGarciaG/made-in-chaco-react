@@ -126,6 +126,7 @@ section {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   animation: discoverPulse 3s ease-in-out infinite;
   isolation: isolate;
+  overflow: hidden;
 }
 
 .hero-btn-wrapper .discover-link::before {

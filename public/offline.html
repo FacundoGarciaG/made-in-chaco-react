@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a0e08" />
+  <title>Sin conexión — Made in Chaco</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% 30%, #2a1a10 0%, #1a0e08 60%, #0d0704 100%);
+      color: #f5f0eb;
+      font-family: "Cinzel", serif;
+      text-align: center;
+      padding: 2rem;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 20% 30%, rgba(199, 110, 60, 0.3), transparent),
+        radial-gradient(1px 1px at 80% 20%, rgba(199, 110, 60, 0.2), transparent),
+        radial-gradient(1px 1px at 40% 70%, rgba(255, 180, 120, 0.15), transparent),
+        radial-gradient(1px 1px at 70% 60%, rgba(199, 110, 60, 0.2), transparent),
+        radial-gradient(1px 1px at 10% 80%, rgba(255, 255, 255, 0.08), transparent),
+        radial-gradient(1px 1px at 90% 50%, rgba(255, 255, 255, 0.06), transparent);
+      pointer-events: none;
+      animation: twinkle 6s ease-in-out infinite alternate;
+    }
+
+    @keyframes twinkle {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    .offline-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      animation: fadeInUp 0.8s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .offline-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(134, 56, 25, 0.4), rgba(199, 110, 60, 0.2));
+      border: 1px solid rgba(199, 110, 60, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 0 40px rgba(199, 110, 60, 0.1);
+    }
+
+    .offline-logo {
+      width: min(90vw, 750px);
+      height: auto;
+      filter: drop-shadow(0 0 40px rgba(199, 110, 60, 0.25));
+      margin-bottom: 0.5rem;
+    }
+
+    .offline-title {
+      font-family: "Cinzel", serif;
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #f5f0eb;
+      text-shadow: 0 0 20px rgba(199, 110, 60, 0.3);
+    }
+
+    .offline-desc {
+      font-family: "Cinzel", serif;
+      font-size: clamp(0.85rem, 2.5vw, 1rem);
+      font-weight: 400;
+      letter-spacing: 1px;
+      line-height: 1.7;
+      color: rgba(245, 240, 235, 0.5);
+      max-width: 380px;
+    }
+
+    .offline-btn {
+      font-family: "Cinzel", serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: white;
+      background: linear-gradient(135deg, rgba(134, 56, 25, 0.4), rgba(199, 110, 60, 0.25));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(199, 110, 60, 0.35);
+      border-radius: 40px;
+      padding: 0.85rem 2.8rem;
+      cursor: pointer;
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      text-shadow: 0 0 10px rgba(199, 110, 60, 0.4);
+      box-shadow: 0 0 20px rgba(199, 110, 60, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      margin-top: 0.5rem;
+    }
+
+    .offline-btn:hover {
+      background: linear-gradient(135deg, rgba(134, 56, 25, 0.65), rgba(199, 110, 60, 0.45));
+      border-color: rgba(199, 110, 60, 0.6);
+      box-shadow: 0 0 30px rgba(199, 110, 60, 0.2), 0 4px 20px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+      letter-spacing: 3px;
+    }
+
+    .offline-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 0 15px rgba(199, 110, 60, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-content">
+    <div class="offline-icon">📡</div>
+    <img class="offline-logo" src="/imagenes/madeinchacoclaro.png" alt="Made in Chaco" />
+    <h1 class="offline-title">Sin conexión</h1>
+    <p class="offline-desc">
+      No se pudo cargar esta página. Verificá tu conexión a internet y volvé a intentar.
+    </p>
+    <button class="offline-btn" onclick="window.location.href = '/'">Reintentar</button>
+  </div>
+</body>
+</html>
